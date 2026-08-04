@@ -2,6 +2,8 @@
 
 Study materials based on **Nika Beroshvili's** CV stack.
 
+**Start here for the learning sequence:** [order.md](./order.md)
+
 **55 markdown files / ~24,000+ lines** across 7 technology tracks.
 
 Each chapter includes: learning objectives, topic checklists, deep explanations, tables, interview Q&A with model answers, hands-on drills, green/red flags, CV tie-backs, and mastery checklists.
