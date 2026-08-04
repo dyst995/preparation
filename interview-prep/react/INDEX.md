@@ -7,6 +7,8 @@ This track focuses on **web React** specifically: the DOM renderer, browser-spec
 
 Mark progress in each file with `[ ]` -> `[x]`.
 
+> Each of the 6 chapter files now also includes a "Senior-Level Best Practices" section (decision frameworks, production checklists, anti-patterns, failure modes, observability, and harder senior follow-up Q&A) near the end of the file - use it as the final drill pass after the core material feels solid.
+
 ---
 
 ## Chapters

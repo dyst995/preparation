@@ -6,6 +6,8 @@ Detailed study guides for the foundation underneath everything else on your CV: 
 
 Mark progress in each file by flipping `[ ]` to `[x]` as you master a topic.
 
+> Each of the 5 chapter files now also includes a "Senior-Level Best Practices" section (decision frameworks, production checklists, anti-patterns, failure modes, and harder senior follow-up Q&A) placed near the end of the file - use it as the final drill pass after the core material feels solid.
+
 ---
 
 ## Chapters
