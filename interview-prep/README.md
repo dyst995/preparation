@@ -1,0 +1,90 @@
+# Interview Prep — Master Index
+
+Study materials based on **Nika Beroshvili's** CV stack.
+
+**55 detailed markdown files · ~20,000 lines** across 7 technology tracks.
+
+Each chapter includes: learning objectives, topic checklists, deep explanations, tables, interview Q&A with model answers, hands-on drills, green/red flags, CV tie-backs, and mastery checklists.
+
+---
+
+## Tracks
+
+| Folder | What's inside | From your CV | Priority |
+|---|---|---|---|
+| [react-native/](./react-native/REACT_NATIVE_INTERVIEW.md) | 14 chapters + index | RN, Navigation, Turbo Modules, Firebase, Fastlane, native Android/iOS | **Highest** |
+| [typescript-javascript/](./typescript-javascript/INDEX.md) | 5 chapters + index | TypeScript, JavaScript | **High** (foundation) |
+| [react/](./react/INDEX.md) | 6 chapters + index | React, Redux, React Query, Zustand, HTML/CSS/Tailwind | **High** |
+| [nextjs/](./nextjs/INDEX.md) | 5 chapters + index | Next.js (Clean House, Travel2Georgia) | **High** |
+| [nestjs/](./nestjs/INDEX.md) | 7 chapters + index | NestJS, Node, REST, WebSockets, JWT, Swagger, TypeORM | **High** |
+| [sql-databases/](./sql-databases/INDEX.md) | 5 chapters + index | PostgreSQL, MySQL, SQL, TypeORM | **Medium–High** |
+| [devops-cloud/](./devops-cloud/INDEX.md) | 5 chapters + index | Docker, AWS S3/SNS, Nginx, Git, SSL/VPS, CI | **Medium** |
+
+Working-knowledge languages (Kotlin, Swift, Java, Objective-C) are covered inside [react-native/07-native-modules.md](./react-native/07-native-modules.md), not as separate language tracks.
+
+---
+
+## Chapter map (quick open)
+
+### React Native
+`01` Fundamentals · `02` Architecture · `03` State · `04` Navigation · `05` Networking · `06` Performance · `07` Native Modules · `08` Push/Firebase · `09` Fintech UX · `10` Testing · `11` CI/CD · `12` Stability · `13` Security · `14` Behavioral
+
+### TypeScript / JavaScript
+`01` JS Fundamentals · `02` Async/Event Loop · `03` TS Core · `04` TS Advanced · `05` Q&A Drills
+
+### React
+`01` Rendering · `02` Hooks · `03` State/Data · `04` Performance · `05` Forms/UI/CSS · `06` Q&A Bank
+
+### Next.js
+`01` Routing/Rendering · `02` Data/Caching · `03` Middleware/Auth/APIs · `04` Perf/Deploy · `05` Q&A + Stories
+
+### NestJS
+`01` Architecture/DI · `02` REST/Validation/Swagger · `03` Auth/JWT/RBAC · `04` WebSockets · `05` TypeORM · `06` Node Runtime · `07` Q&A + STAR
+
+### SQL / Databases
+`01` SQL Fundamentals · `02` Indexing/Perf · `03` Transactions · `04` Postgres vs MySQL · `05` Q&A + Schema Design
+
+### DevOps / Cloud
+`01` Docker · `02` Nginx/SSL/VPS · `03` AWS S3/SNS · `04` Git/CI · `05` Q&A + Deploy Stories
+
+---
+
+## Suggested study order (8–10h/day)
+
+### Phase A — Foundations (Day 1–2)
+1. `typescript-javascript/`
+2. `react/` (rendering + hooks first)
+
+### Phase B — Product stack (Day 3–5)
+3. `react-native/` (your strongest differentiator — go deep)
+4. `nestjs/` + `sql-databases/`
+5. `nextjs/`
+
+### Phase C — Senior glue (Day 6–7)
+6. `devops-cloud/`
+7. Behavioral stories (RN ch.14 + Nest/Next STAR sections)
+
+### Phase D — Mocks (Day 8+)
+Timed coding + system design for: **EasyPay**, **Clean House**, **VetApp**, **Online School**, **Travel2Georgia**
+
+---
+
+## How to use each chapter
+
+1. Read explanations
+2. Check off topics you can teach out loud
+3. Answer interview questions without notes
+4. Do hands-on drills
+5. Rehearse CV stories with metrics
+
+---
+
+## Progress
+
+- [ ] TypeScript / JavaScript
+- [ ] React
+- [ ] React Native
+- [ ] NestJS / Node
+- [ ] SQL / Databases
+- [ ] Next.js
+- [ ] DevOps / Cloud
