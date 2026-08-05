@@ -100,3 +100,17 @@ Timed coding + system design for: **EasyPay**, **Clean House**, **VetApp**, **On
 - [ ] SQL / Databases
 - [ ] Next.js
 - [ ] DevOps / Cloud
+
+---
+
+## Flashcards app
+
+Practice with the web app in [`../flashcards-project/`](../flashcards-project/):
+
+```bash
+cd flashcards-project && npm install && npm run dev
+```
+
+Cards are auto-generated from interview-prep chapters. Only **real Q&A pairs** are included (questions with actual model answers from the docs) — no generic placeholder cards.
+
+Default view in the app: **Q&A with answers**.
