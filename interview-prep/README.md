@@ -100,6 +100,7 @@ Timed coding + system design for: **EasyPay**, **Clean House**, **VetApp**, **On
 - [ ] SQL / Databases
 - [ ] Next.js
 - [ ] DevOps / Cloud
+- [ ] DSA ([interview-dsa/](../interview-dsa/))
 
 ---
 
