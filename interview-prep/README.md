@@ -115,3 +115,15 @@ cd flashcards-project && npm install && npm run dev
 Cards are auto-generated from interview-prep chapters. Only **real Q&A pairs** are included (questions with actual model answers from the docs) — no generic placeholder cards.
 
 Default view in the app: **Q&A with answers**.
+
+## Mock interviewer app
+
+Timed AI mock interviews (text + live coding + voice) with end-of-session feedback, in [`../mock-interview/`](../mock-interview/):
+
+```bash
+cd mock-interview
+cp .env.example .env.local   # add OPENAI_API_KEY
+npm install && npm run dev
+```
+
+Uses the same markdown as the knowledge base; grades you against model answers and points you back to specific chapters.
