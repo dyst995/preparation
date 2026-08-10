@@ -1,0 +1,4837 @@
+{
+  "generatedAt": "2026-08-10T08:22:30.098Z",
+  "topics": [
+    {
+      "bookOrder": 1,
+      "track": "typescript-javascript",
+      "base": "01-javascript-fundamentals",
+      "h1": "01 - JavaScript Fundamentals",
+      "relPath": "typescript-javascript/01-javascript-fundamentals.md",
+      "topicDir": "typescript-javascript/01-javascript-fundamentals",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-scope-lexical-scope-block-scope-function-scope.md",
+          "title": "Scope: lexical scope, block scope, function scope",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-hoisting-and-the-temporal-dead-zone.md",
+          "title": "Hoisting and the Temporal Dead Zone",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-closures.md",
+          "title": "Closures",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-this-binding.md",
+          "title": "this binding",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-prototypes-and-classes.md",
+          "title": "Prototypes and classes",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-type-coercion-and-equality.md",
+          "title": "Type coercion and equality",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-modules-commonjs-vs-es-modules.md",
+          "title": "Modules: CommonJS vs ES Modules",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 13
+        }
+      ]
+    },
+    {
+      "bookOrder": 2,
+      "track": "typescript-javascript",
+      "base": "02-async-event-loop",
+      "h1": "02 - Async & the Event Loop",
+      "relPath": "typescript-javascript/02-async-event-loop.md",
+      "topicDir": "typescript-javascript/02-async-event-loop",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-javascript-is-single-threaded-what-that-actually-means.md",
+          "title": "JavaScript is single-threaded - what that actually means",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-the-event-loop-call-stack-task-queue-microtask-queue.md",
+          "title": "The event loop: call stack, task queue, microtask queue",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-promises.md",
+          "title": "Promises",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-async-await.md",
+          "title": "async/await",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-concurrency-pitfalls-in-real-apps.md",
+          "title": "Concurrency pitfalls in real apps",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-node-nest-and-rn-specific-notes.md",
+          "title": "Node/Nest and RN-specific notes",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 7
+        },
+        {
+          "file": "08-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 3,
+      "track": "typescript-javascript",
+      "base": "03-typescript-core",
+      "h1": "03 - TypeScript Core",
+      "relPath": "typescript-javascript/03-typescript-core.md",
+      "topicDir": "typescript-javascript/03-typescript-core",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-typescripts-type-system-structural-and-erased.md",
+          "title": "TypeScript's type system: structural and erased",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-type-vs-interface.md",
+          "title": "type vs interface",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-unions-intersections-and-discriminated-unions.md",
+          "title": "Unions, intersections, and discriminated unions",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-narrowing-and-type-guards.md",
+          "title": "Narrowing and type guards",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-generics.md",
+          "title": "Generics",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-utility-types.md",
+          "title": "Utility types",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-unknown-vs-any.md",
+          "title": "unknown vs any",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-enums-vs-union-of-literals.md",
+          "title": "Enums vs union-of-literals",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 14
+        }
+      ]
+    },
+    {
+      "bookOrder": 4,
+      "track": "typescript-javascript",
+      "base": "04-typescript-advanced",
+      "h1": "04 - TypeScript Advanced",
+      "relPath": "typescript-javascript/04-typescript-advanced.md",
+      "topicDir": "typescript-javascript/04-typescript-advanced",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-conditional-types.md",
+          "title": "Conditional types",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-mapped-types.md",
+          "title": "Mapped types",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-declaration-merging-and-module-augmentation.md",
+          "title": "Declaration merging and module augmentation",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-typing-react-patterns-precisely.md",
+          "title": "Typing React patterns precisely",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-typing-nestjs-patterns-precisely.md",
+          "title": "Typing NestJS patterns precisely",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-strict-mode-unpacked.md",
+          "title": "Strict mode, unpacked",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-practical-api-dto-typing-end-to-end.md",
+          "title": "Practical API DTO typing - end to end",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 13
+        }
+      ]
+    },
+    {
+      "bookOrder": 5,
+      "track": "typescript-javascript",
+      "base": "05-interview-questions-drills",
+      "h1": "05 - Interview Questions & Drills",
+      "relPath": "typescript-javascript/05-interview-questions-drills.md",
+      "topicDir": "typescript-javascript/05-interview-questions-drills",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-how-to-use-this-chapter.md",
+          "title": "How to use this chapter",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-part-a-rapid-fire-recall-javascript.md",
+          "title": "Part A - Rapid-fire recall (JavaScript)",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-part-b-rapid-fire-recall-async-event-loop.md",
+          "title": "Part B - Rapid-fire recall (Async & Event Loop)",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-part-c-rapid-fire-recall-typescript.md",
+          "title": "Part C - Rapid-fire recall (TypeScript)",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-part-d-predict-the-output-drills.md",
+          "title": "Part D - \"Predict the output\" drills",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-part-e-design-deeper-dive-questions.md",
+          "title": "Part E - Design / deeper-dive questions",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-part-f-live-coding-style-exercises.md",
+          "title": "Part F - Live-coding-style exercises",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-daily-drill-plan.md",
+          "title": "Daily drill plan",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-weak-spot-tracker.md",
+          "title": "Weak-spot tracker",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-final-pre-interview-checklist.md",
+          "title": "Final pre-interview checklist",
+          "kind": "chapter",
+          "num": 11
+        }
+      ]
+    },
+    {
+      "bookOrder": 6,
+      "track": "react",
+      "base": "01-rendering-reconciliation",
+      "h1": "01 - Rendering & Reconciliation",
+      "relPath": "react/01-rendering-reconciliation.md",
+      "topicDir": "react/01-rendering-reconciliation",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-what-the-virtual-dom-actually-is.md",
+          "title": "What the virtual DOM actually is",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-render-phase-vs-commit-phase.md",
+          "title": "Render phase vs commit phase",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-fiber-the-unit-of-work.md",
+          "title": "Fiber: the unit of work",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-reconciliation-the-diffing-algorithm.md",
+          "title": "Reconciliation: the diffing algorithm",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-pure-components-and-why-purity-matters.md",
+          "title": "Pure components and why purity matters",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-batching-how-many-renders-does-one-event-trigger.md",
+          "title": "Batching: how many renders does one event trigger?",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-react-strictmode-what-it-actually-does.md",
+          "title": "React.StrictMode - what it actually does",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-does-a-re-render-always-touch-the-dom.md",
+          "title": "Does a re-render always touch the DOM?",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-interview-question-bank-rendering-reconciliation.md",
+          "title": "Interview question bank (rendering & reconciliation)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 13
+        }
+      ]
+    },
+    {
+      "bookOrder": 7,
+      "track": "react",
+      "base": "02-hooks-deep-dive",
+      "h1": "02 - Hooks Deep Dive",
+      "relPath": "react/02-hooks-deep-dive.md",
+      "topicDir": "react/02-hooks-deep-dive",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-how-hooks-work-mechanically.md",
+          "title": "How hooks work mechanically",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-the-rules-of-hooks.md",
+          "title": "The Rules of Hooks",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-usestate-in-depth.md",
+          "title": "useState in depth",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-useeffect-in-depth.md",
+          "title": "useEffect in depth",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-uselayouteffect-vs-useeffect.md",
+          "title": "useLayoutEffect vs useEffect",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-effects-vs-events-the-mental-model-that-resolves-most-useeffect-misuse.md",
+          "title": "Effects vs events - the mental model that resolves most useEffect misuse",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-useref-in-depth.md",
+          "title": "useRef in depth",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-custom-hooks-encapsulating-reusable-stateful-logic.md",
+          "title": "Custom hooks - encapsulating reusable stateful logic",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-other-built-in-hooks-working-knowledge.md",
+          "title": "Other built-in hooks (working knowledge)",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-interview-question-bank-hooks.md",
+          "title": "Interview question bank (hooks)",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 14
+        }
+      ]
+    },
+    {
+      "bookOrder": 8,
+      "track": "react",
+      "base": "03-state-data-fetching",
+      "h1": "03 - State & Data Fetching",
+      "relPath": "react/03-state-data-fetching.md",
+      "topicDir": "react/03-state-data-fetching",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-the-four-kinds-of-state-classify-before-you-pick-a-tool.md",
+          "title": "The four kinds of state - classify before you pick a tool",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-local-component-state-usestate-usereducer.md",
+          "title": "Local component state - useState/useReducer",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-context-what-its-good-for-and-its-sharp-edges.md",
+          "title": "Context - what it's good for, and its sharp edges",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-server-state-is-not-client-state-the-core-insight-behind-react-query.md",
+          "title": "Server state is not client state - the core insight behind React Query",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-zustand-minimal-client-state-without-boilerplate.md",
+          "title": "Zustand - minimal client state without boilerplate",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-redux-toolkit-modern-redux-without-the-boilerplate.md",
+          "title": "Redux Toolkit - modern Redux without the boilerplate",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-prop-drilling-when-its-fine-and-when-its-a-smell.md",
+          "title": "Prop drilling - when it's fine, and when it's a smell",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-interview-question-bank-state-data-fetching.md",
+          "title": "Interview question bank (state & data fetching)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 9,
+      "track": "react",
+      "base": "04-performance-patterns",
+      "h1": "04 - Performance Patterns",
+      "relPath": "react/04-performance-patterns.md",
+      "topicDir": "react/04-performance-patterns",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "00-the-golden-rule-measure-first.md",
+          "title": "The golden rule: measure first",
+          "kind": "chapter",
+          "num": 0
+        },
+        {
+          "file": "01-react-memo-what-it-does-and-its-real-cost.md",
+          "title": "React.memo - what it does and its real cost",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-usememo-memoizing-computed-values.md",
+          "title": "useMemo - memoizing computed values",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-usecallback-memoizing-function-references.md",
+          "title": "useCallback - memoizing function references",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-profiling-with-react-devtools.md",
+          "title": "Profiling with React DevTools",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-list-virtualization.md",
+          "title": "List virtualization",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-code-splitting.md",
+          "title": "Code splitting",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-avoiding-waterfalls.md",
+          "title": "Avoiding waterfalls",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-usetransition-and-usedeferredvalue-keeping-ui-responsive-under-load.md",
+          "title": "useTransition and useDeferredValue - keeping UI responsive under load",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-perceived-performance-beyond-raw-computation.md",
+          "title": "Perceived performance beyond raw computation",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-interview-question-bank-performance.md",
+          "title": "Interview question bank (performance)",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 14
+        }
+      ]
+    },
+    {
+      "bookOrder": 10,
+      "track": "react",
+      "base": "05-forms-ui-css",
+      "h1": "05 - Forms, UI & CSS",
+      "relPath": "react/05-forms-ui-css.md",
+      "topicDir": "react/05-forms-ui-css",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-controlled-vs-uncontrolled-inputs.md",
+          "title": "Controlled vs uncontrolled inputs",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-building-a-form-from-scratch-the-full-mental-model.md",
+          "title": "Building a form from scratch - the full mental model",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-form-libraries-what-they-actually-buy-you.md",
+          "title": "Form libraries - what they actually buy you",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-html-semantics-why-its-not-just-best-practice.md",
+          "title": "HTML semantics - why it's not just \"best practice\"",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-flexbox-mental-model.md",
+          "title": "Flexbox mental model",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-grid-mental-model.md",
+          "title": "Grid mental model",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-tailwind-css-practical-patterns.md",
+          "title": "Tailwind CSS - practical patterns",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-accessibility-a11y-basics.md",
+          "title": "Accessibility (a11y) basics",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-interview-question-bank-forms-ui-css.md",
+          "title": "Interview question bank (forms, UI, CSS)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 13
+        }
+      ]
+    },
+    {
+      "bookOrder": 11,
+      "track": "react",
+      "base": "06-interview-questions",
+      "h1": "06 - Interview Question Bank",
+      "relPath": "react/06-interview-questions.md",
+      "topicDir": "react/06-interview-questions",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-how-to-use-this-chapter.md",
+          "title": "How to use this chapter",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-section-a-rendering-reconciliation.md",
+          "title": "Section A - Rendering & Reconciliation",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-section-b-hooks.md",
+          "title": "Section B - Hooks",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-section-c-state-data-fetching.md",
+          "title": "Section C - State & Data Fetching",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-section-d-performance.md",
+          "title": "Section D - Performance",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-section-e-forms-ui-css.md",
+          "title": "Section E - Forms, UI & CSS",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-section-f-rapid-fire-round-answer-in-under-15-seconds-each.md",
+          "title": "Section F - Rapid-fire round (answer in under 15 seconds each)",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-section-g-live-coding-whiteboard-prompts.md",
+          "title": "Section G - Live coding / whiteboard prompts",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-section-h-why-did-you-cv-tie-back-questions.md",
+          "title": "Section H - \"Why did you...\" / CV tie-back questions",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-final-review-checklist-are-you-ready.md",
+          "title": "Final review checklist - are you ready?",
+          "kind": "chapter",
+          "num": 11
+        }
+      ]
+    },
+    {
+      "bookOrder": 12,
+      "track": "react-native",
+      "base": "01-fundamentals",
+      "h1": "01  React Native Fundamentals",
+      "relPath": "react-native/01-fundamentals.md",
+      "topicDir": "react-native/01-fundamentals",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-how-react-native-differs-from-react-on-the-web.md",
+          "title": "How React Native differs from React on the web",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-the-old-bridge-architecture.md",
+          "title": "The old Bridge architecture",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-new-architecture-jsi-fabric-turbo-modules-codegen.md",
+          "title": "New Architecture: JSI, Fabric, Turbo Modules, Codegen",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-threads-js-ui-main-native-modules.md",
+          "title": "Threads: JS, UI/main, native modules",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-hermes.md",
+          "title": "Hermes",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-metro-bundler.md",
+          "title": "Metro bundler",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-components-map-to-native-views.md",
+          "title": "Components map to native views",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-platform-specific-code.md",
+          "title": "Platform-specific code",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-stylesheet-flexbox-rn-vs-web.md",
+          "title": "StyleSheet & Flexbox (RN vs web)",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-lists-flatlist-sectionlist-flashlist.md",
+          "title": "Lists: FlatList, SectionList, FlashList",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-images-fonts-assets-icons-splash.md",
+          "title": "Images, fonts, assets, icons, splash",
+          "kind": "chapter",
+          "num": 11
+        },
+        {
+          "file": "12-debugging-toolkit.md",
+          "title": "Debugging toolkit",
+          "kind": "chapter",
+          "num": 12
+        },
+        {
+          "file": "13-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 14
+        },
+        {
+          "file": "15-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 15
+        },
+        {
+          "file": "16-tie-backs-to-your-experience-use-in-answers.md",
+          "title": "Tie-backs to your experience (use in answers)",
+          "kind": "extra",
+          "num": 16
+        },
+        {
+          "file": "17-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 17
+        },
+        {
+          "file": "18-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 18
+        }
+      ]
+    },
+    {
+      "bookOrder": 13,
+      "track": "react-native",
+      "base": "02-architecture",
+      "h1": "02  Architecture & Project Structure",
+      "relPath": "react-native/02-architecture.md",
+      "topicDir": "react-native/02-architecture",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-why-architecture-matters-in-rn-interviews.md",
+          "title": "Why architecture matters in RN interviews",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-type-based-vs-feature-based-architecture.md",
+          "title": "Type-based vs feature-based architecture",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-recommended-layering-inside-a-feature.md",
+          "title": "Recommended layering inside a feature",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-app-shell-responsibilities.md",
+          "title": "App shell responsibilities",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-navigation-architecture-as-part-of-app-architecture.md",
+          "title": "Navigation architecture as part of app architecture",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-shared-ui-design-system-when-to-extract.md",
+          "title": "Shared UI / design system  when to extract",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-data-and-domain-boundaries.md",
+          "title": "Data and domain boundaries",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-environments-flavors-and-config.md",
+          "title": "Environments, flavors, and config",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-legacy-modernization-playbook-your-strongest-architecture-story.md",
+          "title": "Legacy modernization playbook (your strongest architecture story)",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-example-target-structure-for-a-fintech-app-easypay-like.md",
+          "title": "Example target structure for a fintech app (EasyPay-like)",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-interview-question-bank-detailed.md",
+          "title": "Interview question bank (detailed)",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-hands-on-drills.md",
+          "title": "Hands-on drills",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-green-flags-red-flags.md",
+          "title": "Green flags / red flags",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 14
+        },
+        {
+          "file": "15-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 15
+        }
+      ]
+    },
+    {
+      "bookOrder": 14,
+      "track": "react-native",
+      "base": "03-state-management",
+      "h1": "03  State Management",
+      "relPath": "react-native/03-state-management.md",
+      "topicDir": "react-native/03-state-management",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-the-state-taxonomy-memorize-this.md",
+          "title": "The state taxonomy (memorize this)",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-context-api-where-it-fits-and-where-it-fails.md",
+          "title": "Context API  where it fits and where it fails",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-zustand-deep-dive.md",
+          "title": "Zustand  deep dive",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-redux-redux-toolkit-deep-dive.md",
+          "title": "Redux & Redux Toolkit  deep dive",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-react-query-tanstack-query-deep-dive.md",
+          "title": "React Query (TanStack Query)  deep dive",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-rtk-query-vs-react-query.md",
+          "title": "RTK Query vs React Query",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-auth-session-state-fintech-sensitive.md",
+          "title": "Auth/session state (fintech-sensitive)",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-persistence.md",
+          "title": "Persistence",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-optimistic-ui-design.md",
+          "title": "Optimistic UI design",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-derived-state-and-duplication-traps.md",
+          "title": "Derived state and duplication traps",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-interview-question-bank.md",
+          "title": "Interview question bank",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-model-answers-short.md",
+          "title": "Model answers (short)",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-hands-on-drills.md",
+          "title": "Hands-on drills",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-green-flags-red-flags.md",
+          "title": "Green flags / red flags",
+          "kind": "extra",
+          "num": 14
+        },
+        {
+          "file": "15-tie-to-your-cv.md",
+          "title": "Tie to your CV",
+          "kind": "extra",
+          "num": 15
+        },
+        {
+          "file": "16-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 16
+        },
+        {
+          "file": "17-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 17
+        }
+      ]
+    },
+    {
+      "bookOrder": 15,
+      "track": "react-native",
+      "base": "04-navigation",
+      "h1": "04  Navigation",
+      "relPath": "react-native/04-navigation.md",
+      "topicDir": "react-native/04-navigation",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-react-navigation-building-blocks.md",
+          "title": "React Navigation building blocks",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-nested-navigation-architecture.md",
+          "title": "Nested navigation architecture",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-auth-flow-patterns.md",
+          "title": "Auth flow patterns",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-type-safe-navigation-typescript.md",
+          "title": "Type-safe navigation (TypeScript)",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-params-vs-global-fetched-state.md",
+          "title": "Params vs global/fetched state",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-deep-linking-universal-links.md",
+          "title": "Deep linking & universal links",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-push-notification-screen-routing.md",
+          "title": "Push notification ? screen routing",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-navigation-resets-common-flow-completions.md",
+          "title": "Navigation resets & common flow completions",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-usefocuseffect-lifecycle-and-data-refresh.md",
+          "title": "useFocusEffect, lifecycle, and data refresh",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-performance-ux-considerations.md",
+          "title": "Performance & UX considerations",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-interview-question-bank.md",
+          "title": "Interview question bank",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-model-end-to-end-answer-easypay-like.md",
+          "title": "Model end-to-end answer (EasyPay-like)",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-hands-on-drills.md",
+          "title": "Hands-on drills",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-green-flags-red-flags.md",
+          "title": "Green flags / red flags",
+          "kind": "extra",
+          "num": 14
+        },
+        {
+          "file": "15-tie-to-your-cv.md",
+          "title": "Tie to your CV",
+          "kind": "extra",
+          "num": 15
+        },
+        {
+          "file": "16-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 16
+        },
+        {
+          "file": "17-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 17
+        }
+      ]
+    },
+    {
+      "bookOrder": 16,
+      "track": "react-native",
+      "base": "05-networking",
+      "h1": "05  Networking & Data",
+      "relPath": "react-native/05-networking.md",
+      "topicDir": "react-native/05-networking",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-mobile-networking-constraints.md",
+          "title": "Mobile networking constraints",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-http-client-architecture.md",
+          "title": "HTTP client architecture",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-jwt-access-refresh-critical-interview-topic.md",
+          "title": "JWT access + refresh (critical interview topic)",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-react-query-as-the-data-layer.md",
+          "title": "React Query as the data layer",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-pagination.md",
+          "title": "Pagination",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-http-caching-etags-you-used-this.md",
+          "title": "HTTP caching & ETags (you used this)",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-error-modeling.md",
+          "title": "Error modeling",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-retries-timeouts-idempotency.md",
+          "title": "Retries, timeouts, idempotency",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-offline-flaky-network-ux.md",
+          "title": "Offline & flaky network UX",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-file-uploads-downloads.md",
+          "title": "File uploads / downloads",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-realtime-websockets-vs-push-fcm.md",
+          "title": "Realtime: WebSockets vs push (FCM)",
+          "kind": "chapter",
+          "num": 11
+        },
+        {
+          "file": "12-security-at-the-network-edge-overview.md",
+          "title": "Security at the network edge (overview)",
+          "kind": "chapter",
+          "num": 12
+        },
+        {
+          "file": "13-cancelation-screen-lifecycle.md",
+          "title": "Cancelation & screen lifecycle",
+          "kind": "chapter",
+          "num": 13
+        },
+        {
+          "file": "14-interview-question-bank.md",
+          "title": "Interview question bank",
+          "kind": "extra",
+          "num": 14
+        },
+        {
+          "file": "15-model-answers.md",
+          "title": "Model answers",
+          "kind": "extra",
+          "num": 15
+        },
+        {
+          "file": "16-hands-on-drills.md",
+          "title": "Hands-on drills",
+          "kind": "extra",
+          "num": 16
+        },
+        {
+          "file": "17-green-flags-red-flags.md",
+          "title": "Green flags / red flags",
+          "kind": "extra",
+          "num": 17
+        },
+        {
+          "file": "18-tie-to-your-cv.md",
+          "title": "Tie to your CV",
+          "kind": "extra",
+          "num": 18
+        },
+        {
+          "file": "19-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 19
+        },
+        {
+          "file": "20-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 20
+        }
+      ]
+    },
+    {
+      "bookOrder": 17,
+      "track": "react-native",
+      "base": "15-bridge",
+      "h1": "15 - The React Native Bridge (Legacy Architecture)",
+      "relPath": "react-native/15-bridge.md",
+      "topicDir": "react-native/15-bridge",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-what-the-bridge-is.md",
+          "title": "What the Bridge is",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-serialization-and-batching-the-expensive-parts.md",
+          "title": "Serialization and batching (the expensive parts)",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-asynchrony-what-you-can-and-cannot-do-cleanly.md",
+          "title": "Asynchrony: what you can and cannot do cleanly",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-threads-and-the-bridge.md",
+          "title": "Threads and the Bridge",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-bridge-era-native-modules-relationship.md",
+          "title": "Bridge-era Native Modules (relationship)",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-bridge-congestion-how-seniors-debug-it.md",
+          "title": "Bridge congestion - how seniors debug it",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-new-architecture-migration-context.md",
+          "title": "New Architecture migration context",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-cv-tie-backs-use-these.md",
+          "title": "CV tie-backs (use these)",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-interview-question-bank.md",
+          "title": "Interview question bank",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-hands-on-drills.md",
+          "title": "Hands-on drills",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 18,
+      "track": "react-native",
+      "base": "16-native-modules",
+      "h1": "16 - Native Modules (Legacy Bridge Modules)",
+      "relPath": "react-native/16-native-modules.md",
+      "topicDir": "react-native/16-native-modules",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-what-a-native-module-is.md",
+          "title": "What a Native Module is",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-when-you-write-one-decision-framework.md",
+          "title": "When you write one (decision framework)",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-android-legacy-native-module-anatomy.md",
+          "title": "Android legacy Native Module anatomy",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-ios-legacy-native-module-anatomy.md",
+          "title": "iOS legacy Native Module anatomy",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-communication-patterns-promise-vs-callback-vs-event.md",
+          "title": "Communication patterns: Promise vs Callback vs Event",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-types-that-cross-the-bridge-safely.md",
+          "title": "Types that cross the Bridge safely",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-threading-rules-say-this-in-interviews.md",
+          "title": "Threading rules (say this in interviews)",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-js-side-usage-pattern-clean-architecture.md",
+          "title": "JS-side usage pattern (clean architecture)",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-packaging-linking-and-autolinking.md",
+          "title": "Packaging, linking, and autolinking",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-debugging-native-modules.md",
+          "title": "Debugging Native Modules",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-testing-native-modules.md",
+          "title": "Testing Native Modules",
+          "kind": "chapter",
+          "num": 11
+        },
+        {
+          "file": "12-migration-pressure-legacy-modules-in-a-turbo-module-world.md",
+          "title": "Migration pressure: legacy modules in a Turbo Module world",
+          "kind": "chapter",
+          "num": 12
+        },
+        {
+          "file": "13-interview-question-bank.md",
+          "title": "Interview question bank",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-hands-on-drills.md",
+          "title": "Hands-on drills",
+          "kind": "extra",
+          "num": 14
+        },
+        {
+          "file": "15-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 15
+        },
+        {
+          "file": "16-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 16
+        }
+      ]
+    },
+    {
+      "bookOrder": 19,
+      "track": "react-native",
+      "base": "17-turbo-modules",
+      "h1": "17 - Turbo Modules (New Architecture Native Modules)",
+      "relPath": "react-native/17-turbo-modules.md",
+      "topicDir": "react-native/17-turbo-modules",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-why-turbo-modules-exist.md",
+          "title": "Why Turbo Modules exist",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-core-building-blocks.md",
+          "title": "Core building blocks",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-codegen-specs-source-of-truth.md",
+          "title": "Codegen specs (source of truth)",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-lazy-loading-and-startup.md",
+          "title": "Lazy loading and startup",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-sync-vs-async-methods.md",
+          "title": "Sync vs async methods",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-android-implementation-shape-interview-depth.md",
+          "title": "Android implementation shape (interview depth)",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-ios-implementation-shape-interview-depth.md",
+          "title": "iOS implementation shape (interview depth)",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-events-in-a-turbo-module-world.md",
+          "title": "Events in a Turbo Module world",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-migrating-legacy-native-module-turbo-module.md",
+          "title": "Migrating legacy Native Module -> Turbo Module",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-testing-turbo-modules.md",
+          "title": "Testing Turbo Modules",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-performance-observability.md",
+          "title": "Performance & observability",
+          "kind": "chapter",
+          "num": 11
+        },
+        {
+          "file": "12-cv-storytelling-memorize.md",
+          "title": "CV storytelling (memorize)",
+          "kind": "chapter",
+          "num": 12
+        },
+        {
+          "file": "13-interview-question-bank.md",
+          "title": "Interview question bank",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-hands-on-drills.md",
+          "title": "Hands-on drills",
+          "kind": "extra",
+          "num": 14
+        },
+        {
+          "file": "15-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 15
+        },
+        {
+          "file": "16-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 16
+        }
+      ]
+    },
+    {
+      "bookOrder": 20,
+      "track": "react-native",
+      "base": "07-native-modules",
+      "h1": "07 ? Native Modules, Turbo Modules & Integrations",
+      "relPath": "react-native/07-native-modules.md",
+      "topicDir": "react-native/07-native-modules",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-when-do-you-actually-need-native-code.md",
+          "title": "When do you actually need native code?",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-legacy-native-modules-vs-turbo-modules-vs-raw-jsi.md",
+          "title": "Legacy Native Modules vs Turbo Modules vs raw JSI",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-codegen-typed-contracts-between-js-and-native.md",
+          "title": "Codegen ? typed contracts between JS and native",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-android-native-module-exposure-pattern-kotlin-java-interview-depth.md",
+          "title": "Android native module exposure pattern (Kotlin/Java) ? interview depth",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-ios-native-module-exposure-pattern-swift-objective-c-interview-depth.md",
+          "title": "iOS native module exposure pattern (Swift/Objective-C) ? interview depth",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-promises-vs-callbacks-vs-events-choosing-the-right-pattern.md",
+          "title": "Promises vs Callbacks vs Events ? choosing the right pattern",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-permissions-android-vs-ios-differences.md",
+          "title": "Permissions ? Android vs iOS differences",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-biometric-authentication.md",
+          "title": "Biometric authentication",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-camera-barcode-scanning-integrations.md",
+          "title": "Camera & barcode scanning integrations",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-patching-native-android-libraries.md",
+          "title": "Patching native Android libraries",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-upgrade-compatibility-for-native-modules.md",
+          "title": "Upgrade compatibility for native modules",
+          "kind": "chapter",
+          "num": 11
+        },
+        {
+          "file": "12-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 14
+        },
+        {
+          "file": "15-tie-backs-to-your-experience-use-in-answers.md",
+          "title": "Tie-backs to your experience (use in answers)",
+          "kind": "extra",
+          "num": 15
+        },
+        {
+          "file": "16-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 16
+        },
+        {
+          "file": "17-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 17
+        }
+      ]
+    },
+    {
+      "bookOrder": 21,
+      "track": "react-native",
+      "base": "06-performance",
+      "h1": "06  Performance Optimization",
+      "relPath": "react-native/06-performance.md",
+      "topicDir": "react-native/06-performance",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-the-performance-mental-model-two-threads-one-perception-of-smooth.md",
+          "title": "The performance mental model: two threads, one perception of \"smooth\"",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-profiling-tools-know-one-from-each-platform-cold.md",
+          "title": "Profiling tools  know one from each platform cold",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-memo-usememo-usecallback-correct-use-and-real-tradeoffs.md",
+          "title": "memo, useMemo, useCallback  correct use and real tradeoffs",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-flatlist-performance-deep-dive-high-interview-weight.md",
+          "title": "FlatList performance  deep dive (high interview weight)",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-reanimated-gesture-handler-high-level-but-confident.md",
+          "title": "Reanimated & Gesture Handler  high-level but confident",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-image-optimization.md",
+          "title": "Image optimization",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-startup-performance-time-to-interactive-tti.md",
+          "title": "Startup performance & Time-To-Interactive (TTI)",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-memory-leaks-in-react-native.md",
+          "title": "Memory leaks in React Native",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-bridge-jsi-cost-and-when-it-still-matters.md",
+          "title": "Bridge / JSI cost, and when it still matters",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-measure-first-the-meta-skill-interviewers-actually-grade.md",
+          "title": "Measure first  the meta-skill interviewers actually grade",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-tie-backs-to-your-experience-use-in-answers.md",
+          "title": "Tie-backs to your experience (use in answers)",
+          "kind": "extra",
+          "num": 14
+        },
+        {
+          "file": "15-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 15
+        },
+        {
+          "file": "16-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 16
+        }
+      ]
+    },
+    {
+      "bookOrder": 22,
+      "track": "react-native",
+      "base": "08-push-firebase-device",
+      "h1": "08  Push Notifications, Firebase & Device Features",
+      "relPath": "react-native/08-push-firebase-device.md",
+      "topicDir": "react-native/08-push-firebase-device",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-the-push-notification-pipeline-end-to-end.md",
+          "title": "The push notification pipeline end-to-end",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-fcm-setup-android.md",
+          "title": "FCM setup  Android",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-fcm-setup-ios.md",
+          "title": "FCM setup  iOS",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-notifee-channels-local-notifications-foreground-handling.md",
+          "title": "Notifee  channels, local notifications, foreground handling",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-notification-permissions-and-oem-quirks.md",
+          "title": "Notification permissions and OEM quirks",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-handling-every-app-state-foreground-background-killed.md",
+          "title": "Handling every app state: foreground, background, killed",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-notification-navigation-deep-link-style-routing.md",
+          "title": "Notification ? navigation (deep-link-style routing)",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-firebase-crashlytics-workflow.md",
+          "title": "Firebase Crashlytics workflow",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-analytics-events-high-level.md",
+          "title": "Analytics events (high level)",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-secure-storage-keychain-keystore.md",
+          "title": "Secure storage: Keychain / Keystore",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-appstate-and-background-execution-limits.md",
+          "title": "AppState and background execution limits",
+          "kind": "chapter",
+          "num": 11
+        },
+        {
+          "file": "12-deep-links-universal-links-and-deferred-deep-links.md",
+          "title": "Deep links, universal links, and deferred deep links",
+          "kind": "chapter",
+          "num": 12
+        },
+        {
+          "file": "13-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 14
+        },
+        {
+          "file": "15-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 15
+        },
+        {
+          "file": "16-tie-backs-to-your-experience-use-in-answers.md",
+          "title": "Tie-backs to your experience (use in answers)",
+          "kind": "extra",
+          "num": 16
+        },
+        {
+          "file": "17-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 17
+        },
+        {
+          "file": "18-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 18
+        }
+      ]
+    },
+    {
+      "bookOrder": 23,
+      "track": "react-native",
+      "base": "09-forms-ux-fintech",
+      "h1": "09  Forms, UX Patterns & Fintech-Specific Flows",
+      "relPath": "react-native/09-forms-ux-fintech.md",
+      "topicDir": "react-native/09-forms-ux-fintech",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-keyboard-handling.md",
+          "title": "Keyboard handling",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-validation-strategies.md",
+          "title": "Validation strategies",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-money-formatting-precision-and-currencies.md",
+          "title": "Money formatting, precision, and currencies",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-qr-payment-flows.md",
+          "title": "QR payment flows",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-transfer-wallet-loan-ui-states.md",
+          "title": "Transfer / wallet / loan UI states",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-idempotency-ux.md",
+          "title": "Idempotency UX",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-session-timeout-and-re-auth.md",
+          "title": "Session timeout and re-auth",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-accessibility.md",
+          "title": "Accessibility",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-empty-error-offline-states.md",
+          "title": "Empty / error / offline states",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-double-submit-prevention-deeper-pattern.md",
+          "title": "Double-submit prevention (deeper pattern)",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-background-screenshot-app-switcher-protection.md",
+          "title": "Background screenshot / app-switcher protection",
+          "kind": "chapter",
+          "num": 11
+        },
+        {
+          "file": "12-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "chapter",
+          "num": 12
+        },
+        {
+          "file": "13-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "chapter",
+          "num": 13
+        },
+        {
+          "file": "14-easypay-flow-walkthrough-use-this-as-your-flagship-story.md",
+          "title": "EasyPay flow walkthrough (use this as your flagship story)",
+          "kind": "chapter",
+          "num": 14
+        },
+        {
+          "file": "15-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 15
+        },
+        {
+          "file": "16-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 16
+        }
+      ]
+    },
+    {
+      "bookOrder": 24,
+      "track": "react-native",
+      "base": "10-testing",
+      "h1": "10  Testing",
+      "relPath": "react-native/10-testing.md",
+      "topicDir": "react-native/10-testing",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-the-testing-pyramid-applied-to-react-native.md",
+          "title": "The testing pyramid, applied to React Native",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-jest-unit-tests.md",
+          "title": "Jest unit tests",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-react-native-testing-library-rntl-component-tests.md",
+          "title": "React Native Testing Library (RNTL)  component tests",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-mocking-react-navigation.md",
+          "title": "Mocking React Navigation",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-mocking-react-query.md",
+          "title": "Mocking React Query",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-mocking-native-modules-notifee-fcm-keychain-biometrics.md",
+          "title": "Mocking native modules (Notifee, FCM, Keychain, biometrics)",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-integration-tests-for-critical-flows.md",
+          "title": "Integration tests for critical flows",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-detox-maestro-e2e-awareness.md",
+          "title": "Detox / Maestro  E2E awareness",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-what-to-test-first-in-a-fintech-app-priority-framework.md",
+          "title": "What to test first in a fintech app (priority framework)",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-testing-deep-links.md",
+          "title": "Testing deep links",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-keeping-tests-stable-as-ui-changes-frequently.md",
+          "title": "Keeping tests stable as UI changes frequently",
+          "kind": "chapter",
+          "num": 11
+        },
+        {
+          "file": "12-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 14
+        },
+        {
+          "file": "15-tie-backs-to-your-experience-use-in-answers.md",
+          "title": "Tie-backs to your experience (use in answers)",
+          "kind": "extra",
+          "num": 15
+        },
+        {
+          "file": "16-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 16
+        },
+        {
+          "file": "17-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 17
+        }
+      ]
+    },
+    {
+      "bookOrder": 25,
+      "track": "react-native",
+      "base": "11-cicd-releases",
+      "h1": "11 - Builds, CI/CD, Releases & Store Ops",
+      "relPath": "react-native/11-cicd-releases.md",
+      "topicDir": "react-native/11-cicd-releases",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-debug-vs-release-builds.md",
+          "title": "Debug vs release builds",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-android-signing-keystores.md",
+          "title": "Android signing: keystores",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-ios-signing-certificates-provisioning-profiles.md",
+          "title": "iOS signing: certificates & provisioning profiles",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-fastlane-lanes-android-ios.md",
+          "title": "Fastlane lanes (Android + iOS)",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-gitlab-runner-pipelines-for-android-ios.md",
+          "title": "GitLab Runner pipelines for Android/iOS",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-versioning-strategy.md",
+          "title": "Versioning strategy",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-ota-updates-codepush-eas-update-tradeoffs.md",
+          "title": "OTA updates: CodePush / EAS Update tradeoffs",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-store-release-checklists.md",
+          "title": "Store release checklists",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-staged-rollouts.md",
+          "title": "Staged rollouts",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-proguard-r8-high-level.md",
+          "title": "Proguard/R8 (high level)",
+          "kind": "chapter",
+          "num": 10
+        },
+        {
+          "file": "11-secrets-in-ci.md",
+          "title": "Secrets in CI",
+          "kind": "chapter",
+          "num": 11
+        },
+        {
+          "file": "12-hotfix-strategy.md",
+          "title": "Hotfix strategy",
+          "kind": "chapter",
+          "num": 12
+        },
+        {
+          "file": "13-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 14
+        },
+        {
+          "file": "15-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 15
+        },
+        {
+          "file": "16-tie-backs-to-your-experience-use-in-answers.md",
+          "title": "Tie-backs to your experience (use in answers)",
+          "kind": "extra",
+          "num": 16
+        },
+        {
+          "file": "17-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 17
+        },
+        {
+          "file": "18-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 18
+        }
+      ]
+    },
+    {
+      "bookOrder": 26,
+      "track": "react-native",
+      "base": "12-upgrades-stability",
+      "h1": "12 - Upgrades, Stability & Production Debugging",
+      "relPath": "react-native/12-upgrades-stability.md",
+      "topicDir": "react-native/12-upgrades-stability",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-react-native-upgrade-strategy.md",
+          "title": "React Native upgrade strategy",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-dependency-conflicts-dependency-hell.md",
+          "title": "Dependency conflicts & \"dependency hell\"",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-crashlytics-js-vs-native-stacks.md",
+          "title": "Crashlytics: JS vs native stacks",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-anr-vs-crash-vs-freeze.md",
+          "title": "ANR vs crash vs freeze",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-systematic-crash-reduction-playbook.md",
+          "title": "Systematic crash reduction playbook",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-feature-flags-remote-config-for-risky-releases.md",
+          "title": "Feature flags / remote config for risky releases",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-pii-safe-logging.md",
+          "title": "PII-safe logging",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-reproducing-device-specific-bugs.md",
+          "title": "Reproducing device-specific bugs",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-tie-backs-to-your-experience-use-in-answers.md",
+          "title": "Tie-backs to your experience (use in answers)",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 14
+        }
+      ]
+    },
+    {
+      "bookOrder": 27,
+      "track": "react-native",
+      "base": "13-security",
+      "h1": "13 - Security (Mobile)",
+      "relPath": "react-native/13-security.md",
+      "topicDir": "react-native/13-security",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-secure-storage-keychain-keystore-vs-asyncstorage.md",
+          "title": "Secure storage: Keychain/Keystore vs AsyncStorage",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-ssl-certificate-pinning-tradeoffs.md",
+          "title": "SSL/certificate pinning tradeoffs",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-jailbreak-root-detection-awareness.md",
+          "title": "Jailbreak/root detection awareness",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-obfuscation-reducing-reverse-engineering-risk.md",
+          "title": "Obfuscation (reducing reverse engineering risk)",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-screenshot-screen-recording-protection.md",
+          "title": "Screenshot / screen recording protection",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-deep-link-validation.md",
+          "title": "Deep link validation",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-permissions-least-privilege.md",
+          "title": "Permissions: least privilege",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-secrets-never-in-the-bundle.md",
+          "title": "Secrets never in the bundle",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-native-bridge-security-issues.md",
+          "title": "Native bridge security issues",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-tie-backs-to-your-experience-use-in-answers.md",
+          "title": "Tie-backs to your experience (use in answers)",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 14
+        }
+      ]
+    },
+    {
+      "bookOrder": 28,
+      "track": "react-native",
+      "base": "14-behavioral-stories",
+      "h1": "14 - Behavioral / Project Stories (React Native Focus)",
+      "relPath": "react-native/14-behavioral-stories.md",
+      "topicDir": "react-native/14-behavioral-stories",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-easypay-green-field-build.md",
+          "title": "EasyPay - green-field build",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-mycreditinfo-legacy-modernization-crash-reduction.md",
+          "title": "MyCreditInfo - legacy modernization + crash reduction",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-wizer-architecture-refactor-native-ios-file-preview-payments.md",
+          "title": "Wizer - architecture refactor + native iOS file preview + payments",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-online-school-deadline-pressure-ci-cd-crash-reduction.md",
+          "title": "Online School - deadline pressure + CI/CD + crash reduction",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-clean-house-zebra-datawedge-barcode-integration.md",
+          "title": "Clean House - Zebra DataWedge barcode integration",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-fastlane-gitlab-runner-ci-cd-cross-cutting-story.md",
+          "title": "Fastlane + GitLab Runner CI/CD (cross-cutting story)",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-client-collaboration-requirements-to-production.md",
+          "title": "Client collaboration - requirements to production",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-hardest-production-bug-you-diagnosed.md",
+          "title": "Hardest production bug you diagnosed",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-green-flags-red-flags.md",
+          "title": "Green flags / red flags",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 29,
+      "track": "nestjs",
+      "base": "01-nestjs-architecture",
+      "h1": "01 - NestJS Architecture: Modules, Providers, DI, Controllers, Services, Lifecycle, Config",
+      "relPath": "nestjs/01-nestjs-architecture.md",
+      "topicDir": "nestjs/01-nestjs-architecture",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-what-is-nestjs-and-why-does-it-exist.md",
+          "title": "What is NestJS and why does it exist",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-modules.md",
+          "title": "Modules",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-providers-dependency-injection.md",
+          "title": "Providers & Dependency Injection",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-controllers.md",
+          "title": "Controllers",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-services.md",
+          "title": "Services",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-application-request-lifecycle.md",
+          "title": "Application & request lifecycle",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-configmodule.md",
+          "title": "ConfigModule",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-project-structure.md",
+          "title": "Project structure",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-full-interview-question-bank-rapid-fire.md",
+          "title": "Full interview question bank (rapid fire)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-hands-on-drills.md",
+          "title": "Hands-on drills",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 14
+        }
+      ]
+    },
+    {
+      "bookOrder": 30,
+      "track": "sql-databases",
+      "base": "01-sql-fundamentals",
+      "h1": "01-sql-fundamentals",
+      "relPath": "sql-databases/01-sql-fundamentals.md",
+      "topicDir": "sql-databases/01-sql-fundamentals",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-select-basics-and-logical-query-order.md",
+          "title": "SELECT basics and logical query order",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-join-types.md",
+          "title": "JOIN types",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-group-by-aggregation-and-having.md",
+          "title": "GROUP BY, aggregation, and HAVING",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-null-semantics-three-valued-logic.md",
+          "title": "NULL semantics (three-valued logic)",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-subqueries-scalar-correlated-in-exists-and-ctes.md",
+          "title": "Subqueries: scalar, correlated, IN/EXISTS, and CTEs",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-set-operations.md",
+          "title": "Set operations",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-window-functions-high-value-often-underused-by-mid-level-candidates.md",
+          "title": "Window functions (high-value, often underused by mid-level candidates)",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-a-repeatable-method-for-live-sql-interview-questions.md",
+          "title": "A repeatable method for live SQL interview questions",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-interview-question-bank-with-answer-targets.md",
+          "title": "Interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-hands-on-drills-do-these-do-not-just-read-them.md",
+          "title": "Hands-on drills (do these, do not just read them)",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-tie-backs-to-your-experience-use-in-answers.md",
+          "title": "Tie-backs to your experience (use in answers)",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 14
+        }
+      ]
+    },
+    {
+      "bookOrder": 31,
+      "track": "nestjs",
+      "base": "02-rest-validation-swagger",
+      "h1": "02 - REST Design, Validation & Swagger: DTOs, Pipes, Interceptors, Filters, OpenAPI",
+      "relPath": "nestjs/02-rest-validation-swagger.md",
+      "topicDir": "nestjs/02-rest-validation-swagger",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-rest-api-design.md",
+          "title": "REST API design",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-dtos-class-validator-class-transformer.md",
+          "title": "DTOs: class-validator & class-transformer",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-pipes.md",
+          "title": "Pipes",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-interceptors.md",
+          "title": "Interceptors",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-exception-filters.md",
+          "title": "Exception filters",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-swagger-openapi.md",
+          "title": "Swagger / OpenAPI",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-the-full-pipeline-in-order-memorize-this-table.md",
+          "title": "The full pipeline, in order (memorize this table)",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-full-interview-question-bank-rapid-fire.md",
+          "title": "Full interview question bank (rapid fire)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-hands-on-drills.md",
+          "title": "Hands-on drills",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 13
+        }
+      ]
+    },
+    {
+      "bookOrder": 32,
+      "track": "nestjs",
+      "base": "03-auth-jwt-rbac",
+      "h1": "03 - Auth: JWT Access/Refresh, Guards, Passport Strategies, RBAC",
+      "relPath": "nestjs/03-auth-jwt-rbac.md",
+      "topicDir": "nestjs/03-auth-jwt-rbac",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-jwt-fundamentals.md",
+          "title": "JWT fundamentals",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-passport-strategies-in-nestjs.md",
+          "title": "Passport strategies in NestJS",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-guards.md",
+          "title": "Guards",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-rbac-role-based-access-control-vetapp.md",
+          "title": "RBAC (Role-Based Access Control) - VetApp",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-refresh-token-flow-rotation-revocation.md",
+          "title": "Refresh token flow, rotation & revocation",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-password-security-high-level.md",
+          "title": "Password security (high level)",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-full-interview-question-bank-rapid-fire.md",
+          "title": "Full interview question bank (rapid fire)",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-hands-on-drills.md",
+          "title": "Hands-on drills",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 33,
+      "track": "nestjs",
+      "base": "05-typeorm-persistence",
+      "h1": "05 - TypeORM & Persistence: Entities, Relations, Migrations, N+1, Transactions",
+      "relPath": "nestjs/05-typeorm-persistence.md",
+      "topicDir": "nestjs/05-typeorm-persistence",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-entities-decorators.md",
+          "title": "Entities & decorators",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-repository-pattern-querybuilder.md",
+          "title": "Repository pattern & QueryBuilder",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-migrations.md",
+          "title": "Migrations",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-the-n-1-problem.md",
+          "title": "The N+1 problem",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-transactions.md",
+          "title": "Transactions",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-mysql-vs-postgresql-notes-from-real-project-exposure.md",
+          "title": "MySQL vs PostgreSQL notes (from real project exposure)",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-full-interview-question-bank-rapid-fire.md",
+          "title": "Full interview question bank (rapid fire)",
+          "kind": "extra",
+          "num": 7
+        },
+        {
+          "file": "08-hands-on-drills.md",
+          "title": "Hands-on drills",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 34,
+      "track": "sql-databases",
+      "base": "02-indexing-performance",
+      "h1": "02-indexing-performance",
+      "relPath": "sql-databases/02-indexing-performance.md",
+      "topicDir": "sql-databases/02-indexing-performance",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-what-an-index-actually-is.md",
+          "title": "What an index actually is",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-types-of-indexes.md",
+          "title": "Types of indexes",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-when-indexes-help-and-when-they-hurt.md",
+          "title": "When indexes help and when they hurt",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-reading-explain-explain-analyze.md",
+          "title": "Reading EXPLAIN / EXPLAIN ANALYZE",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-the-n-1-query-problem-and-typeorm-specifically.md",
+          "title": "The N+1 query problem (and TypeORM specifically)",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-a-repeatable-method-for-how-would-you-make-this-query-faster.md",
+          "title": "A repeatable method for \"how would you make this query faster\"",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-interview-question-bank-with-answer-targets.md",
+          "title": "Interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 7
+        },
+        {
+          "file": "08-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 35,
+      "track": "sql-databases",
+      "base": "03-transactions-consistency",
+      "h1": "03-transactions-consistency",
+      "relPath": "sql-databases/03-transactions-consistency.md",
+      "topicDir": "sql-databases/03-transactions-consistency",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-acid.md",
+          "title": "ACID",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-isolation-levels-and-read-anomalies.md",
+          "title": "Isolation levels and read anomalies",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-mvcc-in-one-paragraph-why-postgres-readers-dont-block-writers.md",
+          "title": "MVCC in one paragraph (why Postgres readers don't block writers)",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-locking-pessimistic-vs-optimistic.md",
+          "title": "Locking: pessimistic vs optimistic",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-deadlocks.md",
+          "title": "Deadlocks",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-transactions-in-typeorm-two-patterns.md",
+          "title": "Transactions in TypeORM: two patterns",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-interview-question-bank-with-answer-targets.md",
+          "title": "Interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 7
+        },
+        {
+          "file": "08-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 36,
+      "track": "nestjs",
+      "base": "04-websockets-realtime",
+      "h1": "04 - WebSockets & Realtime: Gateways, Socket.IO vs WS, Socket Auth, FCM vs Sockets",
+      "relPath": "nestjs/04-websockets-realtime.md",
+      "topicDir": "nestjs/04-websockets-realtime",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-gateways-in-nestjs.md",
+          "title": "Gateways in NestJS",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-socket-io-vs-raw-websocket-ws.md",
+          "title": "Socket.IO vs raw WebSocket (ws)",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-authenticating-websocket-connections.md",
+          "title": "Authenticating WebSocket connections",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-scaling-websockets.md",
+          "title": "Scaling WebSockets",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-websockets-vs-firebase-cloud-messaging-fcm-the-clean-house-decision.md",
+          "title": "WebSockets vs Firebase Cloud Messaging (FCM) - the Clean House decision",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-error-handling-reconnection.md",
+          "title": "Error handling & reconnection",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-full-interview-question-bank-rapid-fire.md",
+          "title": "Full interview question bank (rapid fire)",
+          "kind": "extra",
+          "num": 7
+        },
+        {
+          "file": "08-hands-on-drills.md",
+          "title": "Hands-on drills",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 37,
+      "track": "nestjs",
+      "base": "06-nodejs-runtime",
+      "h1": "06 - Node.js Runtime: Event Loop, Streams, Clustering, Error Handling, Background Jobs",
+      "relPath": "nestjs/06-nodejs-runtime.md",
+      "topicDir": "nestjs/06-nodejs-runtime",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-the-event-loop.md",
+          "title": "The event loop",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-streams.md",
+          "title": "Streams",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-clustering-pm2.md",
+          "title": "Clustering & PM2",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-error-handling.md",
+          "title": "Error handling",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-background-jobs-vetapp.md",
+          "title": "Background jobs (VetApp)",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-recognizing-a-blocked-degraded-event-loop-in-production.md",
+          "title": "Recognizing a blocked/degraded event loop in production",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-full-interview-question-bank-rapid-fire.md",
+          "title": "Full interview question bank (rapid fire)",
+          "kind": "extra",
+          "num": 7
+        },
+        {
+          "file": "08-hands-on-drills.md",
+          "title": "Hands-on drills",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 38,
+      "track": "nestjs",
+      "base": "07-interview-questions",
+      "h1": "07 - Interview Question Bank: NestJS/Node + VetApp/Wizer/Travel2Georgia STAR Stories",
+      "relPath": "nestjs/07-interview-questions.md",
+      "topicDir": "nestjs/07-interview-questions",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-how-to-use-this-chapter.md",
+          "title": "How to use this chapter",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-part-1-cross-topic-technical-q-a.md",
+          "title": "Part 1 - Cross-topic technical Q&A",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-part-2-system-design-flavored-questions-backend-scoped.md",
+          "title": "Part 2 - System-design-flavored questions (backend-scoped)",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-part-3-star-stories-rehearse-these-until-fluent.md",
+          "title": "Part 3 - STAR stories (rehearse these until fluent)",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-part-4-rapid-fire-drill-answer-all-no-notes-then-check-yourself-against-the-chap.md",
+          "title": "Part 4 - Rapid-fire drill (answer all, no notes, then check yourself against the chapters)",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-part-5-mock-interview-flow-run-this-the-day-before.md",
+          "title": "Part 5 - Mock interview flow (run this the day before)",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-cross-chapter-mastery-tracker.md",
+          "title": "Cross-chapter mastery tracker",
+          "kind": "chapter",
+          "num": 8
+        }
+      ]
+    },
+    {
+      "bookOrder": 39,
+      "track": "sql-databases",
+      "base": "04-postgres-vs-mysql",
+      "h1": "Generate a migration from entity changes (compares current schema to entities)",
+      "relPath": "sql-databases/04-postgres-vs-mysql.md",
+      "topicDir": "sql-databases/04-postgres-vs-mysql",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-quick-orientation.md",
+          "title": "Quick orientation",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-data-types-practical-differences.md",
+          "title": "Data types: practical differences",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-storage-engines-and-transactions.md",
+          "title": "Storage engines and transactions",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-case-sensitivity-and-identifiers.md",
+          "title": "Case sensitivity and identifiers",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-limit-offset-string-functions-and-other-small-but-real-differences.md",
+          "title": "LIMIT/OFFSET, string functions, and other small but real differences",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-replication-and-scaling-awareness-level-dont-over-invest-here.md",
+          "title": "Replication and scaling (awareness level - don't over-invest here)",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-typeorm-configuration-and-mapping-notes.md",
+          "title": "TypeORM configuration and mapping notes",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-which-would-you-choose-for-a-new-project-a-good-non-dogmatic-answer.md",
+          "title": "\"Which would you choose for a new project\" - a good, non-dogmatic answer",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-interview-question-bank-with-answer-targets.md",
+          "title": "Interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 13
+        },
+        {
+          "file": "14-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 14
+        }
+      ]
+    },
+    {
+      "bookOrder": 40,
+      "track": "sql-databases",
+      "base": "05-interview-questions",
+      "h1": "05-interview-questions",
+      "relPath": "sql-databases/05-interview-questions.md",
+      "topicDir": "sql-databases/05-interview-questions",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-part-a-schema-design-drills.md",
+          "title": "Part A - Schema Design Drills",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-part-b-sql-query-bank-write-these-from-memory-using-the-schemas-above.md",
+          "title": "Part B - SQL Query Bank (write these from memory, using the schemas above)",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-part-c-rapid-fire-concept-q-a-say-the-answer-in-one-breath.md",
+          "title": "Part C - Rapid-fire concept Q&A (say the answer in one breath)",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-hands-on-drills-do-these-under-time-pressure.md",
+          "title": "Hands-on drills (do these under time pressure)",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-senior-red-flags-green-flags-schema-design-specific.md",
+          "title": "Senior red flags / green flags (schema design specific)",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "chapter",
+          "num": 8
+        }
+      ]
+    },
+    {
+      "bookOrder": 41,
+      "track": "nextjs",
+      "base": "01-routing-rendering",
+      "h1": "01 - Routing & Rendering",
+      "relPath": "nextjs/01-routing-rendering.md",
+      "topicDir": "nextjs/01-routing-rendering",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-app-router-vs-pages-router.md",
+          "title": "App Router vs Pages Router",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-file-based-routing-conventions-app-router.md",
+          "title": "File-based routing conventions (App Router)",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-layouts-and-nested-layouts-in-depth.md",
+          "title": "Layouts and nested layouts in depth",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-server-components-vs-client-components.md",
+          "title": "Server Components vs Client Components",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-rendering-strategies-ssr-ssg-isr-csr.md",
+          "title": "Rendering strategies: SSR, SSG, ISR, CSR",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-streaming-and-suspense.md",
+          "title": "Streaming and Suspense",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-client-side-navigation-prefetching-and-hydration.md",
+          "title": "Client-side navigation, prefetching, and hydration",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-tie-backs-to-your-experience-use-in-answers.md",
+          "title": "Tie-backs to your experience (use in answers)",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 13
+        }
+      ]
+    },
+    {
+      "bookOrder": 42,
+      "track": "nextjs",
+      "base": "02-data-fetching-caching",
+      "h1": "02 - Data Fetching & Caching",
+      "relPath": "nextjs/02-data-fetching-caching.md",
+      "topicDir": "nextjs/02-data-fetching-caching",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-the-four-next-js-caches-app-router.md",
+          "title": "The four Next.js caches (App Router)",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-fetch-caching-in-the-app-router.md",
+          "title": "fetch caching in the App Router",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-cookies-and-headers-the-dynamic-apis.md",
+          "title": "cookies() and headers() - the dynamic APIs",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-avoiding-waterfalls-parallel-vs-sequential-data-fetching.md",
+          "title": "Avoiding waterfalls - parallel vs sequential data fetching",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-react-query-and-swr-on-the-client-how-they-coexist-with-app-router-caching.md",
+          "title": "React Query (and SWR) on the client - how they coexist with App Router caching",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-server-actions-and-mutations-touching-the-cache.md",
+          "title": "Server Actions and mutations touching the cache",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-common-data-fetching-bugs-and-how-to-reason-about-them.md",
+          "title": "Common data-fetching bugs and how to reason about them",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-tie-backs-to-your-experience-use-in-answers.md",
+          "title": "Tie-backs to your experience (use in answers)",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 13
+        }
+      ]
+    },
+    {
+      "bookOrder": 43,
+      "track": "nextjs",
+      "base": "03-middleware-auth-apis",
+      "h1": "03 - Middleware, Auth & APIs",
+      "relPath": "nextjs/03-middleware-auth-apis.md",
+      "topicDir": "nextjs/03-middleware-auth-apis",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-middleware.md",
+          "title": "Middleware",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-route-handlers-route-ts.md",
+          "title": "Route Handlers (route.ts)",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-auth-patterns-jwt-and-session-at-interview-depth.md",
+          "title": "Auth patterns - JWT and session, at interview depth",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-next-js-api-routes-vs-a-separate-nestjs-backend-the-question-you-will-get.md",
+          "title": "Next.js API routes vs a separate NestJS backend - the question you WILL get",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-protected-routes-end-to-end-app-router.md",
+          "title": "Protected routes end-to-end (App Router)",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 6
+        },
+        {
+          "file": "07-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 7
+        },
+        {
+          "file": "08-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-tie-backs-to-your-experience-use-in-answers.md",
+          "title": "Tie-backs to your experience (use in answers)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 11
+        }
+      ]
+    },
+    {
+      "bookOrder": 44,
+      "track": "nextjs",
+      "base": "04-performance-deployment",
+      "h1": "04 - Performance & Deployment",
+      "relPath": "nextjs/04-performance-deployment.md",
+      "topicDir": "nextjs/04-performance-deployment",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-next-image-image-optimization.md",
+          "title": "next/image - image optimization",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-next-font-font-optimization.md",
+          "title": "next/font - font optimization",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-bundle-analysis-and-code-splitting.md",
+          "title": "Bundle analysis and code splitting",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-edge-runtime-vs-node-js-runtime.md",
+          "title": "Edge runtime vs Node.js runtime",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-docker-nginx-ssl-deployment-travel2georgia.md",
+          "title": "Docker, Nginx, SSL deployment (Travel2Georgia)",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-environment-variables-and-config.md",
+          "title": "Environment variables and config",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-core-web-vitals-and-general-performance-framing.md",
+          "title": "Core Web Vitals and general performance framing",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-full-interview-question-bank-with-answer-targets.md",
+          "title": "Full interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-tie-backs-to-your-experience-use-in-answers.md",
+          "title": "Tie-backs to your experience (use in answers)",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 12
+        },
+        {
+          "file": "13-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 13
+        }
+      ]
+    },
+    {
+      "bookOrder": 45,
+      "track": "nextjs",
+      "base": "05-interview-questions",
+      "h1": "05 - Interview Questions & Stories",
+      "relPath": "nextjs/05-interview-questions.md",
+      "topicDir": "nextjs/05-interview-questions",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-learning-objectives.md",
+          "title": "Learning objectives",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-how-to-use-this-chapter.md",
+          "title": "How to use this chapter",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-part-a-consolidated-q-a-bank.md",
+          "title": "Part A - Consolidated Q&A bank",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-part-b-rapid-fire-drill-answer-in-15-20-seconds-each.md",
+          "title": "Part B - Rapid-fire drill (answer in 15-20 seconds each)",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-part-c-clean-house-star-stories.md",
+          "title": "Part C - Clean House STAR stories",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-part-d-travel2georgia-star-stories.md",
+          "title": "Part D - Travel2Georgia STAR stories",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-part-e-architecture-opinion-questions-tradeoff-first-answers-expected.md",
+          "title": "Part E - Architecture / opinion questions (tradeoff-first answers expected)",
+          "kind": "chapter",
+          "num": 7
+        },
+        {
+          "file": "08-part-f-weak-spot-tracker.md",
+          "title": "Part F - Weak-spot tracker",
+          "kind": "chapter",
+          "num": 8
+        },
+        {
+          "file": "09-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "chapter",
+          "num": 9
+        },
+        {
+          "file": "10-mastery-checklist-track-track-track.md",
+          "title": "Mastery checklist (track track track)",
+          "kind": "chapter",
+          "num": 10
+        }
+      ]
+    },
+    {
+      "bookOrder": 46,
+      "track": "devops-cloud",
+      "base": "01-docker",
+      "h1": "BAD: copying everything first means ANY source file change invalidates",
+      "relPath": "devops-cloud/01-docker.md",
+      "topicDir": "devops-cloud/01-docker",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-images-vs-containers-vs-registries.md",
+          "title": "Images vs containers vs registries",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-image-layers-and-build-caching.md",
+          "title": "Image layers and build caching",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-multi-stage-builds.md",
+          "title": "Multi-stage builds",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-dockerfile-best-practices-checklist-you-should-be-able-to-recite.md",
+          "title": "Dockerfile best practices (checklist you should be able to recite)",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-docker-compose.md",
+          "title": "docker-compose",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-container-networking-and-process-model-basics.md",
+          "title": "Container networking and process model basics",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-interview-question-bank-with-answer-targets.md",
+          "title": "Interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 7
+        },
+        {
+          "file": "08-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 47,
+      "track": "devops-cloud",
+      "base": "02-nginx-ssl-vps",
+      "h1": "/etc/nginx/conf.d/travel2georgia.conf",
+      "relPath": "devops-cloud/02-nginx-ssl-vps.md",
+      "topicDir": "devops-cloud/02-nginx-ssl-vps",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-what-a-reverse-proxy-is-and-why.md",
+          "title": "What a reverse proxy is, and why",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-nginx-config-anatomy.md",
+          "title": "Nginx config anatomy",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-ssl-tls-with-lets-encrypt-certbot.md",
+          "title": "SSL/TLS with Let's Encrypt/Certbot",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-domains-and-dns-basics.md",
+          "title": "Domains and DNS basics",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-vps-basics-systemd-firewall-logs.md",
+          "title": "VPS basics: systemd, firewall, logs",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-diagnosing-a-502-bad-gateway-the-single-most-common-real-world-nginx-symptom.md",
+          "title": "Diagnosing a 502 Bad Gateway (the single most common real-world Nginx symptom)",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-interview-question-bank-with-answer-targets.md",
+          "title": "Interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 7
+        },
+        {
+          "file": "08-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 48,
+      "track": "devops-cloud",
+      "base": "03-aws-s3-sns",
+      "h1": "03-aws-s3-sns",
+      "relPath": "devops-cloud/03-aws-s3-sns.md",
+      "topicDir": "devops-cloud/03-aws-s3-sns",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-s3-object-storage-fundamentals.md",
+          "title": "S3: object storage fundamentals",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-access-control-basics.md",
+          "title": "Access control basics",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-presigned-signed-urls-the-single-most-practically-useful-s3-concept-for-an-app-d.md",
+          "title": "Presigned (signed) URLs - the single most practically useful S3 concept for an app developer",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-when-youd-actually-use-s3-grounded-in-your-projects.md",
+          "title": "When you'd actually use S3 (grounded in your projects)",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-sns-pub-sub-and-fan-out.md",
+          "title": "SNS: pub/sub and fan-out",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-sns-vs-sqs-a-very-common-paired-interview-question.md",
+          "title": "SNS vs SQS (a very common paired interview question)",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-interview-question-bank-with-answer-targets.md",
+          "title": "Interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 7
+        },
+        {
+          "file": "08-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 49,
+      "track": "devops-cloud",
+      "base": "04-git-ci-basics",
+      "h1": "Merge: preserves both histories, creates a merge commit",
+      "relPath": "devops-cloud/04-git-ci-basics.md",
+      "topicDir": "devops-cloud/04-git-ci-basics",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-git-workflows.md",
+          "title": "Git workflows",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-real-git-scenarios-you-should-be-able-to-handle-live.md",
+          "title": "Real Git scenarios you should be able to handle live",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-pr-code-review-etiquette.md",
+          "title": "PR / code review etiquette",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-gitlab-ci-concepts.md",
+          "title": "GitLab CI concepts",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-fastlane-for-mobile-release-automation.md",
+          "title": "Fastlane for mobile release automation",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-backend-ci-concepts-generalized-not-tied-to-a-specific-mobile-pipeline.md",
+          "title": "Backend CI concepts (generalized, not tied to a specific mobile pipeline)",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-interview-question-bank-with-answer-targets.md",
+          "title": "Interview question bank (with answer targets)",
+          "kind": "extra",
+          "num": 7
+        },
+        {
+          "file": "08-hands-on-drills-do-these.md",
+          "title": "Hands-on drills (do these)",
+          "kind": "extra",
+          "num": 8
+        },
+        {
+          "file": "09-senior-red-flags-green-flags.md",
+          "title": "Senior red flags / green flags",
+          "kind": "extra",
+          "num": 9
+        },
+        {
+          "file": "10-tie-backs-to-your-experience.md",
+          "title": "Tie-backs to your experience",
+          "kind": "extra",
+          "num": 10
+        },
+        {
+          "file": "11-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "extra",
+          "num": 11
+        },
+        {
+          "file": "12-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "extra",
+          "num": 12
+        }
+      ]
+    },
+    {
+      "bookOrder": 50,
+      "track": "devops-cloud",
+      "base": "05-interview-questions",
+      "h1": "05-interview-questions",
+      "relPath": "devops-cloud/05-interview-questions.md",
+      "topicDir": "devops-cloud/05-interview-questions",
+      "chapters": [
+        {
+          "file": "00-introduction.md",
+          "title": "Introduction & Learning Objectives",
+          "kind": "intro",
+          "num": 0
+        },
+        {
+          "file": "01-part-a-rapid-fire-q-a-bank-answer-in-one-breath-each.md",
+          "title": "Part A - Rapid-fire Q&A bank (answer in one breath each)",
+          "kind": "chapter",
+          "num": 1
+        },
+        {
+          "file": "02-part-b-deployment-story-drills-star-format-rehearse-out-loud.md",
+          "title": "Part B - Deployment story drills (STAR format, rehearse out loud)",
+          "kind": "chapter",
+          "num": 2
+        },
+        {
+          "file": "03-part-c-live-troubleshooting-drills-say-your-method-out-loud-not-just-the-answer.md",
+          "title": "Part C - Live troubleshooting drills (say your method out loud, not just the answer)",
+          "kind": "chapter",
+          "num": 3
+        },
+        {
+          "file": "04-part-d-whiteboard-the-deployment-drill.md",
+          "title": "Part D - \"Whiteboard the deployment\" drill",
+          "kind": "chapter",
+          "num": 4
+        },
+        {
+          "file": "05-senior-red-flags-green-flags-whole-track-summary.md",
+          "title": "Senior red flags / green flags (whole-track summary)",
+          "kind": "chapter",
+          "num": 5
+        },
+        {
+          "file": "06-senior-level-best-practices.md",
+          "title": "Senior-Level Best Practices",
+          "kind": "chapter",
+          "num": 6
+        },
+        {
+          "file": "07-mastery-checklist.md",
+          "title": "Mastery checklist",
+          "kind": "chapter",
+          "num": 7
+        }
+      ]
+    }
+  ]
+}
