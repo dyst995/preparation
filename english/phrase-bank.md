@@ -19,9 +19,22 @@ Phrases I already understand but should use **out loud** in interviews. Add new 
 
 - **definition → explanation → practical consequence/example**
 
+## Everyday / professional (activate)
+
+- It depends on...
+- As far as I know...
+- To be honest...
+- What I mean is...
+- Let me rephrase that.
+- That makes sense.
+- Could you clarify...?
+- I see what you mean.
+- In other words...
+- The point is...
+
 ## Session additions
 
-<!-- Append dated entries below, e.g.:
-### 2026-08-26
-- "..." — use when explaining X
--->
+### 2026-08-27
+- Full drill: `english/sessions/2026-08-27.md`
+- Watch: **actually** (in fact) vs **currently** (right now)
+- Upgrades: I’d suggest… / I’m struggling with… / Could you explain that to me?
