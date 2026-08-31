@@ -32,9 +32,26 @@ Phrases I already understand but should use **out loud** in interviews. Add new 
 - In other words...
 - The point is...
 
+- I’d suggest...
+- Would you mind...?
+- I’m not sure yet.
+- I’ll get back to you.
+- That works for me.
+- I’m struggling with...
+- Just to confirm...
+- Feel free to...
+- On the other hand...
+- At the same time...
+
 ## Session additions
 
 ### 2026-08-27
 - Full drill: `english/sessions/2026-08-27.md`
 - Watch: **actually** (in fact) vs **currently** (right now)
 - Upgrades: I’d suggest… / I’m struggling with… / Could you explain that to me?
+
+### 2026-08-30
+- Full drill: `english/sessions/2026-08-30.md`
+- Words: suggest, prefer, consider, assume, expect, avoid, mention, follow up, postpone, worth, rather, though
+- Watch: **expect** / **except** / **accept**
+- Hedging: Could you… / Would it be possible… / I’m not sure this is the best option
