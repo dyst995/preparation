@@ -1,23 +1,29 @@
 # DSA Interview Prep
 
 A structured, interview-focused walkthrough of Data Structures and
-Algorithms, organized by pattern rather than by data structure alone. Every
-topic file follows the same format: a study guide (when to use the pattern,
-templates, common pitfalls, interview tips) followed by a problem table
-with real LeetCode names/numbers and a Must / Should / Optional priority.
+Algorithms, organized by pattern rather than by data structure alone.
+
+Each topic lives in its own folder:
+
+```text
+NN. topic-name/
+  notes.md              -- study guide (when to use the pattern, pitfalls)
+  common-techniques.md  -- the code you actually write in an interview
+  problems.md           -- LeetCode list only (Must / Should / Optional)
+```
+
+`00. complexity-and-patterns` has `notes.md` + `common-techniques.md`
+(the 7-step loop) and no `problems.md`.
 
 ## Start Here
 
-1. Read [00-complexity-and-patterns.md](00-complexity-and-patterns.md)
-   first -- it has the Big-O reference, a universal 7-step framework for
-   approaching any problem, and a keyword-to-pattern recognition table you
-   will come back to constantly.
-2. Pick a schedule from [order.md](order.md) (12-week, 8-week, or 4-week
-   crash plan) and follow it topic by topic.
-3. Track progress on all problems in [PROBLEMS-MASTER-LIST.md](PROBLEMS-MASTER-LIST.md).
-4. Within each topic file, solve MUST problems first, then SHOULD, then
-   OPTIONAL if you have time or the topic is a known focus of your target
-   company.
+1. Read [00. complexity-and-patterns/notes.md](00. complexity-and-patterns/notes.md)
+   first -- Big-O, the 7-step interview framework, and the keyword-to-pattern map.
+2. Pick a schedule from [order.md](./order.md) (12-week, 8-week, or 4-week
+   crash plan) and follow it topic by topic. The **week order is not the
+   same as the folder numbers** -- see [Curriculum notes](#curriculum-notes).
+3. Track progress in [PROBLEMS-MASTER-LIST.md](PROBLEMS-MASTER-LIST.md).
+4. Within each topic, solve MUST problems first, then SHOULD, then OPTIONAL.
 
 ## Priority System
 
@@ -28,77 +34,89 @@ with real LeetCode names/numbers and a Must / Should / Optional priority.
 - **Optional**: depth, mastery, or company-specific value; solve if you have
   extra time.
 
+Each LeetCode number has **one primary home**. If the same problem teaches
+two patterns, the other topic's `problems.md` lists it under **Related --
+do not solve twice**.
+
 ## Topic Index
 
-| # | Topic | File | What it covers |
-|---|-------|------|-----------------|
-| 00 | Complexity and Patterns | [00-complexity-and-patterns.md](00-complexity-and-patterns.md) | Big-O cheat sheet, universal problem-solving framework, keyword-to-pattern map, data structure selection guide |
-| 01 | Arrays and Strings | [01-arrays-strings.md](01-arrays-strings.md) | Array/string fundamentals, prefix sums, in-place manipulation |
-| 02 | Hash Map and Hash Set | [02-hash-map-set.md](02-hash-map-set.md) | Hash map/set patterns, frequency counting, complement lookups |
-| 03 | Two Pointers | [03-two-pointers.md](03-two-pointers.md) | Converging pointers, fast/slow, sorted-array pair problems |
-| 04 | Sliding Window | [04-sliding-window.md](04-sliding-window.md) | Fixed and variable-size windows, substring/subarray optimization |
-| 05 | Stack and Queue | [05-stack-queue.md](05-stack-queue.md) | Monotonic stack, valid parentheses family, queue-based simulation |
-| 06 | Linked Lists | [06-linked-lists.md](06-linked-lists.md) | Reversal, fast/slow pointers, cycle detection, merging |
-| 07 | Trees | [07-trees.md](07-trees.md) | Traversals (BST, BFS/DFS), tree construction, tree DP |
-| 08 | Graphs | [08-graphs.md](08-graphs.md) | BFS/DFS, topological sort, cycle detection |
-| 09 | Heap / Priority Queue | [09-heap-priority-queue.md](09-heap-priority-queue.md) | Top-K patterns, two-heap median, k-way merge |
-| 10 | Binary Search | [10-binary-search.md](10-binary-search.md) | Classic binary search, binary search on the answer |
-| 11 | Sorting | [11-sorting.md](11-sorting.md) | Sorting algorithms and concepts, when sorting unlocks a simpler solution |
-| 12 | Recursion and Backtracking | [12-recursion-backtracking.md](12-recursion-backtracking.md) | Recurrence relations, combinatorial search: subsets, permutations, combinations |
-| 13 | Dynamic Programming | [13-dynamic-programming.md](13-dynamic-programming.md) | 1D DP, 2D DP (string/grid), 0/1 and unbounded knapsack, state machine DP |
-| 14 | Greedy | [14-greedy.md](14-greedy.md) | Sort-then-sweep, exchange argument proofs, interval/heap-based greedy |
-| 15 | Bit Manipulation | [15-bit-manipulation.md](15-bit-manipulation.md) | XOR tricks, bitmasks, bitmask DP, binary trie for max XOR |
-| 16 | Intervals | [16-intervals.md](16-intervals.md) | Merge/insert intervals, greedy interval selection, sweep line |
-| 17 | Trie | [17-trie.md](17-trie.md) | Prefix tree implementation, wildcard search, trie + grid DFS |
-| 18 | Union-Find | [18-union-find.md](18-union-find.md) | Disjoint Set Union with path compression and union by size, cycle detection, dynamic connectivity |
+| # | Topic | Folder | What it covers |
+|---|---|---|---|
+| 00 | Complexity and Patterns | [00. complexity-and-patterns](00. complexity-and-patterns/notes.md) | Big-O, 7-step framework, keyword-to-pattern map |
+| 01 | Arrays and Strings | [01. arrays-strings](01. arrays-strings/notes.md) | Prefix sums, in-place pointers, Kadane, matrix walks |
+| 02 | Hash Map and Hash Set | [02. hash-map-set](02. hash-map-set/notes.md) | Frequency counting, complement lookups, prefix+map |
+| 03 | Two Pointers | [03. two-pointers](03. two-pointers/notes.md) | Converging / same-direction pointers, sorted pairs |
+| 04 | Sliding Window | [04. sliding-window](04. sliding-window/notes.md) | Fixed and variable windows, substring/subarray |
+| 05 | Stack and Queue | [05. stack-queue](05. stack-queue/notes.md) | Monotonic stack, parentheses, deque |
+| 06 | Linked Lists | [06. linked-lists](06. linked-lists/notes.md) | Reversal, fast/slow, cycle detection, merging |
+| 07 | Trees | [07. trees](07. trees/notes.md) | Traversals, BST, BFS/DFS, tree DP intro |
+| 08 | Graphs | [08. graphs](08. graphs/notes.md) | BFS/DFS, topological sort, cycle detection |
+| 09 | Heap / Priority Queue | [09. heap-priority-queue](09. heap-priority-queue/notes.md) | Top-K, two-heap median, k-way merge |
+| 10 | Binary Search | [10. binary-search](10. binary-search/notes.md) | Classic BS, search on the answer |
+| 11 | Sorting | [11. sorting](11. sorting/notes.md) | Implement merge/quick sort; when sorting unlocks a solution |
+| 12 | Recursion and Backtracking | [12. recursion-backtracking](12. recursion-backtracking/notes.md) | Subsets, permutations, combinations |
+| 13 | Dynamic Programming | [13. dynamic-programming](13. dynamic-programming/notes.md) | 1D / 2D / knapsack / state machine |
+| 14 | Greedy | [14. greedy](14. greedy/notes.md) | Exchange argument, jump-game, sort-then-pass |
+| 15 | Bit Manipulation | [15. bit-manipulation](15. bit-manipulation/notes.md) | XOR, bitmasks, per-bit counting |
+| 16 | Intervals | [16. intervals](16. intervals/notes.md) | Merge/insert, sweep line, interval greedy |
+| 17 | Trie | [17. trie](17. trie/notes.md) | Prefix tree, wildcard search, trie + grid DFS |
+| 18 | Union-Find | [18. union-find](18. union-find/notes.md) | DSU, connectivity, cycle detection |
 
-Every file listed above exists in this repo and follows the same core
-structure: a study guide (patterns, templates, pitfalls, interview tips)
-followed by a problem table with LeetCode name/number, difficulty, and a
-Must/Should/Optional priority (files `07-12` label the priority column `P`
-with `M`/`S`/`O` for brevity; files `00` and `13-18` spell out
-Must/Should/Optional in full).
+## Curriculum notes
+
+What was wrong, and what to follow now:
+
+**Folder numbers stay 00-18** so chapter references inside the notes
+("see chapter 09") stay stable. **The week-by-week plan in `order.md`
+is the real study order.**
+
+1. **High-frequency array patterns first (01-05) is correct.** Hash,
+   two pointers, sliding window, and stack are what interviews hit first.
+2. **Calling `sort()` is not chapter 11.** Arrays, two pointers, and
+   intervals all sort in week 1-3. Chapter 11 is *implementing* merge sort /
+   quicksort / quickselect. Do not wait for it before sorting an input.
+3. **Heap before graphs in the schedule.** Dijkstra needs a min-heap.
+   Trees (week 5) already taught BFS with a queue; heap is the next tool;
+   then graphs can use both.
+4. **Union-Find immediately after graphs**, not in a week-12 dump. It is
+   a connectivity tool, not a "special topic at the end."
+5. **Intervals + greedy in the same week.** They overlap (merge vs
+   non-overlapping vs arrows). Keeping intervals at folder 16 and greedy
+   at 14 is fine; studying them together is not.
+6. **Binary search after heap in the same week is fine.** Classic BS only
+   needs a sorted array; BS-on-answer is the harder half and can wait until
+   you have the early patterns down.
+7. **Backtracking after trees/graphs is correct.** You already used
+   recursion for DFS. Chapter 12 is combinatorial search, not "what is a
+   recursive call."
+8. **DP still gets two weeks.** It is the dense chapter. Do not compress it.
+9. **The old master list stopped at topic 12.** Topics 13-18 are now on
+   the same checklist.
+
+Duplicates that used to be Must in two folders (Two Sum, 3Sum, Merge
+Intervals, Top K, Number of Islands, etc.) now have one primary home.
 
 ## Study Schedule
 
-See [order.md](order.md) for full week-by-week plans:
+See [order.md](./order.md):
 
-- **12-Week Plan**: recommended default, covers Must + Should (+ Optional if
-  ahead of schedule).
-- **8-Week Plan**: accelerated, Must-only with Should as time allows.
-- **4-Week Crash Plan**: emergency prep, Must problems only, heavy on mock
-  interviews in the final week.
-
-## File Structure (Template Used by Every Topic File)
-
-Each `NN-topic-name.md` file follows this structure:
-
-```text
-# NN. Topic Name
-
-## Overview                        -- what the pattern is, why it matters
-## When to Suspect This Pattern    -- keyword/signal recognition
-## Pattern 1, 2, 3...              -- named sub-patterns with code templates
-## Common Pitfalls                 -- mistakes that cause wrong/slow answers
-## Interview Tips                  -- what to say and do during the interview
-## Problem List                    -- table: Problem | LeetCode # | Difficulty
-                                       | Priority | Notes
-```
-
-Code templates are written in Python for brevity and readability, but the
-patterns and templates translate directly to Java, C++, JavaScript,
-TypeScript, or Go -- the logic, not the syntax, is what interviews test.
+- **12-Week Plan**: recommended default, Must + Should (+ Optional if ahead).
+- **8-Week Plan**: Must-only, Should as time allows.
+- **4-Week Crash Plan**: Must only, mocks in the final week.
 
 ## How to Use This Repo Day to Day
 
-1. Read the study guide section of the day's topic; re-derive each code
-   template from memory rather than copy-pasting.
-2. Solve problems in priority order (Must, then Should, then Optional).
-3. If stuck for more than 30-40 minutes, peek at the approach only, finish
-   the problem, then re-solve it unaided 2-3 days later (spaced repetition
-   beats one-time grinding).
-4. Once a week, mix in 2-3 problems from earlier topics so patterns stay
-   fresh (interleaved review, not just sequential progress).
-5. In the final 2-3 weeks before an interview, replace new problems with
-   timed mock interviews using the 7-step framework from
-   `00-complexity-and-patterns.md`.
+1. Read `notes.md` for the day's topic.
+2. Re-derive every snippet in `common-techniques.md` from memory (that is the
+   interview muscle).
+3. Open `problems.md` and solve Must, then Should, then Optional.
+4. If stuck for more than 30-40 minutes, peek at the approach only, finish
+   the problem, then re-solve it unaided 2-3 days later.
+5. Once a week, mix in 2-3 problems from earlier topics (interleaved review).
+6. In the final 2-3 weeks before an interview, replace new problems with
+   timed mocks using the 7-step framework from
+   `00. complexity-and-patterns/notes.md`.
+
+`common-techniques.md` is TypeScript — the code you should be able to write
+in an interview. `notes.md` still has longer explanations (some examples in
+Python). Interviews test the pattern, not the syntax.
