@@ -1,0 +1,32 @@
+# StyleSheet and Flexbox (RN vs web) — Next-day repetition
+
+## How to use
+
+1. Do **not** open `notes.md` first. The full question bank is `self-test.md`; this file is the next-day subset.
+2. Answer every question out loud or in writing, notes closed.
+3. Check `answers.md` only after you finish (or after an item if stuck more than ~2 minutes).
+4. Mark `[x]` only if you retrieved it without looking.
+5. If more than about a third are misses, restudy those sections in `notes.md`, then retry only the misses.
+
+Target time: **15–25 minutes**.
+
+## Must retrieve
+
+- [ ] Yoga vs CSS engine. Default `flexDirection` in RN vs typical web flex.
+- [ ] Five memorize bullets: column, no cascade, subset, units, text on `Text`.
+- [ ] Style arrays; `StyleSheet.create` (two benefits). iOS shadow vs Android `elevation`.
+- [ ] What unit is `padding: 16`? What does safe area solve?
+- [ ] Why `color` on `View` doesn’t CSS-inherit to `Text`. Why `top: 0` isn’t enough under a notch.
+
+## Predict / debug
+
+- [ ] Parent `flex: 1`, no `flexDirection`, two fixed-height children — stacked or row? Explain why.
+- [ ] `style={[styles.a, styles.b]}` both set `marginTop` — who wins? Explain why.
+- [ ] Web engineer: Flexbox is “broken,” items in a column. First question? Android no shadow, only `shadowOpacity` — diagnosis?
+- [ ] `memo(Row)` + `style={{ padding: 8 }}` still re-renders. Likely cause?
+
+## Say it out loud
+
+- [ ] Explain RN StyleSheet/Flexbox vs web CSS in 30–60 seconds.
+- [ ] How does Flexbox differ in RN? Follow-ups: cascade? Units? Shadows? `StyleSheet.create`?
+- [ ] Why put font styles on `Text`? How do you handle notches?

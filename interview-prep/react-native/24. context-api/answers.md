@@ -1,0 +1,92 @@
+# Context API — Answers
+
+## Core recall
+
+1. **Dependency injection** of **low-frequency** app-wide dependencies — **not** a default data store.
+2. **Theme, i18n, auth presence (coarse), QueryClient/services.**
+3. **Rapidly changing values** (scroll, keystroke); **large business stores without selectors**.
+4. Context for **low-frequency** deps. Not default global store — **value change re-renders consumers** unless split/memoized. **Zustand** for complex client; **RQ** for server.
+5. **All** those consumers **re-render**.
+6. **No.**
+7. **Fan-out:** a change in **one** concern notifying **unrelated** consumers.
+8. **Boolean / userId / logged-in**, **not** the full **profile** (or hot fields).
+9. Avoid a **new object identity** every render when the **contents** didn’t change.
+10. **No** — `useContext` still re-renders on value change.
+
+## Explain why
+
+1. The **client instance is stable**; screens need it **without drilling**. It’s **DI**, not a changing **balance**.
+2. It **changes every frame** → **all** consumers work on the **JS thread** every tick.
+3. **One** `Object.is` on the **whole** value; any field change (or new object) notifies **everyone**.
+4. Each tree subscribes only to **what it needs**; theme toggle doesn’t wake auth-only leaves (and vice versa).
+5. **`value={{…}}` is a new object** → `Object.is` fails → **spurious** consumer renders.
+6. **`y` still changes every frame** — memo **correctly** rebuilds; the problem is **hot data**, not identity bugs.
+7. **Login/logout** is **rare**. **Profile refetch** is **frequent** → Context becomes a **store**.
+8. No **selectors**; every business field **wakes the world**. Zustand/Redux **subscribe by slice**.
+9. **Granularity of subscription**, not a speed brand. Context **broadcasts**; stores **select**.
+10. `memo` compares **props**. Context is **not** props; subscription **bypasses** memo.
+
+## Compare and contrast
+
+1. **DI:** stable theme/client. **Store:** lots of changing business data — **wrong** tool.
+2. Zustand: **selectors**, so `selectedAccountId` doesn’t re-render **theme** readers. Context: **all or nothing** per provider.
+3. RQ: **server cache**. Context does **not** refetch/invalidate. Don’t put lists in Context.
+4. **Presence** for the **tree** can be Context **or** a small store. **Token at rest** = **secure storage**. Don’t **also** put the token in a hot Context.
+5. **Theme:** rare → Context OK. **Account selection:** more often, **many** screens → Zustand.
+6. **Split:** independent `Object.is`. **Fat:** one bus.
+7. **`useMemo` value:** fewer **false** Context notifications. **Memo children:** parent re-renders don’t **also** rebuild a huge child **if** they aren’t consumers — **doesn’t** stop **true** Context updates.
+8. Taxonomy **assigns kinds**. This unit: **Context only if the kind is low-frequency DI**.
+
+## Predict the output
+
+1. **Yes** (typically) — **new object** each time → consumers re-render.
+2. **No** (from Context) — identity **stable** if `theme` unchanged.
+3. **No** — **different** context; ThemeButton **doesn’t** subscribe to `ScrollCtx`.
+4. **Yes** — subscribed to the **fat** ctx that includes `y`.
+5. **All re-render every refetch** (if `user` object identity changes). Coarse presence wouldn’t.
+6. **Not because of QueryClient Context** — **stable client**. Parent ticks don’t change that Provider value. (Children still re-render if **their** parent re-renders — that’s **not** QueryClient notifying.)
+
+## Debugging
+
+1. **Search string in Context** = per-keystroke store. Lift to **local state** or Zustand **selector**.
+2. **Don’t keep txs in Context.** RQ for txs; **split** theme; or Zustand for UI.
+3. **Unstable value** → consumers re-render on **every** App setState. **`useMemo`**.
+4. **WalletScreen consumes theme Context** (or a fat ctx). Memo **doesn’t** apply. Split or don’t consume.
+5. **New `t` function every render** → new `value` (if not memoized as a whole) or new function identity inside memo deps. **`useCallback`/`useMemo`** the i18n API.
+6. **Session token** is **session**, not Context-hot. Refresh **churns** all consumers; **leak** risk. Auth store + secure storage; Context at most **boolean**.
+
+## Application
+
+1. Use/avoid as curriculum; spoken sketch as notes.
+2. `QueryClientProvider` → `ThemeProvider` → `I18nProvider` → navigator.
+3.
+
+```tsx
+const value = useMemo(() => ({ mode, setMode }), [mode]);
+return <ThemeCtx.Provider value={value}>{children}</ThemeCtx.Provider>;
+```
+
+4. Theme → Context. scrollY → not Context. balances → RQ. QueryClient → Context. `isAuthenticated` → coarse Context or auth store. profile → RQ.
+5. **…be referentially stable unless the dependency actually changed** (and must not be high-frequency).
+6. **theme → Context; isAuthenticated → auth store or coarse Context; selectedAccountId → Zustand.**
+
+## Interview questions
+
+1. **Spoken:** Context is great for low-frequency app-wide dependencies. It’s not my default global data store because any value change re-renders consumers unless carefully split and memoized. Complex client → Zustand; server → React Query.  
+   **Follow-up:** **No selectors**; scroll/keystroke/fat business objects **fan out**.
+
+2. **Spoken:** **Classify.** Server → RQ. Hot/complex **client** → Zustand (or Redux if needed). **Stable DI** (theme, i18n, QueryClient) → Context. Not fashion.
+
+3. **Spoken:** **Split** providers by concern; **`useMemo`** values; **never** put hot fields in the same object as theme.
+
+4. **Spoken:** `memo` is **props**. Context consumers **still** re-render when **value** changes.
+
+5. **Spoken:** **Sometimes** a **boolean** for the shell. **Not** the token or a **refetching** user object.
+
+## Connections
+
+1. Theme **is** global client; **frequency** says **Context is enough**. `selectedAccountId` is also global client but **hotter** → Zustand.
+2. Shell **is** the place those Providers **live**.
+3. Root reads **presence**; **doesn’t** store routes or balances. Token **not** in Context.
+4. **Subscribe to one field**; Context cannot. That’s §3.
+5. Sharing ≠ Context. **RQ cache** is the share; Context would **duplicate** and **wake the tree**.
