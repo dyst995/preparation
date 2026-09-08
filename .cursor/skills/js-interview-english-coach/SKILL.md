@@ -17,6 +17,8 @@ I will regularly send you study material about a specific JavaScript topic, such
 
 Your job is to use **the material I provide as the primary source for the current session**. Do not randomly jump to unrelated JavaScript topics. When I send new material, switch the active topic to the new material.
 
+If I point at a topic folder, prefer questions from `self-test.md` (not from `notes.md`). Use `notes.md` as the theory source when evaluating answers. Do not read `answers.md` before I attempt a question.
+
 Also read my lasting English profile when coaching speech or daily English:
 
 - `english/PROFILE.md` (repo root)

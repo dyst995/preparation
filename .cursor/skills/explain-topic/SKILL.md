@@ -2,8 +2,8 @@
 name: explain-topic
 description: >-
   Expand an existing curriculum/outline section into a complete technical study
-  unit with theory, examples, connections, answer-free self-test questions in
-  notes.md, a matching answers.md answer key, and a next-day repetition.md
+  unit with theory and examples in notes.md, answer-free self-test questions in
+  self-test.md, a matching answers.md answer key, and a next-day repetition.md
   question list. Use when the user runs /explain-topic, asks to finish teaching
   a topic from existing notes, or wants outline → study unit → retrieval
   practice notes.
@@ -112,13 +112,25 @@ or:
 
 Connections should explain **why** the concepts are related.
 
-## 6. Add a self-test section
+## 6. Write self-test questions in `self-test.md`
 
-At the END of the study unit, add questions for later retrieval practice.
+Write the retrieval-practice questions in a **separate file**: **`self-test.md`** in the **same topic folder**.
 
-**Do not include answers to these questions.**
+**Never put the Self-test in `notes.md`.** Theory stays in `notes.md`; questions live only in `self-test.md`.
 
-Separate them by type.
+**Do not include answers to these questions** in `self-test.md`.
+
+If `notes.md` already has a `# Self-test` section (legacy layout), **move** those questions into `self-test.md` and **remove** the Self-test from `notes.md`. Do not leave a duplicate copy in both files.
+
+At the end of `notes.md`, add only a short pointer (no questions):
+
+```markdown
+---
+
+Self-test: [self-test.md](./self-test.md). Answers: [answers.md](./answers.md). Next-day: [repetition.md](./repetition.md).
+```
+
+Separate questions by type.
 
 ### A. Core recall
 
@@ -188,16 +200,16 @@ Generate as many questions as necessary to adequately test the important concept
 
 ## 8. Keep questions separate from teaching material
 
-The theory portion is my reference material.
+The theory portion in `notes.md` is my reference material.
 
-The self-test portion in `notes.md` is what I will return to later without rereading the theory first.
+`self-test.md` is what I will return to later without rereading the theory first.
 
 Therefore:
 
 * explanations belong in the theory sections of `notes.md`;
-* questions belong at the end of `notes.md` under `# Self-test`;
-* next-day review questions belong in `repetition.md`, not in `notes.md`;
-* do **not** put answers immediately beneath self-test questions in `notes.md` or in `repetition.md`.
+* questions belong in **`self-test.md`** under `# Self-test` — **not** in `notes.md`;
+* next-day review questions belong in `repetition.md`, not in `notes.md` or `self-test.md`;
+* do **not** put answers immediately beneath questions in `self-test.md` or in `repetition.md`.
 
 When I later provide my answers in chat, evaluate each answer individually for:
 
@@ -211,13 +223,13 @@ Then explain what I got wrong or omitted and identify which concepts I should re
 
 ## 9. Answer key file (`answers.md`)
 
-After writing `notes.md`, also write **`answers.md`** in the **same topic folder**.
+After writing `notes.md` and `self-test.md`, also write **`answers.md`** in the **same topic folder**.
 
-`answers.md` is the answer key for the Self-test section. I use it after attempting questions from memory.
+`answers.md` is the answer key for `self-test.md`. I use it after attempting questions from memory.
 
 ### Requirements
 
-1. Cover **every** self-test question from `notes.md` — same sections, same numbering/order.
+1. Cover **every** question from `self-test.md` — same sections, same numbering/order.
 2. For each question provide:
    * a clear **answer**;
    * a short **explanation** of why (mechanism, not only the result);
@@ -240,11 +252,11 @@ After writing `notes.md`, also write **`answers.md`** in the **same topic folder
 
 4. Do not leave placeholders like “see notes.” Answers must stand alone so I can check myself without hunting through `notes.md`.
 5. Keep explanations concise but complete enough for interview-level understanding.
-6. If `answers.md` already exists, update it in place when the self-test changes.
+6. If `answers.md` already exists, update it in place when `self-test.md` changes.
 
 ## 10. Next-day file (`repetition.md`)
 
-After writing `notes.md` and `answers.md`, also write **`repetition.md`** in the **same topic folder**.
+After writing `notes.md`, `self-test.md`, and `answers.md`, also write **`repetition.md`** in the **same topic folder**.
 
 `repetition.md` is the file I open **the next day** to repeat the topic. It is not a second full self-test and not a summary of the theory.
 
@@ -258,7 +270,7 @@ I should be able to sit down, open only `repetition.md`, answer the list, then c
 
 Include a short **How to use** block:
 
-1. Do **not** open `notes.md` first.
+1. Do **not** open `notes.md` first. The full question bank is `self-test.md`; this file is the next-day subset.
 2. Answer every question out loud or in writing, notes closed.
 3. Check `answers.md` only after you finish (or after an item if stuck more than ~2 minutes).
 4. Mark `[x]` only if you retrieved it without looking.
@@ -268,12 +280,12 @@ Target time: **15–25 minutes**.
 
 ### Question list
 
-Write a **curated** list — not a dump of the entire Self-test.
+Write a **curated** list — not a dump of the entire `self-test.md`.
 
-1. Select the highest-value items from the Self-test: load-bearing definitions, the easiest-to-confuse contrasts, the best predict-the-output snippets, one debugging or application item, and 1–2 interview questions I should be able to say out loud.
-2. Prefer copying or lightly adapting Self-test questions so the answers still live in `answers.md`. Do not invent a parallel question bank that drifts from the answer key.
+1. Select the highest-value items from `self-test.md`: load-bearing definitions, the easiest-to-confuse contrasts, the best predict-the-output snippets, one debugging or application item, and 1–2 interview questions I should be able to say out loud.
+2. Prefer copying or lightly adapting questions from `self-test.md` so the answers still live in `answers.md`. Do not invent a parallel question bank that drifts from the answer key.
 3. Do **not** include answers, hints that give the answer away, or theory recaps.
-4. Keep the list short enough for next-day review: typically **8–14 questions**. A small topic may need ~8; a large one (event loop, promises, hooks) may need up to ~14. Never copy every Self-test question.
+4. Keep the list short enough for next-day review: typically **8–14 questions**. A small topic may need ~8; a large one (event loop, promises, hooks) may need up to ~14. Never copy every question from `self-test.md`.
 5. Use checkboxes so I can mark what I got right:
 
 ```markdown
@@ -300,12 +312,12 @@ Write a **curated** list — not a dump of the entire Self-test.
 ```
 
 8. Under **Must retrieve**: core facts, explain-why, and compare/contrast that the topic collapses without.
-9. Under **Predict / debug**: 2–5 of the strongest snippets (not every snippet from the Self-test).
+9. Under **Predict / debug**: 2–5 of the strongest snippets (not every snippet from `self-test.md`).
 10. Under **Say it out loud**: 1–2 interview questions, plus a one-line prompt to explain the topic in 30–60 seconds as if an interviewer asked.
 
 ### Keep it in sync
 
-If `notes.md` Self-test or `answers.md` changes, update `repetition.md` in place so it still points at the current load-bearing questions.
+If `self-test.md` or `answers.md` changes, update `repetition.md` in place so it still points at the current load-bearing questions.
 
 If `repetition.md` already exists, update it rather than creating a duplicate filename.
 
@@ -335,7 +347,16 @@ Theory and examples.
 
 ## Interview perspective
 
-# Self-test
+---
+
+Self-test: [self-test.md](./self-test.md). Answers: [answers.md](./answers.md). Next-day: [repetition.md](./repetition.md).
+
+Do **not** include `# Self-test` or questions in `notes.md`.
+
+### `self-test.md`
+
+```markdown
+# [Topic] — Self-test
 
 ## Core recall
 
@@ -352,10 +373,13 @@ Theory and examples.
 ## Interview questions
 
 ## Connections
+```
+
+No answers in this file.
 
 ### `answers.md`
 
-Full answer key matching the Self-test section (see §9).
+Full answer key matching `self-test.md` (see §9).
 
 ### `repetition.md`
 
@@ -369,15 +393,16 @@ After you finish the study unit, **write it to disk** — do not only paste it i
    - lowercase kebab-case (e.g. `Scope` → `scope`, `Event Loop` → `event-loop`);
    - keep it short and stable; do not invent a curriculum path the user did not ask for.
 2. Create that folder if it does not exist.
-3. Write all three files inside it:
-   - `<topic-folder>/notes.md` — theory + self-test questions (no answers under questions)
-   - `<topic-folder>/answers.md` — answers and explanations for every self-test question
+3. Write all four files inside it:
+   - `<topic-folder>/notes.md` — theory only (no Self-test questions)
+   - `<topic-folder>/self-test.md` — retrieval questions (no answers)
+   - `<topic-folder>/answers.md` — answers and explanations for every `self-test.md` question
    - `<topic-folder>/repetition.md` — next-day retrieval list (no answers)
 4. Placement:
    - If the user points at an existing notes file or directory, create the topic folder **next to that source** (same parent directory), unless they specify another location.
    - Otherwise create the topic folder in the workspace root.
    - If the user names an explicit output path, use that.
-5. If `notes.md`, `answers.md`, or `repetition.md` already exists, update in place rather than creating duplicate filenames, unless the user asks for a new file.
-6. After writing, tell the user the exact paths of **all three** saved files.
+5. If `notes.md`, `self-test.md`, `answers.md`, or `repetition.md` already exists, update in place rather than creating duplicate filenames, unless the user asks for a new file.
+6. After writing, tell the user the exact paths of **all four** saved files.
 
-The chat reply may briefly confirm what was expanded and where it was saved. The durable artifacts are `notes.md`, `answers.md`, and `repetition.md` in the topic folder.
+The chat reply may briefly confirm what was expanded and where it was saved. The durable artifacts are `notes.md`, `self-test.md`, `answers.md`, and `repetition.md` in the topic folder.

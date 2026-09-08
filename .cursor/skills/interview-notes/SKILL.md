@@ -4,7 +4,7 @@ description: >-
   Create structured interview-preparation notes from technical material in the
   Definition / How to say it template. Use when the user asks for verbal
   rehearsal notes or that older concept template. For outline → full study unit
-  with self-test questions, use /explain-topic instead.
+  with self-test questions in self-test.md, use /explain-topic instead.
 ---
 
 # Interview Notes Generator
@@ -97,6 +97,7 @@ List 3–6 likely follow-ups with short model answers (2–4 sentences each).
 - If the source is shallow, expand it until an interview explanation is possible.
 - If the source mixes many ideas, split into separate `## Concept` sections.
 - Use the stack I am studying when relevant (JavaScript, TypeScript, React, React Native, Next.js, NestJS, SQL, DevOps).
+- If this skill is used to produce retrieval questions, write them in a separate `self-test.md` in the same folder. Do **not** put a `# Self-test` section inside the notes file. Answers go in `answers.md`, never under the questions.
 
 ---
 
