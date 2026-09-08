@@ -9,7 +9,7 @@
 
 Interview bar: explain the **jank problem**, how **linked-list traversal + yield** fixes it, **current vs work-in-progress** double buffering, and that **Fiber ≠ concurrent mode** (Fiber enables it).
 
-Prerequisites: [virtual DOM / elements](../1.%20virtual-dom/notes.md) (if present), [render vs commit](../2.%20render-vs-commit/notes.md).
+Prerequisites: [virtual DOM / elements](../1.%20virtual-dom/notes.md), [render vs commit](../2.%20render-vs-commit/notes.md).
 
 ---
 
