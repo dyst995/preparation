@@ -2,6 +2,8 @@
 
 > Goal: Speak fluently and confidently about the exact pipeline you built and ran in production - Fastlane + GitLab Runner for Android and iOS, signing, versioning, OTA tradeoffs, store submission, staged rollouts, and hotfixes - at a depth that survives senior/staff follow-ups.
 
+iOS signing **pieces** (certificate / App ID / profile) and Android keystore vs Play App Signing are also in [native-developement](../native-developement/INDEX.md) — this chapter is lanes, runners, and store ops.
+
 Mark progress with `[x]` as you master each topic.
 
 ---

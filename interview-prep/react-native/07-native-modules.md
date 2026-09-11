@@ -8,6 +8,8 @@ Mark progress with `[x]` as you master each topic.
 > - [15 - Bridge](./15-bridge.md)
 > - [16 - Native Modules (legacy)](./16-native-modules.md)
 > - [17 - Turbo Modules](./17-turbo-modules.md)
+>
+> Host OS (Gradle, Xcode, lifecycle, permissions, signing — not Bridge/Codegen): [native-developement](../native-developement/INDEX.md)
 
 ---
 

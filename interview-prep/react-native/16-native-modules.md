@@ -2,7 +2,7 @@
 
 > Goal: Implement and explain classic React Native Native Modules on Android and iOS - registration, exported methods, promises/callbacks/events, threading, and packaging - at senior interview depth.
 
-Your CV explicitly includes **Native Android Integrations** and **Native iOS Integrations**. This chapter is the legacy-module deep dive. For transport theory see [15-bridge.md](./15-bridge.md). For modern Turbo Modules see [17-turbo-modules.md](./17-turbo-modules.md). For product integrations (DataWedge, biometrics, patches) see [07-native-modules.md](./07-native-modules.md).
+Your CV explicitly includes **Native Android Integrations** and **Native iOS Integrations**. This chapter is the legacy-module deep dive. For transport theory see [15-bridge.md](./15-bridge.md). For modern Turbo Modules see [17-turbo-modules.md](./17-turbo-modules.md). For product integrations (DataWedge, biometrics, patches) see [07-native-modules.md](./07-native-modules.md). For Gradle / Xcode / lifecycle / permissions (the host those modules run in) see [native-developement](../native-developement/INDEX.md).
 
 Mark progress with `[x]`.
 

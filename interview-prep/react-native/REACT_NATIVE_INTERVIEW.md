@@ -38,6 +38,7 @@ Study these three together - they map directly to CV keywords:
 2. [16 - Native Modules](./16-native-modules.md) - classic Android/iOS integrations
 3. [17 - Turbo Modules](./17-turbo-modules.md) - modern New Architecture modules
 4. Then review [07 - Native Integrations](./07-native-modules.md) for DataWedge / Wizer / patches / biometrics stories
+5. Host OS literacy (Gradle / Xcode / permissions / signing): [native-developement](../native-developement/INDEX.md)
 
 ---
 

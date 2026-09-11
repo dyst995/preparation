@@ -2,6 +2,8 @@
 
 > Goal: Speak with fintech-grade rigor about mobile client security - secure storage, transport security, anti-tampering awareness, deep link validation, permissions, and native bridge risks - at a depth that matches having shipped real fintech and government-adjacent apps (Orient Logic) plus payment flows (Wizer, EasyPay, MyCreditInfo).
 
+Host knobs (ATS / networkSecurityConfig, backup, FileProvider, background limits): [native-developement/05](../native-developement/05-storage-background-security.md).
+
 Mark progress with `[x]` as you master each topic.
 
 ---

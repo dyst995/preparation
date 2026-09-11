@@ -1,6 +1,6 @@
 # Learning Order
 
-Follow this sequence top to bottom. It is built for **8-10 hours/day** and prioritizes what interviewers will hit hardest for your CV: **TypeScript/JS -> React -> React Native (including Bridge / Native Modules / Turbo Modules) -> NestJS + SQL -> Next.js -> DevOps -> mocks**.
+Follow this sequence top to bottom. It is built for **8-10 hours/day** and prioritizes what interviewers will hit hardest for your CV: **TypeScript/JS -> React -> React Native (including Bridge / Native Modules / Turbo Modules) -> native Android/iOS host literacy -> NestJS + SQL -> Next.js -> DevOps -> mocks**.
 
 Mark items `[x]` as you finish.
 
@@ -110,6 +110,27 @@ Goal: own the keywords on your CV. Do these in this exact order.
 - [ ] Draw Bridge vs JSI/Turbo Modules from memory
 - [ ] 90-second stories: DataWedge, Wizer iOS preview, MyCreditInfo native patch
 - [ ] FlatList + JS vs UI thread diagnosis
+
+---
+
+## After Day 5 (same evening or Day 6 morning) — Native platform literacy
+
+Goal: Gradle / Xcode / lifecycle / permissions so modules and signing have a **host**. Day 5 is already full — budget **~2.5h** (01–04 first; 05–06 if they probe storage or crashes).
+
+- [ ] [native-developement/INDEX.md](./native-developement/INDEX.md)
+- [ ] [native-developement/01-android.md](./native-developement/01-android.md)
+- [ ] [native-developement/02-ios.md](./native-developement/02-ios.md)
+- [ ] [native-developement/03-android-vs-ios.md](./native-developement/03-android-vs-ios.md) (fill tables from memory)
+- [ ] [native-developement/05-storage-background-security.md](./native-developement/05-storage-background-security.md)
+- [ ] [native-developement/06-debug-playbook.md](./native-developement/06-debug-playbook.md)
+- [ ] [native-developement/04-interview-questions.md](./native-developement/04-interview-questions.md) (notes closed)
+
+**Check**
+- [ ] Three SDK numbers + iOS signing trio
+- [ ] When you open Android Studio / Xcode vs Metro
+- [ ] Permission crash (iOS) vs silent fail (Android)
+- [ ] Vault vs AsyncStorage; no background payment socket
+- [ ] One incident: ANR **or** patched AAR **or** QuickLook
 
 ---
 
@@ -270,6 +291,15 @@ Use this if you prefer one flat list with no day splits.
 20. [ ] `react-native/07-native-modules.md`
 21. [ ] `react-native/06-performance.md`
 
+### Native platform literacy (host OS — Android + iOS)
+- [ ] `native-developement/INDEX.md`
+- [ ] `native-developement/01-android.md`
+- [ ] `native-developement/02-ios.md`
+- [ ] `native-developement/03-android-vs-ios.md`
+- [ ] `native-developement/05-storage-background-security.md`
+- [ ] `native-developement/06-debug-playbook.md`
+- [ ] `native-developement/04-interview-questions.md`
+
 ### React Native (production)
 22. [ ] `react-native/08-push-firebase-device.md`
 23. [ ] `react-native/09-forms-ux-fintech.md`
@@ -317,7 +347,7 @@ Do this compressed path only:
 
 1. Day 1: TS/JS `01-03` + React `01-02`
 2. Day 2: React `03-06` + RN `01-05`
-3. Day 3: RN `15 -> 16 -> 17 -> 07 -> 06 -> 12 -> 14`
+3. Day 3: RN `15 -> 16 -> 17 -> 07 -> 06 -> 12 -> 14` (+ `native-developement/03` tables if they ask Gradle/Xcode)
 4. Day 4: Nest `01-03,05` + SQL `01-03`
 5. Day 5: Next `01-03` + DevOps `01-02` + mocks + stories
 
@@ -336,6 +366,8 @@ Emergency order (one day):
 7. `react-native/04-navigation.md`
 8. `react-native/12-upgrades-stability.md`
 9. `react-native/14-behavioral-stories.md`
+10. `native-developement/03-android-vs-ios.md` + `04-interview-questions.md` (45 min if they probe Studio/Xcode)
+11. `native-developement/06-debug-playbook.md` if they ask “walk a native crash”
 
 ---
 
@@ -346,6 +378,7 @@ Emergency order (one day):
 - [ ] Day 3 done
 - [ ] Day 4 done
 - [ ] Day 5 done (Bridge / Native / Turbo)
+- [ ] Native platform literacy done (Android + iOS host)
 - [ ] Day 6 done
 - [ ] Day 7 done
 - [ ] Day 8 done

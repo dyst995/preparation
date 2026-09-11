@@ -4,7 +4,7 @@ Study materials based on **Nika Beroshvili's** CV stack.
 
 **Start here for the learning sequence:** [order.md](./order.md)
 
-**55 markdown files / ~24,000+ lines** across 7 technology tracks.
+**62 markdown files / ~24,000+ lines** across 8 technology tracks.
 
 Each chapter includes: learning objectives, topic checklists, deep explanations, tables, interview Q&A with model answers, hands-on drills, green/red flags, CV tie-backs, and mastery checklists.
 
@@ -30,8 +30,9 @@ Each chapter includes: learning objectives, topic checklists, deep explanations,
 | [nestjs/](./nestjs/INDEX.md) | 7 chapters + index | NestJS, Node, REST, WebSockets, JWT, Swagger, TypeORM | **High** |
 | [sql-databases/](./sql-databases/INDEX.md) | 5 chapters + index | PostgreSQL, MySQL, SQL, TypeORM | **Medium-High** |
 | [devops-cloud/](./devops-cloud/INDEX.md) | 5 chapters + index | Docker, AWS S3/SNS, Nginx, Git, SSL/VPS, CI | **Medium** |
+| [native-developement/](./native-developement/INDEX.md) | 6 chapters + index | Android Gradle/Manifest/Activity; iOS Xcode/plist/signing; storage/backup; host debugging | **High** with RN (platform literacy) |
 
-Working-knowledge languages (Kotlin, Swift, Java, Objective-C) are covered inside [react-native/07-native-modules.md](./react-native/07-native-modules.md), not as separate language tracks.
+Working-knowledge languages (Kotlin, Swift, Java, Objective-C) are **not** separate language tracks. Read them inside [react-native/07-native-modules.md](./react-native/07-native-modules.md) and the [native-developement](./native-developement/INDEX.md) host-OS track (Gradle, Xcode, lifecycle, permissions).
 
 ---
 
@@ -58,6 +59,9 @@ Working-knowledge languages (Kotlin, Swift, Java, Objective-C) are covered insid
 ### DevOps / Cloud
 `01` Docker | `02` Nginx/SSL/VPS | `03` AWS S3/SNS | `04` Git/CI | `05` Q&A + Deploy Stories
 
+### Native development (Android + iOS)
+`01` Android | `02` iOS | `03` Android vs iOS tables | `04` Spoken Q&A | `05` Storage/background/security | `06` Debug playbook — [track index](./native-developement/INDEX.md)
+
 ---
 
 ## Suggested study order (8-10h/day)
@@ -72,8 +76,9 @@ Working-knowledge languages (Kotlin, Swift, Java, Objective-C) are covered insid
 5. `nextjs/`
 
 ### Phase C - Senior glue (Day 6-7)
-6. `devops-cloud/`
-7. Behavioral stories (RN ch.14 + Nest/Next STAR sections)
+6. `native-developement/` (after RN native modules — Gradle/Xcode host literacy)
+7. `devops-cloud/`
+8. Behavioral stories (RN ch.14 + Nest/Next STAR sections)
 
 ### Phase D - Mocks (Day 8+)
 Timed coding + system design for: **EasyPay**, **Clean House**, **VetApp**, **Online School**, **Travel2Georgia**
@@ -100,6 +105,7 @@ Timed coding + system design for: **EasyPay**, **Clean House**, **VetApp**, **On
 - [ ] SQL / Databases
 - [ ] Next.js
 - [ ] DevOps / Cloud
+- [ ] Native development (Android + iOS)
 - [ ] DSA ([interview-dsa/](../interview-dsa/))
 
 ---
