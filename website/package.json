@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:pages": "BASE_PATH=/preparation/ vite build",
+    "build:pages": "BASE_PATH=/preparation/ vite build && cp dist/index.html dist/404.html",
     "preview": "vite preview",
     "preview:pages": "BASE_PATH=/preparation/ vite preview"
   },

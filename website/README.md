@@ -16,7 +16,7 @@ Repo is [dyst995/preparation](https://github.com/dyst995/preparation). The site 
 
 **https://dyst995.github.io/preparation/**
 
-Push to `master` runs [`.github/workflows/pages.yml`](../.github/workflows/pages.yml): it builds with `BASE_PATH=/preparation/` and deploys static `dist/` (catalog + notes baked into `data/`).
+Push to `master` runs [`.github/workflows/pages.yml`](../.github/workflows/pages.yml): it builds with `BASE_PATH=/preparation/` and deploys static `dist/` (catalog + notes baked into `data/`). `404.html` is a copy of `index.html` so unknown paths still load the app.
 
 One-time setup in the GitHub repo:
 
