@@ -110,17 +110,17 @@ Timed coding + system design for: **EasyPay**, **Clean House**, **VetApp**, **On
 
 ---
 
-## Flashcards app
+## Notes + flashcards site
 
-Practice with the web app in [`../flashcards-project/`](../flashcards-project/):
+Read theory and (when a topic has a deck) flip flashcards in [`../website/`](../website/):
 
 ```bash
-cd flashcards-project && npm install && npm run dev
+cd website && npm install && npm run dev
 ```
 
-Cards are auto-generated from interview-prep chapters. Only **real Q&A pairs** are included (questions with actual model answers from the docs) — no generic placeholder cards.
+Live (after Pages is enabled): **https://dyst995.github.io/preparation/**
 
-Default view in the app: **Q&A with answers**.
+Study units show **Notes / Self-test / Answers / Repetition**. A **Flashcards** tab appears only if that topic has `flashcards.json` (or `01-foo.flashcards.json` next to a chapter file). Decks are added per topic on request — they are not auto-generated.
 
 ## Mock interviewer app
 
