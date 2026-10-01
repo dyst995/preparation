@@ -1,0 +1,204 @@
+{
+  "title": "Enums vs union literals",
+  "subtitle": "Runtime emit, reverse mapping, as const maps",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "closed-set-two-tools",
+      "front": "What two TypeScript tools model a closed set of values?",
+      "meaning": "Enums, which emit runtime objects, and string/number literal unions, which are usually fully erased. Enums remain useful for namespacing and some numeric domains; many modern React/RN codebases default to literal unions or as const objects."
+    },
+    {
+      "id": "modern-default-unions",
+      "front": "What do many React/RN codebases default to instead of enums?",
+      "meaning": "Literal unions or as const objects. Enums are kept when namespacing or a numeric domain actually needs a runtime object — not as the default for API/DTO string fields."
+    },
+    {
+      "id": "numeric-auto-increment",
+      "front": "What values do numeric enum members get if you omit initializers?",
+      "meaning": "They auto-increment from 0: Admin is 0, Editor is 1, Viewer is 2. Role.Admin is therefore 0 at both type and runtime.",
+      "example": "enum Role { Admin, Editor, Viewer } // Role.Admin === 0"
+    },
+    {
+      "id": "numeric-reverse-map",
+      "front": "What is Role[0] on a numeric enum?",
+      "meaning": "Numeric enums emit a runtime object with forward and reverse mapping: Role.Admin is 0 and Role[0] is 'Admin'. Role['Admin'] === 0 as well.",
+      "example": "Role[0]; // 'Admin' — reverse mapping",
+      "notes": "Newcomers often confuse Role[Role.Admin], which looks up the reverse name from the numeric value."
+    },
+    {
+      "id": "enum-iife-emit",
+      "front": "How does a regular enum compile to JavaScript?",
+      "meaning": "It compiles to an IIFE that builds a real JS object with forward entries and, for numeric enums, reverse entries. That object is shipped in the bundle unless tree-shaken carefully — often kept whole."
+    },
+    {
+      "id": "enum-runtime-footprint",
+      "front": "What is the bundle cost of a regular enum vs a literal union?",
+      "meaning": "A regular enum is a real JS object, usually shipped whole. A string literal union type has zero runtime footprint for the type itself — fully erased."
+    },
+    {
+      "id": "object-keys-numeric-enum",
+      "front": "What does Object.keys(Role) include for a numeric enum?",
+      "meaning": "Both member names and the stringified numbers from reverse mapping. Numeric enums are not a clean list of names if you iterate the object naively.",
+      "example": "Object.keys(Role) includes 'Admin' and '0' (and the rest)."
+    },
+    {
+      "id": "iterate-numeric-enum",
+      "front": "How do you iterate a numeric enum without picking up reverse keys?",
+      "meaning": "Filter with care — a common approach is typeof value === 'string' so you keep names and skip the numeric reverse entries. Unfiltered iteration includes both directions.",
+      "notes": "Iterating numeric enums without filtering reverse keys is a listed trap."
+    },
+    {
+      "id": "role-role-admin-trap",
+      "front": "Why is Role[Role.Admin] confusing on a numeric enum?",
+      "meaning": "Role.Admin is 0, so Role[Role.Admin] is Role[0], which reverse-maps to the string 'Admin'. Newcomers mix the numeric value with the reverse name lookup."
+    },
+    {
+      "id": "string-enum-runtime",
+      "front": "Is a string enum erased at runtime?",
+      "meaning": "No. It is still a runtime object, like a numeric enum. The difference is values are stable strings closer to API payloads — not that it vanishes from the bundle."
+    },
+    {
+      "id": "string-enum-no-reverse",
+      "front": "Do string enums have reverse mapping?",
+      "meaning": "No. TypeScript does not auto-create Role.ADMIN-style keys from the string values. Only numeric enums add reverse entries.",
+      "example": "enum Role { Admin = 'ADMIN' } // Role['ADMIN'] is not auto-created"
+    },
+    {
+      "id": "string-enum-compare",
+      "front": "How do you typically compare a string-enum value?",
+      "meaning": "You often still write role === Role.Admin rather than treating any 'ADMIN' string as the same. Whether a loose string counts depends on typing and the enum's somewhat nominal behavior."
+    },
+    {
+      "id": "string-enum-interop",
+      "front": "Can a plain JSON string assign to a string enum?",
+      "meaning": "Often not without a cast. String enums are somewhat nominal: a plain 'ADMIN' may not be assignable to Role. A literal union type Role = 'admin' | … accepts matching strings after validation more naturally."
+    },
+    {
+      "id": "nominal-feature-or-pain",
+      "front": "Is string-enum nominal typing a feature or a pain?",
+      "meaning": "Both. Stricter assignability can prevent mixing arbitrary strings with Role; the same rule is a pain for JSON interop, where you may need a cast that a literal union would not."
+    },
+    {
+      "id": "const-enum",
+      "front": "What does const enum emit, and what are the tooling caveats?",
+      "meaning": "Members inline at compile time — no runtime object from classic tsc emit. isolatedModules, Babel, and SWC may forbid or mishandle const enum because they do not see the whole program; you may need preserveConstEnums or should avoid const enum.",
+      "example": "const enum Direction { Up, Down } const d = Direction.Up; // typically inlines to 0"
+    },
+    {
+      "id": "const-enum-debug",
+      "front": "Why is const enum harder to debug?",
+      "meaning": "Inlined members appear as magic numbers or strings in the output, with no Direction.Up object left to inspect. That is another reason teams prefer literal unions unless they control a tsc-centric pipeline and want inlining."
+    },
+    {
+      "id": "prefer-unions-over-const-enum",
+      "front": "When should you prefer literal unions over const enum?",
+      "meaning": "By default. Prefer literal unions unless you control a tsc-centric pipeline and specifically want inlining. Const enum plus Babel or isolatedModules is a common breakage."
+    },
+    {
+      "id": "union-json-assign",
+      "front": "Why do API JSON strings work with a literal union type?",
+      "meaning": "The type is fully erased and a plain literal like 'admin' is assignable after validation. canEdit('admin') is ok — you do not need an enum member or a cast the way string enums often do.",
+      "example": "type Role = 'admin' | 'editor' | 'viewer'; canEdit('admin'); // ok"
+    },
+    {
+      "id": "union-discriminated-pair",
+      "front": "How do literal unions pair with discriminated unions?",
+      "meaning": "Discriminant tags are themselves literal unions, e.g. status: 'loading' | 'success'. That is the default style — not numeric enums as tags."
+    },
+    {
+      "id": "as-const-map",
+      "front": "How do you derive a union from an as const object?",
+      "meaning": "const ROLES = { Admin: 'admin', ... } as const; type Role = (typeof ROLES)[keyof typeof ROLES]. You get namespaced ROLES.Admin plus a derived union of the values.",
+      "example": "type Role = (typeof ROLES)[keyof typeof ROLES]; // 'admin' | 'editor' | 'viewer'"
+    },
+    {
+      "id": "as-const-no-reverse",
+      "front": "Does an as const object map include reverse mapping?",
+      "meaning": "No. You get a runtime object only if you use it, and it contains only the entries you listed — no numeric reverse map. That is enum ergonomics without enum reverse-mapping surprises."
+    },
+    {
+      "id": "as-const-tree-shake",
+      "front": "How does as const tree-shaking compare to a regular enum?",
+      "meaning": "An as const map can tree-shake better if you import individual constants carefully (bundler-dependent). A regular enum object with all members is worse to shake and is often kept whole."
+    },
+    {
+      "id": "const-array-union",
+      "front": "How do you derive a union from an as const array?",
+      "meaning": "const ROLES = ['admin', 'editor', 'viewer'] as const; type Role = (typeof ROLES)[number] derives the union from a readonly tuple — useful for iteration plus typing together.",
+      "example": "type Role = (typeof ROLES)[number];"
+    },
+    {
+      "id": "comparison-runtime",
+      "front": "Comparison table: runtime footprint of enum vs union?",
+      "meaning": "enum is a real JS object (usually). A union of string literals has zero footprint for the type — fully erased. const enum inlines with tooling caveats; unions are always erased."
+    },
+    {
+      "id": "comparison-interop",
+      "front": "Comparison table: enum vs union interop with JSON strings?",
+      "meaning": "Enums often need an enum member or a cast — especially string enums' nominal feel; numeric enums are worse. With a union, 'admin' works with the union type after validation."
+    },
+    {
+      "id": "comparison-reverse-tree",
+      "front": "Comparison table: reverse mapping and tree-shaking?",
+      "meaning": "Numeric enums have reverse mapping (surprising); unions have none. Tree-shaking is worse for enums because you ship an object with all members; better for unions because there is nothing to ship for the type."
+    },
+    {
+      "id": "prefer-unions-default",
+      "front": "Why prefer type Role = 'admin' | 'editor' | 'viewer' over enum Role?",
+      "meaning": "Unions are erased — no bundle cost — while regular enums emit a JS object. Literals interoperate with JSON/API strings more naturally. Enums give Role.Admin namespacing and numeric ordering sometimes; for most API/DTO fields, default to string literal unions or as const maps when you want a runtime namespace."
+    },
+    {
+      "id": "when-enum-still",
+      "front": "When do enums still make sense?",
+      "meaning": "Existing codebase or library APIs that already expose enums; when you want a runtime object to iterate or display labels and accept the cost; rare numeric protocols with reverse lookup (document carefully); or aligning with a domain that already thinks in enums, such as some Java interop. Otherwise union plus as const."
+    },
+    {
+      "id": "exhaustiveness-both",
+      "front": "Does switch plus assertNever work with enum vs union?",
+      "meaning": "Literal unions work cleanly with switch and assertNever. Enums do too (case Role.Admin). With numeric enums, remember reverse-mapping quirks if values are not fixed carefully, and reverse keys when iterating the enum object."
+    },
+    {
+      "id": "enums-not-erased",
+      "front": "Are enums erased like interfaces?",
+      "meaning": "Regular enums are not — they emit runtime objects. Interfaces and type unions erase. Assuming enums vanish like interfaces is a common mistake."
+    },
+    {
+      "id": "numeric-json-trap",
+      "front": "Why not use numeric enums for API roles?",
+      "meaning": "APIs sending 0/1 for roles are brittle and confuse consumers. Prefer string literals in DTOs and validate at the boundary — fewer mappings than numeric enums."
+    },
+    {
+      "id": "enums-banned-absolutism",
+      "front": "Are enums always banned?",
+      "meaning": "No. 'Enums are banned' absolutism skips the tradeoff. Default to unions for DTOs; keep enums when you need a runtime namespace, an existing API, or a documented numeric protocol."
+    },
+    {
+      "id": "string-enum-assignability-trap",
+      "front": "What is the trap when comparing a string enum to a loose string?",
+      "meaning": "Assignability is not the same as a literal union. A loose string may not be a Role without a cast, so equality checks and JSON values can surprise you if you ignore the somewhat nominal typing."
+    },
+    {
+      "id": "connections-closed-set",
+      "front": "Three ways to model a closed set of values?",
+      "meaning": "A literal union (erased), an enum (runtime object), or an as const map (runtime object plus a derived union). Pick from that fork, not from a fourth invented mechanism."
+    },
+    {
+      "id": "connections-discriminant-style",
+      "front": "Should discriminants be literal tags or numeric enums?",
+      "meaning": "Default style is literal tags, not numeric enums. Discriminated unions pair with string literal unions; numeric enum tags fight JSON interop and reverse-mapping quirks."
+    },
+    {
+      "id": "connections-bundle-rn",
+      "front": "Why prefer erasure for React/RN closed sets?",
+      "meaning": "Bundle size: a type union ships nothing; a regular enum ships an object. React and RN codebases often prefer erasure for that reason, using as const only when a runtime namespace is actually used."
+    },
+    {
+      "id": "interview-balanced-default",
+      "front": "What balanced default should you give in an interview?",
+      "meaning": "Unions for DTOs and API strings; enums when namespacing or a runtime object is wanted. Be ready to show reverse mapping, string-enum vs union interop, const enum tooling caveats, and deriving a union from as const."
+    }
+  ]
+}

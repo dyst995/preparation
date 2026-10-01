@@ -1,0 +1,186 @@
+{
+  "title": "Mapped types",
+  "subtitle": "keyof iteration, modifiers, as remapping",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "basic-map-syntax",
+      "front": "What does { [K in keyof T]: ... } mean?",
+      "meaning": "A mapped type builds a new object type by iterating keys. For each key K in keyof T, emit a property with that name and a computed value type — often T[K] or a transform. You can change value types, add or remove ? / readonly, or rename keys with as."
+    },
+    {
+      "id": "not-magic-builtins",
+      "front": "Are Partial, Required, Readonly, Pick, and Record magic builtins?",
+      "meaning": "No. They are implemented as mapped types, not compiler magic. Thinking Partial or Readonly are special primitives is a listed misconception."
+    },
+    {
+      "id": "flags-boolean-map",
+      "front": "What does Flags<T> = { [K in keyof T]: boolean } produce?",
+      "meaning": "Same keys as T but every value type becomes boolean — a typical feature-flag shape over an interface.",
+      "example": "type FeatureFlags = Flags<FeatureSet>; // { darkMode: boolean; betaAccess: boolean }"
+    },
+    {
+      "id": "mental-model-identity",
+      "front": "What is the mental model, and what is an identity map?",
+      "meaning": "For each key K in keyof T, emit property K with a computed type, often T[K] or a transform of it. type Mirror<T> = { [K in keyof T]: T[K] } is the identity map — same keys and same value types.",
+      "example": "type Mirror<T> = { [K in keyof T]: T[K] };"
+    },
+    {
+      "id": "why-mapped-exist",
+      "front": "Why do mapped types exist?",
+      "meaning": "Object shapes repeat with systematic changes: same keys all optional, same keys readonly, getters for each field. Mapped types express that once instead of re-listing fields."
+    },
+    {
+      "id": "maps-are-erased",
+      "front": "Do mapped types loop at runtime?",
+      "meaning": "No. They are erased — no runtime loop; only a compile-time type. Like other TypeScript type machinery, they do not produce JS iteration."
+    },
+    {
+      "id": "partial-implementation",
+      "front": "How do you implement Partial<T>?",
+      "meaning": "type MyPartial<T> = { [K in keyof T]?: T[K] }; — adds optional ? to every property. Built-in Partial is this mapped type, not magic.",
+      "example": "type MyPartial<T> = { [K in keyof T]?: T[K] };"
+    },
+    {
+      "id": "readonly-implementation",
+      "front": "How do you implement Readonly<T> as a mapped type?",
+      "meaning": "type MyReadonly<T> = { readonly [K in keyof T]: T[K] }; — re-declares each key with readonly and the same value type.",
+      "example": "type MyReadonly<T> = { readonly [K in keyof T]: T[K] };"
+    },
+    {
+      "id": "required-minus-optional",
+      "front": "What does [K in keyof T]-? do?",
+      "meaning": "The -? modifier removes optionality from each key — how Required is implemented. type MyRequired<T> = { [K in keyof T]-?: T[K] }.",
+      "example": "type MyRequired<T> = { [K in keyof T]-?: T[K] };"
+    },
+    {
+      "id": "mutable-minus-readonly",
+      "front": "How do you strip readonly with a mapped type?",
+      "meaning": "type MyMutable<T> = { -readonly [K in keyof T]: T[K] };. The - prefix removes the readonly modifier the way -? removes optionality."
+    },
+    {
+      "id": "plus-modifiers-symmetry",
+      "front": "What are +? and +readonly for?",
+      "meaning": "They exist for symmetry with the minus forms. Usually you write ? / readonly without the +; Partial adds ? and Readonly adds readonly that way."
+    },
+    {
+      "id": "readonly-map",
+      "front": "Does MyReadonly<T> equal Object.freeze?",
+      "meaning": "No. readonly [K in keyof T]: T[K] makes each property readonly at compile time — obj.prop = x errors through that type. It does not Object.freeze at runtime. Use freeze or immutable libraries if you need runtime immutability. Nested objects are not recursively readonly unless you write a deep mapped type."
+    },
+    {
+      "id": "pick-implementation",
+      "front": "How is Pick implemented, and what does it map over?",
+      "meaning": "type MyPick<T, K extends keyof T> = { [P in K]: T[P] }. Pick maps over a subset of keys K, not necessarily all of keyof T. Forgetting K extends keyof T on Pick-like helpers is a listed trap.",
+      "example": "type MyPick<T, K extends keyof T> = { [P in K]: T[P] };"
+    },
+    {
+      "id": "record-implementation",
+      "front": "How is Record implemented?",
+      "meaning": "type MyRecord<K extends string | number | symbol, V> = { [P in K]: V }. Record maps over an arbitrary key union K with uniform value type V — dictionaries and exhaustive key maps.",
+      "example": "type MyRecord<K extends string | number | symbol, V> = { [P in K]: V };"
+    },
+    {
+      "id": "omit-via-pick-exclude",
+      "front": "How does Omit relate to mapped and conditional types?",
+      "meaning": "Omit is typically Pick plus Exclude on keys — not a separate primitive. type MyOmit<T, K extends keyof any> = Pick<T, Exclude<keyof T, K>>.",
+      "example": "type MyOmit<T, K extends keyof any> = Pick<T, Exclude<keyof T, K>>;"
+    },
+    {
+      "id": "as-remap-getters",
+      "front": "What does K in keyof T as `get${Capitalize<...>}` produce?",
+      "meaning": "Key remapping with as renames emitted keys. Getters<Person> becomes { getName: () => string; getAge: () => number }. After in, as NewKey renames (or filters) the emitted key; template literals build names like on${Capitalize<…>}.",
+      "example": "[K in keyof T as `get${Capitalize<string & K>}`]: () => T[K]"
+    },
+    {
+      "id": "as-what-it-does",
+      "front": "What does as NewKey do after in in a mapped type?",
+      "meaning": "It renames or filters the emitted key. Template literals build new names; mapping a key to never drops it. This is TS 4.1+ key remapping."
+    },
+    {
+      "id": "filter-keys-never",
+      "front": "How do you drop keys with as never?",
+      "meaning": "Map the key to never with as to omit it. PublicOnly uses K extends `_${string}` ? never : K to exclude _prefixed fields. The same idea strips function keys.",
+      "example": "[K in keyof T as K extends `_${string}` ? never : K]: T[K]"
+    },
+    {
+      "id": "string-and-k-symbol",
+      "front": "Why write string & K in a template remapping?",
+      "meaning": "keyof can include symbol and number, while template literal types expect string. string & K (or Exclude<K, symbol> patterns) narrows so Capitalize and templates type-check. Forgetting symbol keys is a listed trap."
+    },
+    {
+      "id": "nonfunction-property-names",
+      "front": "How does NonFunctionPropertyNames filter keys via an indexed map?",
+      "meaning": "Map each K to never or K depending on whether T[K] extends Function, then index with [keyof T] to get the remaining key union. NonFunctionProps is Pick<T, NonFunctionPropertyNames<T>>.",
+      "example": "{ [K in keyof T]: T[K] extends Function ? never : K }[keyof T]"
+    },
+    {
+      "id": "conditional-in-map",
+      "front": "How do you filter function keys with as in a mapped type?",
+      "meaning": "type NonFunctionProps2<T> = { [K in keyof T as T[K] extends Function ? never : K]: T[K] }. Pattern: filter keys with conditionals, map values with T[K] transforms."
+    },
+    {
+      "id": "filter-vs-map-values",
+      "front": "What is the split between filtering keys and mapping values?",
+      "meaning": "Filter keys with conditionals (as never, or a key union plus Pick). Map values with T[K] transforms. Combining mapped and conditional types is that two-step pattern."
+    },
+    {
+      "id": "shallow-deep",
+      "front": "Are Partial and Readonly deep?",
+      "meaning": "No — they are shallow. Nested objects are not recursively optional or readonly unless you write a deep mapped type. Expecting deep immutability or optionality from shallow maps is a listed mistake."
+    },
+    {
+      "id": "deep-partial-awareness",
+      "front": "What is the DeepPartial sketch, and what should you skip in interviews?",
+      "meaning": "type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }. Arrays, Date, and functions are edge cases — keep the sketch simple in interviews unless asked. Overbuilding deep recursive maps for a one-off DTO is a listed mistake.",
+      "example": "[K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K]"
+    },
+    {
+      "id": "homomorphic-awareness",
+      "front": "What is a homomorphic mapped type, at awareness level?",
+      "meaning": "When you write { [K in keyof T]: … } over keyof T, TypeScript often preserves optional and readonly modifiers from T in subtle homomorphic ways unless you override with +/-. You do not need the full theory — know that modifiers on the map are how you force optional, required, or readonly."
+    },
+    {
+      "id": "why-partial-adds-question",
+      "front": "Why does Partial add ? explicitly instead of relying on homomorphism?",
+      "meaning": "Homomorphic maps can preserve T's modifiers unless you override. Partial forces ? on every key; Required uses -? to strip optionality. That is why the modifiers are written explicitly."
+    },
+    {
+      "id": "readonly-not-freeze-trap",
+      "front": "Does the readonly mapped modifier freeze at runtime?",
+      "meaning": "No. Believing readonly freezes at runtime is a listed misconception. It is compile-time only; use Object.freeze or an immutable library for runtime."
+    },
+    {
+      "id": "pick-constraint-trap",
+      "front": "What constraint must K have on a Pick-like helper?",
+      "meaning": "K extends keyof T. Without it, you can map keys that do not exist on T. The constraint is part of the homemade Pick signature."
+    },
+    {
+      "id": "connections-keyof-tk",
+      "front": "How do keyof T and T[K] connect to mapped types?",
+      "meaning": "keyof T plus T[K] is the iteration: map over property names and look up each value type. That is how Partial, Readonly, Pick, and Record are built. The utility-types unit consumes this machinery."
+    },
+    {
+      "id": "connections-modifiers",
+      "front": "What do +/- ? and readonly do on a mapped type?",
+      "meaning": "They force modifiers: add or remove optionality and readonly, overriding homomorphic preservation from T."
+    },
+    {
+      "id": "connections-as-never",
+      "front": "What does as NewKey | never connect to?",
+      "meaning": "Rename keys with a new name, or filter them by mapping to never. Template remapping and PublicOnly both sit on that fork."
+    },
+    {
+      "id": "connections-conditional-inside",
+      "front": "How do T[K] extends … ? checks show up inside maps?",
+      "meaning": "As conditional filters on keys or branches on value types — advanced derivations like non-function props and DeepPartial. Mapped types next combine with the conditional-types unit."
+    },
+    {
+      "id": "interview-write-identity",
+      "front": "What mapped-type sketch should you be able to write first?",
+      "meaning": "{ [K in keyof T]: T[K] } — iterate keys, keep value types. Then implement Readonly, Partial, and Required with modifiers; contrast compile-time readonly with Object.freeze; show a simple as remapping; sketch Omit as Exclude plus Pick."
+    }
+  ]
+}

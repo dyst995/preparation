@@ -1,0 +1,244 @@
+{
+  "title": "Prototypes and Classes",
+  "subtitle": "[[Prototype]] chain, new, class as sugar",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "prototype-chain-definition",
+      "front": "What is the prototype chain?",
+      "meaning": "JavaScript objects form a prototype chain. When you read a property that is not an own property, the engine walks that object's internal [[Prototype]] link, then that object's prototype, and so on, until it finds the property or reaches null. There is no separate class-instance runtime underneath ES6 class."
+    },
+    {
+      "id": "prototype-internal-slot",
+      "front": "What is [[Prototype]]?",
+      "meaning": "Every ordinary object has an internal slot [[Prototype]]: either another object or null. That link is how lookup and inheritance walk the chain."
+    },
+    {
+      "id": "getprototypeof-preferred",
+      "front": "How should you read an object's [[Prototype]]?",
+      "meaning": "Prefer Object.getPrototypeOf(obj). __proto__ is a legacy accessor on Object.prototype — avoid it in new code, but recognize it in interviews and debugging."
+    },
+    {
+      "id": "chain-ends-null",
+      "front": "Object.getPrototypeOf({}) and of Object.prototype?",
+      "meaning": "A plain object literal's [[Prototype]] is Object.prototype. Object.getPrototypeOf(Object.prototype) === null — that is the end of the chain.",
+      "example": "Object.getPrototypeOf(dog) === Object.prototype; // true for { bark() {} }"
+    },
+    {
+      "id": "prototype-lookup",
+      "front": "Property miss on obj — what happens?",
+      "meaning": "Walk [[Prototype]] link: check own properties, then prototype object, repeat until null → undefined for ordinary gets. Assignment usually creates own property on obj (shadowing), not mutating prototype.",
+      "example": "Object.create(proto); obj.kind = 'dog' shadows proto.kind."
+    },
+    {
+      "id": "delete-unshadows",
+      "front": "After obj.kind = 'dog', delete obj.kind — what does obj.kind read?",
+      "meaning": "The own property is gone, so lookup walks the chain again and finds proto.kind. Shadowing hid the prototype value; delete reveals it.",
+      "example": "console.log(obj.kind); // 'animal' after delete"
+    },
+    {
+      "id": "shared-behavior",
+      "front": "Why do prototypes exist?",
+      "meaning": "Shared behavior without copying methods onto every object. One speak function on Animal.prototype serves all instances; each instance only stores its own data (name, etc.)."
+    },
+    {
+      "id": "object-prototype-methods",
+      "front": "What lives on Object.prototype?",
+      "meaning": "Most objects ultimately delegate to Object.prototype, which holds widely used methods: toString, hasOwnProperty (legacy style), valueOf, and similar.",
+      "example": "({}).toString(); // '[object Object]' — found via Object.prototype"
+    },
+    {
+      "id": "object-create-null",
+      "front": "Object.create(null) why?",
+      "meaning": "Dictionary with no inherited Object.prototype junk — no inherited toString/hasOwnProperty on the chain.",
+      "example": "dict.toString // undefined — useful for safe key maps"
+    },
+    {
+      "id": "object-create-sets-proto",
+      "front": "What does Object.create(proto) create?",
+      "meaning": "A new object whose [[Prototype]] is proto (or null). Property gets that miss on the new object delegate to proto.",
+      "example": "const dog = Object.create(animal); dog.speak(); // 'sound'; Object.getPrototypeOf(dog) === animal"
+    },
+    {
+      "id": "object-create-descriptors",
+      "front": "Object.create second argument?",
+      "meaning": "Optional second argument can define own properties via property descriptors. Less common in interviews; know it exists."
+    },
+    {
+      "id": "chain-diagram",
+      "front": "Draw the usual instance prototype chain?",
+      "meaning": "instance → Animal.prototype → Object.prototype → null. That is the mental model for where shared methods and Object.prototype methods are found."
+    },
+    {
+      "id": "own-vs-shared",
+      "front": "Constructor pattern: own data vs shared methods?",
+      "meaning": "Own properties are set in the constructor on this (per instance). Shared methods are assigned on Constructor.prototype — one function for all instances.",
+      "example": "function Animal(name) { this.name = name; } Animal.prototype.speak = function () { return this.name + ' makes a sound'; }"
+    },
+    {
+      "id": "four-steps-new",
+      "front": "What does new Ctor() do?",
+      "meaning": "Create empty object; set its [[Prototype]] to Ctor.prototype; call Ctor with this = new object; return new object unless constructor returns another object (primitives ignored)."
+    },
+    {
+      "id": "constructor-return-object",
+      "front": "Constructor returns { b: 2 }?",
+      "meaning": "That object replaces the default new instance as the result of new. Returning a primitive is ignored; instance with own fields remains.",
+      "example": "function Weird() { this.a = 1; return { b: 2 }; } new Weird(); // { b: 2 }"
+    },
+    {
+      "id": "constructor-return-primitive",
+      "front": "Constructor returns 5 — what is new Normal()?",
+      "meaning": "A returned primitive is ignored. The result is the new instance with own fields from this.",
+      "example": "function Normal() { this.a = 1; return 5; } new Normal(); // { a: 1 }"
+    },
+    {
+      "id": "getprototypeof-vs-prototype",
+      "front": "Animal.prototype vs Object.getPrototypeOf(dog)?",
+      "meaning": "Animal.prototype is the object instances link to via new. getPrototypeOf(dog) is dog's actual [[Prototype]] (usually Animal.prototype). dog.prototype is usually undefined — instances aren't constructors."
+    },
+    {
+      "id": "prototype-constructor-convention",
+      "front": "Animal.prototype.constructor by default?",
+      "meaning": "Animal.prototype.constructor === Animal is true by default (a convention). After replacing Dog.prototype with Object.create(...), you repair constructor back to Dog.",
+      "example": "Object.getPrototypeOf(dog) === Animal.prototype; // true"
+    },
+    {
+      "id": "constructor-without-new",
+      "front": "Call a constructor as a plain function (no new)?",
+      "meaning": "Uses default this binding: in strict mode this.name = ... throws; in sloppy mode it can create or pollute globals. Prefer class (throws without new) or always invoke with new."
+    },
+    {
+      "id": "instanceof",
+      "front": "What does obj instanceof Ctor check?",
+      "meaning": "Whether Ctor.prototype appears anywhere on obj's prototype chain — not exclusive construction history. Cross-realm and manual setPrototypeOf can surprise.",
+      "example": "dog instanceof Animal; // true  dog instanceof Object; // true  dog instanceof Array; // false"
+    },
+    {
+      "id": "instanceof-confusers",
+      "front": "What can make instanceof surprising?",
+      "meaning": "Manual Object.setPrototypeOf / Object.create, cross-realm objects (iframe/another window has a different Array.prototype), and rare Symbol.hasInstance customization. It is not a perfect exclusive type check."
+    },
+    {
+      "id": "hasown-vs-in",
+      "front": "Own vs inherited: hasOwnProperty, Object.hasOwn, in?",
+      "meaning": "hasOwnProperty/Object.hasOwn are true for own data (name) and false for prototype methods (speak). Object.hasOwn is the modern preferred own check. The in operator sees inherited properties too: 'speak' in dog → true.",
+      "example": "Object.hasOwn(dog, 'name'); // true  Object.hasOwn(dog, 'speak'); // false"
+    },
+    {
+      "id": "class-is-sugar",
+      "front": "class vs prototypes — interview line?",
+      "meaning": "ES6 class is syntax over constructor + prototype with real differences: strict body, TDZ until class line, TypeError without new, non-enumerable prototype methods. Still: methods on Ctor.prototype, own data from constructor/fields."
+    },
+    {
+      "id": "class-always-strict",
+      "front": "Is a class body strict?",
+      "meaning": "Always strict. A classic function constructor is strict only if requested. That is one real difference, not just prettier syntax."
+    },
+    {
+      "id": "class-tdz-new",
+      "front": "new Person() before class Person {}?",
+      "meaning": "ReferenceError — class declarations are TDZ'd like let, unlike hoisted function constructors.",
+      "example": "const x = new Person(); class Person {} // ReferenceError"
+    },
+    {
+      "id": "class-must-use-new",
+      "front": "Call class A as A() without new?",
+      "meaning": "TypeError: Class constructor A cannot be invoked without 'new'. Classic function constructors instead get silent wrong this / pollution risk.",
+      "example": "class A {} A(); // TypeError"
+    },
+    {
+      "id": "class-methods-nonenumerable",
+      "front": "Are class-body methods enumerable on the prototype?",
+      "meaning": "No — methods in a class body are non-enumerable on the prototype. Manual Constructor.prototype.foo = ... is enumerable by default."
+    },
+    {
+      "id": "instance-fields-vs-methods",
+      "front": "Class field count = 0 vs method inc() — where stored?",
+      "meaning": "count is an own property per instance (set like constructor init). inc lives on Counter.prototype — one shared function.",
+      "example": "class Counter { count = 0; inc() { this.count++; } }"
+    },
+    {
+      "id": "shared-inc-separate-count",
+      "front": "a.inc === b.inc and a.count = 5; b.count?",
+      "meaning": "a.inc === b.inc is true (same function on the prototype). a.count and b.count start equal numerically but are different own properties; after a.count = 5, b.count is still 0.",
+      "example": "const a = new Counter(); const b = new Counter(); a.count = 5; b.count; // 0"
+    },
+    {
+      "id": "prototype-method-vs-arrow-field",
+      "front": "Prototype method vs arrow class field?",
+      "meaning": "Method on Ctor.prototype — one shared function, this from call site. Arrow instance field — own property per instance, lexical this to instance at construction; costs extra allocation per instance, stable detached callbacks.",
+      "notes": "Avoids manual .bind() for older React class event handlers."
+    },
+    {
+      "id": "extends-super",
+      "front": "extends / super mechanically?",
+      "meaning": "Dog.prototype's [[Prototype]] is Animal.prototype; Dog's [[Prototype]] is Animal (statics). super() in subclass constructor runs parent constructor before using this. super.method() uses parent prototype chain."
+    },
+    {
+      "id": "super-before-this",
+      "front": "Subclass constructor: use this before super()?",
+      "meaning": "Invalid — must call super() before accessing this in a derived class constructor."
+    },
+    {
+      "id": "dog-speak-instanceof",
+      "front": "new Dog('Rex', 'lab'); d.speak() and instanceof?",
+      "meaning": "d.speak() is 'Rex noise (woof)' — subclass speak uses super.speak() then appends. d instanceof Dog and d instanceof Animal are both true because both prototypes appear on the chain.",
+      "example": "class Dog extends Animal { constructor(name, breed) { super(name); this.breed = breed; } speak() { return `${super.speak()} (woof)`; } }"
+    },
+    {
+      "id": "static-inheritance-chain",
+      "front": "Object.getPrototypeOf(Dog.prototype) and Object.getPrototypeOf(Dog)?",
+      "meaning": "getPrototypeOf(Dog.prototype) === Animal.prototype (instance method chain). getPrototypeOf(Dog) === Animal (static inheritance — constructors inherit too).",
+      "example": "Object.getPrototypeOf(Dog.prototype) === Animal.prototype; // true"
+    },
+    {
+      "id": "super-speak-lookup",
+      "front": "What does super.speak() look up?",
+      "meaning": "The method on the parent prototype chain — not a dynamic “caller” lookup. super() in the constructor invokes the parent constructor for instance initialization."
+    },
+    {
+      "id": "animal-call-like-super",
+      "front": "Pre-class: Animal.call(this, name) is like what?",
+      "meaning": "Like super() for instance data: run the parent constructor against the child instance so own fields are initialized, then wire prototypes separately with Object.create."
+    },
+    {
+      "id": "object-create-inheritance",
+      "front": "Manual inheritance: Dog.prototype = ?",
+      "meaning": "Object.create(Animal.prototype), then repair Dog.prototype.constructor = Dog. Wrong: Dog.prototype = Animal.prototype (shared one object, methods overwrite each other)."
+    },
+    {
+      "id": "setprototypeof-vs-create",
+      "front": "Object.setPrototypeOf vs Object.create for inheritance?",
+      "meaning": "setPrototypeOf can mutate an existing object's [[Prototype]]; prefer Object.create when building the link for a new prototype object. Mutating prototypes of live objects is slower and surprising — know it, don't casually use it."
+    },
+    {
+      "id": "statics-on-constructor",
+      "front": "Where do class static members live?",
+      "meaning": "On the constructor function itself (called as User.createGuest(), not on an instance), and they follow the constructor's prototype chain with extends — not on instances.",
+      "example": "class User { static createGuest() { return new User('guest'); } } User.createGuest();"
+    },
+    {
+      "id": "nest-decorators-metadata",
+      "front": "When do Nest/TS decorators attach DI metadata?",
+      "meaning": "Decorators are functions that run at class definition time and can attach metadata (Reflect.metadata). TypeScript can emit design-time type metadata for constructor parameters so the DI container knows what to inject."
+    },
+    {
+      "id": "nest-di-sketch",
+      "front": "Nest DI and classes — one sentence?",
+      "meaning": "Providers are constructors; DI reads metadata emitted on the class (e.g. constructor param types) to know what to inject — classes are runtime values; prototype methods are shared instance behavior."
+    },
+    {
+      "id": "mutate-prototype-live",
+      "front": "Mutate Ctor.prototype after instances exist?",
+      "meaning": "It changes behavior for all instances that still delegate to that prototype — powerful and dangerous. Shared methods are not copies on each instance unless you install arrows/fields per instance."
+    },
+    {
+      "id": "where-vs-this",
+      "front": "Prototypes vs this — what question does each answer?",
+      "meaning": "Prototypes answer where the function is found; this answers which receiver was used when calling it. this inside prototype methods still follows call-site rules."
+    }
+  ]
+}

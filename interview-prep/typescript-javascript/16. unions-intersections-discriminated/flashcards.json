@@ -1,0 +1,186 @@
+{
+  "title": "Unions, intersections, discriminated unions",
+  "subtitle": "| vs &, literal tags, exhaustiveness with never",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "most-important-modeling",
+      "front": "Why are unions and discriminated unions a core TS pattern?",
+      "meaning": "They are the most important day-to-day modeling pattern for async UI state, API results, and domain events: alternatives in the domain become a union, then a literal tag, then safe narrowing."
+    },
+    {
+      "id": "union-or",
+      "front": "Union A | B — meaning?",
+      "meaning": "A value of type A | B is either an A or a B (or both if a value happens to satisfy both — rare for primitives). Unions mean “one of these.”"
+    },
+    {
+      "id": "pad-tofixed-error",
+      "front": "On string | number, why is x.toFixed() an error?",
+      "meaning": "toFixed is not on string. Until you narrow, you may only use operations valid for every constituent.",
+      "example": "function pad(x: string | number) {\n  // x.toFixed() // Error — not on string\n  return String(x);\n}"
+    },
+    {
+      "id": "union-common-members",
+      "front": "Cat | Dog — why can't you call meow()?",
+      "meaning": "On a union of objects you may only access members that exist on every constituent until you narrow. Use in, a discriminant, or a type guard before variant-specific methods.",
+      "example": "function speak(a: Cat | Dog) {\n  // a.meow() // Error\n  if ('meow' in a) a.meow();\n  else a.bark();\n}"
+    },
+    {
+      "id": "unions-vs-lying-optionals",
+      "front": "Why model alternatives as a union instead of optionals?",
+      "meaning": "Unions model real alternatives without lying with optionals like data? plus error? on one blob. Invalid combinations stay unrepresentable if you use variants instead of one optional-field bag."
+    },
+    {
+      "id": "intersection-and",
+      "front": "Intersection A & B — meaning?",
+      "meaning": "A value of type A & B must satisfy both A and B at once — “all of these at once.” It is not a substitute for or; that is a union."
+    },
+    {
+      "id": "intersection-compose-objects",
+      "front": "What is { name: string } & { age: number } effectively?",
+      "meaning": "An object type with both fields: { name: string; age: number }. Use intersections to compose object capabilities (Writable & Timestamped) or mix in cross-cutting fields.",
+      "example": "type NameAndAge = { name: string } & { age: number }"
+    },
+    {
+      "id": "string-and-number-never",
+      "front": "type Impossible = string & number?",
+      "meaning": "That resolves to never because no runtime value is both string and number. Call out this trap in interviews.",
+      "example": "type Impossible = string & number; // never"
+    },
+    {
+      "id": "object-property-conflict-never",
+      "front": "Intersecting objects with the same property but incompatible types?",
+      "meaning": "Tends toward never for that property. Same idea as string & number: the intersection asks for something no value can satisfy."
+    },
+    {
+      "id": "when-to-use-intersections",
+      "front": "When to use intersections?",
+      "meaning": "Compose object capabilities and mix in cross-cutting fields. Do not use & when you meant “or” — that is a union."
+    },
+    {
+      "id": "literal-types",
+      "front": "What is a literal type?",
+      "meaning": "A type that admits only specific primitive values, such as 'loading' | 'success' | 'error', Dice = 1 | 2 | 3 | 4 | 5 | 6, or Bit = 0 | 1. String/number/boolean literals are the usual tags for discriminated unions.",
+      "example": "type Status = 'loading' | 'success' | 'error'"
+    },
+    {
+      "id": "literal-widen-vs-annotation",
+      "front": "const s = 'success' vs const t: 'success' = 'success'?",
+      "meaning": "Without as const or an annotation, s might widen to string. t is a literal type. Widening to string weakens discriminant narrowing.",
+      "example": "const s = 'success'; // might widen to string\nconst t: 'success' = 'success'; // literal type"
+    },
+    {
+      "id": "as-const-tagged-values",
+      "front": "Why as const on objects for tagged values?",
+      "meaning": "as const on objects freezes literal inference for fields — useful when building tagged values so status stays 'success' instead of string."
+    },
+    {
+      "id": "discriminated-union",
+      "front": "What is a discriminated (tagged) union?",
+      "meaning": "A union of object types that share one property — the discriminant — with distinct literal types per variant. Checking that tag lets TypeScript narrow the whole object safely.",
+      "example": "type FetchState = LoadingState | SuccessState | ErrorState\n// status: 'loading' | 'success' | 'error'"
+    },
+    {
+      "id": "fetchstate-three-variants",
+      "front": "Sketch a three-state async FetchState?",
+      "meaning": "Loading has only status: 'loading'. Success has status: 'success' and data: User. Error has status: 'error' and error: string. The union is FetchState = those three.",
+      "example": "type LoadingState = { status: 'loading' };\ntype SuccessState = { status: 'success'; data: User };\ntype ErrorState = { status: 'error'; error: string };\ntype FetchState = LoadingState | SuccessState | ErrorState;"
+    },
+    {
+      "id": "narrow-on-switch",
+      "front": "switch (state.status) — what happens?",
+      "meaning": "When you check the discriminant, TypeScript eliminates other variants. Properties unique to the remaining variant become available — no cast. success sees data; error sees error.",
+      "example": "case 'success': return state.data.name; // SuccessState\ncase 'error': return state.error; // ErrorState"
+    },
+    {
+      "id": "optional-bag-trap",
+      "front": "Why not { status: string; data?; error? }?",
+      "meaning": "Invalid combos like { status: 'success', error: 'oops' } are still typeable — the type does not encode valid combinations. With a discriminated union, each variant only carries fields that belong together; construction and reads are enforced, and exhaustiveness with never catches missed cases when the union grows.",
+      "notes": "Preserved interview answer."
+    },
+    {
+      "id": "design-rules-discriminant",
+      "front": "Rules for a working discriminant?",
+      "meaning": "Shared name for the tag (status, type, kind, tag). Literal (or other unit) types that do not overlap across variants. Prefer required tag fields — optional tags weaken narrowing. Keep each variant's exclusive data on the right branches only."
+    },
+    {
+      "id": "discriminant-string-trap",
+      "front": "Discriminant typed as string — problem?",
+      "meaning": "status: string is not a literal, so equality checks do not usefully narrow. Use string literal unions (or as const) so each variant's tag is a distinct literal TypeScript can eliminate."
+    },
+    {
+      "id": "overlapping-tag-literals",
+      "front": "Same literal tag on two variants?",
+      "meaning": "Fails as a clean discriminant. Tags must not overlap across variants, and the tag must not be missing on some members."
+    },
+    {
+      "id": "tag-missing-on-member",
+      "front": "Tag missing on some union members?",
+      "meaning": "Not a clean discriminant. Every variant should carry the shared required tag with a distinct literal."
+    },
+    {
+      "id": "assert-never",
+      "front": "assertNever(x: never) in switch default?",
+      "meaning": "If FetchState later includes { status: 'cancelled' } and you forget a case, state in default is that leftover variant — not never — so assertNever(state) fails to compile. That is the reliable “fail compile on new variant” technique.",
+      "example": "function assertNever(x: never): never {\n  throw new Error(`Unhandled case: ${JSON.stringify(x)}`);\n}"
+    },
+    {
+      "id": "never-bottom-type",
+      "front": "Why never for exhaustiveness?",
+      "meaning": "never is the bottom type: no value should exist there. Assigning something to never is only legal if the checker proves the code is unreachable / fully handled."
+    },
+    {
+      "id": "switch-without-default",
+      "front": "Is a switch exhaustive without default/assertNever?",
+      "meaning": "Not reliably. A switch that returns in every known case may still not error when a new union member is added, depending on control-flow and return types. assertNever in default is the reliable compile-fail when a variant is added."
+    },
+    {
+      "id": "if-discriminant-narrowing",
+      "front": "Can you narrow a discriminant with if, not only switch?",
+      "meaning": "Yes. Same discriminant idea: if (state.status === 'success') { state.data } is OK. switch is not required.",
+      "example": "if (state.status === 'success') {\n  state.data; // ok\n}"
+    },
+    {
+      "id": "discriminants-form-of-narrowing",
+      "front": "How do discriminants relate to typeof / in / predicates?",
+      "meaning": "Other narrowing appears in depth in the narrowing unit. Discriminants are the object-oriented form of the same idea: a runtime check eliminates variants in control flow."
+    },
+    {
+      "id": "union-of-functions-awareness",
+      "front": "Union of function types — callability (awareness)?",
+      "meaning": "A union of function types is callable with args common to all; the return type becomes a union. Awareness only — not a full overloads course."
+    },
+    {
+      "id": "intersection-of-functions-awareness",
+      "front": "Intersection of function types (awareness)?",
+      "meaning": "Intersection of functions behaves differently (overloads-like). Do not casually intersect call signatures without reading the errors — prefer explicit overloads or discriminated args."
+    },
+    {
+      "id": "union-needs-type",
+      "front": "Naming FetchState = Loading | Success | Error — keyword?",
+      "meaning": "Use a type alias. A top-level union of variants cannot be expressed as a single interface alias; interfaces are for object shapes. Related: unions need type from the type-vs-interface unit."
+    },
+    {
+      "id": "trap-pipe-vs-ampersand",
+      "front": "Using | when you meant & (or reverse)?",
+      "meaning": "Classic mix-up of “or” vs “and.” Union is one of these; intersection is all of these at once."
+    },
+    {
+      "id": "trap-access-without-narrowing",
+      "front": "Accessing variant-only fields without narrowing?",
+      "meaning": "Error (or unsafe if you cast). On a union you only get common members until you narrow with the tag, in, typeof, or a predicate."
+    },
+    {
+      "id": "connection-alternatives-chain",
+      "front": "How do alternatives become exhaustiveness checks?",
+      "meaning": "Domain alternatives → union type → literal tag per variant → discriminated union → narrow on tag → assertNever for exhaustiveness. Intersection combines requirements and conflicts go to never. A type alias (not interface) names the union."
+    },
+    {
+      "id": "interview-five-claims",
+      "front": "What should you be able to do in an interview on this unit?",
+      "meaning": "Define | vs & with a one-line example each. Build a three-state async FetchState and narrow on status. Explain why tagged unions beat optional bags. Show assertNever and what breaks when a variant is added. Call out string & number → never."
+    }
+  ]
+}

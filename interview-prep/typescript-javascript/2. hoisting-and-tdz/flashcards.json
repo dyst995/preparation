@@ -1,0 +1,258 @@
+{
+  "title": "Hoisting and TDZ",
+  "subtitle": "Create bindings early, initialize by declaration kind",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "hoisting-question",
+      "front": "What question does hoisting answer?",
+      "meaning": "When a binding exists in its scope, and what you can legally do with it before its declaration line runs. Prerequisite: scope is where a binding lives; hoisting/TDZ is about time inside that scope."
+    },
+    {
+      "id": "hoisting-real-meaning",
+      "front": "What is hoisting really?",
+      "meaning": "Before a scope's code runs, the engine registers declarations in that scope's environment and initializes each binding by kind. Assignments still execute in source order. It is not literal moving of source text to the top."
+    },
+    {
+      "id": "hoisting-not-moved-code",
+      "front": "Why is “JS moves declarations to the top” misleading?",
+      "meaning": "The source text is not rewritten for you to read. Initialization rules differ by declaration kind — “moved to the top” does not explain TDZ. Function bodies are not moved; only how bindings are created/initialized changes. TDZ proves the metaphor is incomplete."
+    },
+    {
+      "id": "instantiation-four-steps",
+      "front": "What happens at scope entry before statements run?",
+      "meaning": "Instantiation/creation phase: (1) find declarations that belong to this scope; (2) create bindings in the environment; (3) initialize each by kind, or leave uninitialized → TDZ; (4) then run the code in source order. “Hoisted” means the binding exists from the start of the scope’s execution, not that your assignment ran early."
+    },
+    {
+      "id": "var-before-line",
+      "front": "console.log(x) before var x = 1?",
+      "meaning": "undefined, not ReferenceError. The var binding exists at function/global scope entry and is initialized to undefined until the assignment line runs.",
+      "example": "console.log(a); var a = 1; // undefined, then a is 1"
+    },
+    {
+      "id": "var-equivalent-intuition",
+      "front": "Equivalent intuition for var a = 1 after an early log?",
+      "meaning": "As if var a; ran at scope entry (created and set to undefined), then console.log(a), then a = 1 at the original assignment line. Not literal engine code — intuition only.",
+      "example": "var a; console.log(a); a = 1;"
+    },
+    {
+      "id": "var-hides-ordering-bugs",
+      "front": "Why is early var access dangerous?",
+      "meaning": "It does not throw — you get undefined, which can hide ordering bugs (conditionals, early returns, circular init).",
+      "example": "function loadConfig() { if (!ready) return defaults; var ready = true; var defaults = { theme: 'dark' }; } // returns undefined"
+    },
+    {
+      "id": "multiple-var-one-binding",
+      "front": "Two var x in the same function?",
+      "meaning": "They share one binding. var x = 1; var x = 2; then console.log(x) is 2.",
+      "example": "function f() { var x = 1; var x = 2; console.log(x); } // 2"
+    },
+    {
+      "id": "var-in-if-created-at-entry",
+      "front": "console.log(a) before if { var a = 1 }?",
+      "meaning": "undefined — the binding is already created at function entry even though the assignment is inside the if. After the if, a is 1 or undefined depending on flag. var ignores blocks; the binding still belongs to the function.",
+      "example": "function f(flag) { console.log(a); if (flag) { var a = 1; } console.log(a); }"
+    },
+    {
+      "id": "function-decl-hoist",
+      "front": "Can you call a function declaration before its line?",
+      "meaning": "Yes. Function declarations are fully initialized at scope entry — the binding holds the function object, so calls before the source line work.",
+      "example": "console.log(sum(1,2)); function sum(a,b) { return a+b; } // 3"
+    },
+    {
+      "id": "function-decl-why-exists",
+      "front": "Why do function declarations hoist fully?",
+      "meaning": "It lets mutually recursive helpers and “main at the bottom” styles work in scripts. Interviewers use it to contrast with function expressions."
+    },
+    {
+      "id": "duplicate-function-decls",
+      "front": "Two function declarations with the same name in one scope?",
+      "meaning": "The later one wins. In sloppy scripts this historically got messy; treat duplicate decls as a smell."
+    },
+    {
+      "id": "block-level-functions",
+      "front": "function declaration inside a block — reliable?",
+      "meaning": "No. Behavior historically differed across browsers and sloppy vs strict. Prefer not to rely on it; prefer const fn = () => {} or function at function/module top level. In strict mode / modules, block-level functions are block-scoped (closer to let), but that is still a footgun if you overclaim without caveats.",
+      "example": "'use strict'; if (true) { function local() { return 1; } } // do not depend on calling local outside"
+    },
+    {
+      "id": "function-expression-early",
+      "front": "var foo = function() {} — call foo() before the line?",
+      "meaning": "foo is undefined until assignment, so calling it throws TypeError (undefined is not a function). Only the variable binding follows var rules; the function value is created at assignment time.",
+      "example": "console.log(typeof a); // 'undefined'\na(); // TypeError\nvar a = function () {};"
+    },
+    {
+      "id": "let-fn-expression-early",
+      "front": "let b = function() {} — call b() before the line?",
+      "meaning": "ReferenceError (TDZ). Touching b before the assignment throws; unlike var, you do not get undefined then TypeError.",
+      "example": "b(); let b = function () {}; // ReferenceError"
+    },
+    {
+      "id": "const-arrow-early",
+      "front": "const foo = () => {} — access foo before the line?",
+      "meaning": "ReferenceError (TDZ). The binding exists at scope entry but stays uninitialized until the assignment. A function declaration, by contrast, is callable before its line."
+    },
+    {
+      "id": "call-before-depends-on-kind",
+      "front": "Can I call this function before it’s defined?",
+      "meaning": "Depends on declaration kind, not on “it’s a function.” function foo(){} is callable early. var/let/const function expressions and arrows only get their value when the assignment runs."
+    },
+    {
+      "id": "named-fn-expression-inner-name",
+      "front": "const f = function g() {} — is g a hoisted outer binding?",
+      "meaning": "No. The assignment still happens on that line. The inner name g is local to the function body and is not a hoisted outer binding you can call early."
+    },
+    {
+      "id": "let-tdz",
+      "front": "What is the Temporal Dead Zone?",
+      "meaning": "From scope entry until the let/const/class declaration line finishes initializing, the binding exists but is uninitialized. Any read, write, or typeof on that name throws ReferenceError.",
+      "notes": "Temporal means time in execution of that scope, not a special memory region."
+    },
+    {
+      "id": "tdz-exists-so-it-shadows",
+      "front": "If a let/const binding is in the TDZ, does it still shadow?",
+      "meaning": "Yes. The binding exists from the start of the scope, so it can shadow outer names even before initialization. That is why an early read does not fall through to the outer binding."
+    },
+    {
+      "id": "why-tdz-exists",
+      "front": "Why does TDZ exist?",
+      "meaning": "With var, early access silently yields undefined and masks bugs. TDZ makes accidental use-before-init a loud failure. It also makes shadowing safer: an inner let x is not accidentally reading the outer x before the inner declaration runs — that access is still TDZ for the inner binding."
+    },
+    {
+      "id": "shadowing-tdz-outer",
+      "front": "Inner block: const x before inner const x — read outer x?",
+      "meaning": "No. The inner let/const x is in TDZ from block entry; early access does not fall through to the outer x — ReferenceError until the inner declaration initializes.",
+      "example": "const x = 'outer'; { console.log(x); const x = 'inner'; } // ReferenceError"
+    },
+    {
+      "id": "const-must-initialize",
+      "front": "const x; with no initializer?",
+      "meaning": "SyntaxError. const must be initialized on the declaration line. Early access is still TDZ (ReferenceError), same as let."
+    },
+    {
+      "id": "const-no-reassign-mutate-ok",
+      "front": "After const init — reassign vs mutate?",
+      "meaning": "The binding cannot be reassigned; object contents can still mutate. Early access is still TDZ, same as let."
+    },
+    {
+      "id": "let-x-equals-x",
+      "front": "let x = x — result?",
+      "meaning": "ReferenceError. The RHS reads x while the binding is still in the TDZ during initialization of that same declaration."
+    },
+    {
+      "id": "typeof-tdz-throws",
+      "front": "typeof x while x is in the TDZ?",
+      "meaning": "ReferenceError. Anything that evaluates the binding before init throws — read, write, or typeof."
+    },
+    {
+      "id": "typeof-tdz-trap",
+      "front": "typeof bar before let bar = 'b'?",
+      "meaning": "ReferenceError, not 'undefined'. typeof is safe for undeclared identifiers but not for TDZ bindings that already exist in the scope.",
+      "example": "typeof undeclaredVar; // 'undefined'\ntypeof bar; let bar = 'b'; // ReferenceError"
+    },
+    {
+      "id": "typeof-undeclared-safe",
+      "front": "typeof undeclaredVar when there is no binding?",
+      "meaning": "'undefined' — no binding in scope. Contrast with a TDZ binding, where typeof throws ReferenceError."
+    },
+    {
+      "id": "typeof-foo-var-bar-let",
+      "front": "typeof foo then typeof bar; var foo='a'; let bar='b' — results?",
+      "meaning": "First logs 'undefined' because var foo exists as undefined at scope entry. Second throws ReferenceError because let bar is in the TDZ until its declaration line.",
+      "notes": "Classic interview ordering question."
+    },
+    {
+      "id": "let-not-unhoisted",
+      "front": "Are let/const hoisted?",
+      "meaning": "Their bindings are created at scope entry; they are not initialized early. Saying they are not hoisted fails typeof and shadowing TDZ questions — they exist from the start but stay unusable until the declaration line."
+    },
+    {
+      "id": "class-tdz",
+      "front": "new Foo() before class Foo {}?",
+      "meaning": "ReferenceError — class declarations are hoisted into the TDZ like let, not fully initialized like function declarations. You cannot use the class before its declaration line.",
+      "example": "const b = new B(); class B {} // ReferenceError"
+    },
+    {
+      "id": "class-vs-function-new-early",
+      "front": "new A() before function A vs new B() before class B?",
+      "meaning": "function A(){} is fully initialized — new A() before the line works. class B {} is TDZ’d like let — new B() before the line is ReferenceError.",
+      "example": "const a = new A(); function A() {} // works\nconst b = new B(); class B {} // ReferenceError"
+    },
+    {
+      "id": "why-classes-tdz",
+      "front": "Why aren’t classes fully initialized like function declarations?",
+      "meaning": "Classes have heritage/extends evaluation and stricter initialization semantics. Treating them like let avoids using a half-ready constructor."
+    },
+    {
+      "id": "class-expression-follows-binding",
+      "front": "const C = class {} — hoisting rule?",
+      "meaning": "Class expressions follow the const/let binding that holds them. Methods inside the class body are not available early via the class binding either — the whole class value appears when initialization completes."
+    },
+    {
+      "id": "declaration-comparison",
+      "front": "Before declaration line: var, let, function decl, const arrow?",
+      "meaning": "var: undefined. let/const/class: TDZ ReferenceError on access. function declaration: callable function object. const arrow: TDZ. var + function expression: undefined, call → TypeError.",
+      "notes": "Interview table question."
+    },
+    {
+      "id": "comparison-var-fn-expr-call",
+      "front": "var foo = function(){} — value and call before the line?",
+      "meaning": "Binding created at scope entry with value undefined. Call before the line: TypeError (undefined is not a function). Contrast function foo(){} which is callable."
+    },
+    {
+      "id": "comparison-mixed-logs",
+      "front": "Early log a (var), b (let), sum (function decl), mul (const arrow)?",
+      "meaning": "a is undefined; b throws ReferenceError; sum(1,2) is 3; mul throws ReferenceError.",
+      "example": "console.log(a); var a = 1; // undefined\nconsole.log(b); let b = 2; // ReferenceError\nconsole.log(sum(1,2)); function sum(a,b){return a+b;} // 3\nconsole.log(mul); const mul = (a,b)=>a*b; // ReferenceError"
+    },
+    {
+      "id": "init-order-in-scope",
+      "front": "Order of initialization inside a scope?",
+      "meaning": "(1) Scope entered. (2) Instantiation creates bindings; var → undefined; function declarations installed; let/const/class uninitialized (TDZ). (3) Statements run top to bottom. (4) Each let/const/class declaration line initializes that binding and ends its TDZ. (5) Assignments to var/writable bindings run when those statements execute."
+    },
+    {
+      "id": "mixed-foo-x-y-order",
+      "front": "foo(); log x; var x=1; let y=2; function foo(){...} — early results?",
+      "meaning": "foo() works immediately ('function body') because the declaration is already initialized. console.log(x) is undefined. console.log(y) would throw TDZ. foo() still works after those lines.",
+      "example": "foo(); console.log(x); var x = 1; let y = 2; function foo() { return 'function body'; }"
+    },
+    {
+      "id": "tdz-not-blocks-only",
+      "front": "Is TDZ only about blocks?",
+      "meaning": "No. TDZ is from the start of the binding’s scope until init. let is block-scoped, so its TDZ starts at block entry — not a special “blocks-only” rule."
+    },
+    {
+      "id": "reference-vs-type-error",
+      "front": "Early let fn vs early var fn call?",
+      "meaning": "Accessing let fn before init: ReferenceError (TDZ). Calling var fn before assignment: TypeError because fn is undefined. Same symptom family, different causes.",
+      "notes": "TDZ messages often say before initialization."
+    },
+    {
+      "id": "ref-error-three-causes",
+      "front": "Same ReferenceError name — what different stories?",
+      "meaning": "Undeclared identifier vs TDZ vs (later) missing export. Same error name, different story. TDZ message often includes “before initialization.”"
+    },
+    {
+      "id": "all-functions-do-not-hoist",
+      "front": "Do all functions hoist?",
+      "meaning": "No. Only function declarations fully hoist. Expressions follow their variable rules (var → undefined/TypeError on call; let/const → TDZ ReferenceError)."
+    },
+    {
+      "id": "closures-vs-hoisting",
+      "front": "How do closures relate to hoisting/TDZ?",
+      "meaning": "Closures use bindings that already exist in outer environments. Hoisting/TDZ explain whether those bindings are usable yet inside their own scope — they do not redefine what a closure is."
+    },
+    {
+      "id": "modules-still-tdz",
+      "front": "Do modules still have TDZ?",
+      "meaning": "Yes. Modules are strict and prefer let/const/exports, but you still get TDZ inside a module scope."
+    },
+    {
+      "id": "hoisting-spoken-answer",
+      "front": "What is hoisting — strong short answer?",
+      "meaning": "Before a scope runs, JS registers its declarations in that scope’s environment. var starts as undefined, function declarations are fully initialized, and let/const/class exist but stay uninitialized until their line — that’s the TDZ. Assignments still happen in source order."
+    }
+  ]
+}

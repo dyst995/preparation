@@ -1,0 +1,199 @@
+{
+  "title": "async / await",
+  "subtitle": "Promise syntax; await yields, resume as microtask",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "sugar-over-promises",
+      "front": "What is async/await, really?",
+      "meaning": "Syntax over Promises. It does not add a second thread or a new settlement model. It makes async control flow read like synchronous code while still yielding to the event loop at each await."
+    },
+    {
+      "id": "async-always-promise",
+      "front": "What does async function return?",
+      "meaning": "Always a Promise — even with a plain return, callers get a Promise. A plain return value is wrapped as fulfillment; throw rejects that Promise.",
+      "example": "async function ok() { return 1; } // Promise fulfilled 1; async function fails() { throw new Error('x'); } // rejected"
+    },
+    {
+      "id": "return-promise-adopts",
+      "front": "async function returns an existing Promise?",
+      "meaning": "It adopts/flattens it — same idea as Promise.resolve. Callers still get a Promise that fulfills with the inner value, not Promise<Promise<T>>.",
+      "example": "async function wrap() { return Promise.resolve(2); } // fulfills with 2"
+    },
+    {
+      "id": "async-forms",
+      "front": "Where can you write async?",
+      "meaning": "async function f() {}, const g = async () => {}, object method async m() {}, class method async m() {}."
+    },
+    {
+      "id": "await-only-in-async",
+      "front": "Can a non-async function use await?",
+      "meaning": "No — only async functions (and modules with top-level await) may use await as a keyword pause point. Using await in a non-async function is a syntax error, except special contexts like some REPL/module top-level cases."
+    },
+    {
+      "id": "await-not-block-thread",
+      "front": "Does await block the JavaScript thread?",
+      "meaning": "No — it pauses the current async function and returns control to the caller / event loop so other code can run. When the awaited Promise settles, the rest of the function is scheduled as a microtask and resumes. It looks synchronous in source, but it never blocks like a busy while loop."
+    },
+    {
+      "id": "a-f1-b-f2-order",
+      "front": "log a; f() async with await; log b — order?",
+      "meaning": "a, f1, b, f2. f() starts and runs sync until await (f1); await suspends f; f() has already returned a Promise to the caller; sync caller continues (b); after the stack clears, microtasks run and f resumes (f2).",
+      "example": "log a; f(); log b → a, f1, b, f2"
+    },
+    {
+      "id": "await-non-promise",
+      "front": "await 0 — still async pause?",
+      "meaning": "Yes. await x wraps non-Promises roughly like Promise.resolve(x); you still get an async pause/resume (microtask), even for plain values: 1, 3, 2 with surrounding sync logs.",
+      "example": "async f: log 1; await 0; log 2; f(); log 3 → 1, 3, 2"
+    },
+    {
+      "id": "await-reject-throw",
+      "front": "await rejectedPromise?",
+      "meaning": "Throws at the await expression inside the async function, which rejects the async function's Promise unless caught.",
+      "example": "async function f() { await Promise.reject(new Error('no')); } f().catch(e => console.log(e.message)); // 'no'"
+    },
+    {
+      "id": "desugar-then",
+      "front": "async/await vs .then — relationship?",
+      "meaning": "Each await is a suspension point; the remainder becomes a continuation like .then. That's why readability improves and why native try/catch works across those steps. Desugaring is pedagogical — engines optimize — but the observable model is Promise return + microtask resume.",
+      "example": "await fetch; await res.json(); return user ≈ fetch().then(res => res.json()).then(user => user)"
+    },
+    {
+      "id": "try-catch-await",
+      "front": "try/catch around await catches what?",
+      "meaning": "Rejections from awaited Promises and synchronous throws in the try body — one control-flow style for sync and async failures in an async function. Multi-step .then/.catch branching gets noisy; this is the ergonomic win."
+    },
+    {
+      "id": "try-catch-finally-patterns",
+      "front": "try/catch/finally patterns around await?",
+      "meaning": "Handle and recover: catch return fallback. Handle and fail outward: catch log + throw (reject the async function's Promise if the caller must know). Cleanup always: finally. Caller handles: omit catch; let the async Promise reject."
+    },
+    {
+      "id": "unhandled-if-nobody-awaits",
+      "front": "If the returned Promise rejects and nobody awaits it?",
+      "meaning": "Unhandled rejection still applies if nobody awaits or .catch-es it — same rule as the Promises unit."
+    },
+    {
+      "id": "sequential-dashboard-bug",
+      "front": "await fetchUser(); await fetchSettings() — bug?",
+      "meaning": "Accidental serialization when independent — second request starts only after first completes (~2× slower). Rule: if B does not need A's result, do not await A before starting B. Fix: Promise.all([fetchUser(), fetchSettings()]) or start both Promises then await."
+    },
+    {
+      "id": "start-then-await",
+      "front": "Start independent fetches then await?",
+      "meaning": "Kick off both first, then await: const userP = fetchUser(); const settingsP = fetchSettings(); return { user: await userP, settings: await settingsP }; — or Promise.all as above."
+    },
+    {
+      "id": "loop-await-serial",
+      "front": "for (id of ids) await fetchItem(id)?",
+      "meaning": "Each fetchItem waits for the previous to finish, so N independent requests take roughly N times longer. Use await Promise.all(ids.map(fetchItem)). If you fear overload, use a concurrency-limited pool — not full serial by default, and not always unbounded parallel."
+    },
+    {
+      "id": "serial-await-when-correct",
+      "front": "When is serial await correct?",
+      "meaning": "When each step needs the previous result — cursor pagination, dependent IDs, or rate-limit one-at-a-time by policy."
+    },
+    {
+      "id": "combinators-still-matter",
+      "front": "Does async/await replace Promise combinators?",
+      "meaning": "No. It composes with all / allSettled / race / any — e.g. const settled = await Promise.allSettled([fetchA(), fetchB()])."
+    },
+    {
+      "id": "predict-interleaving-method",
+      "front": "How to predict async/await interleaving?",
+      "meaning": "1) Run sync code until an await (or function end). 2) At await, schedule resume as a microtask when the awaited Promise settles; continue the caller. 3) After the stack is empty, drain microtasks (resumes, .then, etc.) before the next macrotask."
+    },
+    {
+      "id": "s1-x1-s2-x2-x3",
+      "front": "x() with two awaits; logs s1, x(), s2 — order?",
+      "meaning": "s1, x1, s2, x2, x3. Both resumes are microtasks; no macrotask involved here.",
+      "example": "async x: log x1; await Promise.resolve(); log x2; await Promise.resolve(); log x3 → s1, x1, s2, x2, x3"
+    },
+    {
+      "id": "x1-s-x2-t",
+      "front": "x() with one await; setTimeout(0); log s?",
+      "meaning": "x1, s, x2, t — await resume is a microtask before the timer macrotask.",
+      "example": "setTimeout t; x(); log s → x1, s, x2, t"
+    },
+    {
+      "id": "for-await-of-awareness",
+      "front": "What is for await...of?",
+      "meaning": "Iterates async iterables (objects with Symbol.asyncIterator), awaiting each produced Promise/value. Use when the source is naturally streaming/async.",
+      "example": "for await (const chunk of asyncStream) { process(chunk); }"
+    },
+    {
+      "id": "for-await-vs-map",
+      "front": "for...of over ids.map(fetchItem) — awaits?",
+      "meaning": "No — iterates Promises, doesn't await them. That does not wait for fetches. Serial: for (const id of ids) await fetchItem(id). Parallel: await Promise.all(ids.map(fetchItem)). for await...of is for async iterables, not a drop-in for an array of Promises."
+    },
+    {
+      "id": "for-await-not-parallel",
+      "front": "Does for await...of parallelize?",
+      "meaning": "No — it pulls one at a time from the async iterator. Thinking for await parallelizes is a common mistake."
+    },
+    {
+      "id": "top-level-await",
+      "front": "Top-level await — where?",
+      "meaning": "ES modules in supporting environments/bundlers. Module evaluation waits on that await; importers wait on the module graph. Not available in classic scripts / plain CJS without wrapping. Nest/TS projects: depends on module target and runtime — same caution as the modules unit.",
+      "example": "// module.mjs\nconst config = await loadConfig();\nexport { config };"
+    },
+    {
+      "id": "async-vs-manual-then",
+      "front": "async/await vs returning a .then chain?",
+      "meaning": "Both return Promises. Prefer async/await when there is branching, multiple steps, or try/catch clarity. Thin wrappers can stay as .then chains."
+    },
+    {
+      "id": "async-only-return-promise",
+      "front": "async with no await — smell?",
+      "meaning": "Usually needless (harmless but noisy) unless you want automatic wrapping of throws. Thin .then chain may suffice."
+    },
+    {
+      "id": "trap-forget-await-call",
+      "front": "Calling an async function without await/.then?",
+      "meaning": "Forgetting that async functions return Promises — the caller races ahead. The work is in flight; you didn't wait for it."
+    },
+    {
+      "id": "trap-all-cancels-peers",
+      "front": "Does await Promise.all cancel peers on first failure?",
+      "meaning": "No — same as the Promises unit. It fails fast on the combined Promise only; siblings may still finish unless you abort."
+    },
+    {
+      "id": "trap-empty-catch",
+      "front": "Empty catch around await?",
+      "meaning": "Swallows errors and can return undefined unintentionally. Catch should recover with a fallback, rethrow, or otherwise handle on purpose."
+    },
+    {
+      "id": "cpu-after-await-still-blocks",
+      "front": "Does sync heavy CPU after await still block?",
+      "meaning": "Yes. Once resumed, that JS still runs on the one thread. Mixing: await yields; then CPU after resume still blocks the thread."
+    },
+    {
+      "id": "closures-across-await",
+      "front": "Do bindings stay live across await?",
+      "meaning": "Yes — variables across await points remain the same live bindings. Stale React state in async handlers is still a closure/generation issue, not an await bug."
+    },
+    {
+      "id": "independent-awaits-overlap-host",
+      "front": "Independent awaits + Promise.all — parallel CPU?",
+      "meaning": "Start all then Promise.all overlaps host waiting; still one JS thread. Same single-threaded model as the event-loop unit."
+    },
+    {
+      "id": "try-catch-like-dot-catch",
+      "front": "try/catch around await vs .catch?",
+      "meaning": "Rejection becomes throw at await — same propagation story as .catch, with clearer branches."
+    },
+    {
+      "id": "interview-should-be-able",
+      "front": "async/await interview bar?",
+      "meaning": "Say sugar over Promises and show a mini desugar; prove with log order that await doesn't block the thread; fix sequential dashboard/loop fetches with Promise.all and mention concurrency limits; use try/catch/finally correctly around await; classify when serial await is required vs accidental."
+    },
+    {
+      "id": "strong-one-liner",
+      "front": "async/await one-liner?",
+      "meaning": "async/await pauses the function and schedules the rest as a microtask when the Promise settles — readable sync style, same single-threaded event loop."
+    }
+  ]
+}

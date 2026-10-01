@@ -1,0 +1,180 @@
+{
+  "title": "type vs interface",
+  "subtitle": "Object shapes, merging, unions, and when to pick each",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "same-job-object-shapes",
+      "front": "Plain object shape — interface or type?",
+      "meaning": "Both can describe object shapes and overlap heavily day to day. For a plain object with no unions or mapped types, either works. Consistency in a codebase often matters more than the pick.",
+      "example": "interface UserI { id: string; name: string }\ntype UserT = { id: string; name: string }"
+    },
+    {
+      "id": "both-structural-erased",
+      "front": "Do interface and type survive as runtime values?",
+      "meaning": "No. Prerequisite from structural typing and erasure: both are structural, both are erased, neither supports instanceof."
+    },
+    {
+      "id": "table-object-shape",
+      "front": "Object shape — interface vs type?",
+      "meaning": "Yes for both. That shared ability is why interviews focus on the real differences: merging, unions, mapped/conditional types, and a default you can defend."
+    },
+    {
+      "id": "table-composition",
+      "front": "How does each compose object types?",
+      "meaning": "interface uses extends (multiple allowed). type uses & intersection."
+    },
+    {
+      "id": "declaration-merging",
+      "front": "What is declaration merging?",
+      "meaning": "Multiple interface declarations with the same name in the same scope merge into one interface with all members combined. Type aliases with the same name are a duplicate-identifier error — they do not merge.",
+      "example": "interface Window { myGlobal: string }\ninterface Window { anotherGlobal: number }\n// Window has both\ntype Foo = { a: string }; type Foo = { b: number }; // Error: Duplicate identifier 'Foo'"
+    },
+    {
+      "id": "table-unions",
+      "front": "Union types — interface vs type?",
+      "meaning": "interface: no as the top-level named type. type: yes (type A = B | C)."
+    },
+    {
+      "id": "table-tuple-primitive",
+      "front": "Tuple / primitive alias — interface vs type?",
+      "meaning": "interface: no. type: yes."
+    },
+    {
+      "id": "table-mapped-conditional",
+      "front": "Mapped / conditional types — interface vs type?",
+      "meaning": "interface: no. type: yes."
+    },
+    {
+      "id": "table-implements",
+      "front": "implements by classes — interface vs type?",
+      "meaning": "Yes for interface. Yes for type when the alias is object-shaped."
+    },
+    {
+      "id": "why-merging-matters",
+      "front": "Why does declaration merging matter?",
+      "meaning": "You can augment third-party or global types without forking the library: Express Request with user after auth middleware (Nest), fields on Window / Node globals, and plugin APIs that open an interface for consumers to merge into."
+    },
+    {
+      "id": "nest-express-request",
+      "front": "Why prefer interface for Express Request.user?",
+      "meaning": "Declaration merging. Augmenting Express Request with user after auth middleware is a real Nest case — a second interface Request { user: User } merges automatically. Redeclaring a type with the same name is a compile error.",
+      "notes": "Preserved interview reason."
+    },
+    {
+      "id": "module-augmentation-pattern",
+      "front": "Nest-shaped module augmentation for req.user?",
+      "meaning": "Reopen the library's interface inside declare module so Request gains user and handlers see typed req.user. Exact module name varies by Express typings version; the idea is reopen an interface, merge members.",
+      "example": "import 'express';\ndeclare module 'express-serve-static-core' {\n  interface Request {\n    user?: { id: string; roles: string[] };\n  }\n}"
+    },
+    {
+      "id": "wrong-module-augmentation",
+      "front": "Does merging work if you augment the wrong module?",
+      "meaning": "No. Merging only works when you augment the correct module or global scope. Forgetting module augmentation or using the wrong module name is a common miss."
+    },
+    {
+      "id": "extends-vs-intersection",
+      "front": "interface extends vs type &?",
+      "meaning": "extends reads clearly for “object is a specialization of another object” and allows multiple extends. Conflicting members with incompatible types are an error. & also composes object types and participates in a wider algebra (unions, conditionals). Intersecting contradictory property types can yield never for that property — intersections are not always “extends with nicer errors.”"
+    },
+    {
+      "id": "multiple-extends",
+      "front": "Can an interface extends more than one type?",
+      "meaning": "Yes. Multiple extends is allowed for object specialization.",
+      "example": "interface Entity extends Timestamped { id: string }"
+    },
+    {
+      "id": "extends-incompatible-error",
+      "front": "interface extends with incompatible members?",
+      "meaning": "Error. Conflicting members with incompatible types fail extends. That is one reason extends can be clearer than an intersection that collapses toward never."
+    },
+    {
+      "id": "intersection-conflict-never",
+      "front": "type A & B with contradictory property types?",
+      "meaning": "Can yield never for that property (or hard-to-use types). You also cannot declaration-merge a type. Know that & is not always a friendlier extends."
+    },
+    {
+      "id": "dto-extends-vs-union-and",
+      "front": "DTO extends BaseDto vs A & B where A might be a union?",
+      "meaning": "For “DTO extends BaseDto,” interface extends is often the clearest. For “A & B & C where A might be a union,” type plus & fits."
+    },
+    {
+      "id": "type-only-unions",
+      "front": "Can interface name a union of variants?",
+      "meaning": "No at the top level. A type alias can be A | B; an interface cannot express that union as the alias itself. Object members of an interface can use union field types, but the alias itself cannot be a union — that is a type job.",
+      "example": "type Result = { ok: true; value: string } | { ok: false; error: string }"
+    },
+    {
+      "id": "primitives-tuples",
+      "front": "Tuple or primitive alias — interface?",
+      "meaning": "Use type. Interfaces cannot alias primitives, tuples like [string, number], or recursive Json-style unions the way type aliases can.",
+      "example": "type Id = string;\ntype Pair = [string, number];\ntype Json = string | number | boolean | null | Json[] | { [k: string]: Json }"
+    },
+    {
+      "id": "mapped-conditional-type-only",
+      "front": "Mapped / conditional types — interface or type?",
+      "meaning": "Only type aliases. If your shape needs mapping over keys, you are in type land. Utility types are built this way.",
+      "example": "type ReadonlyPartial<T> = { readonly [K in keyof T]?: T[K] };\ntype NonNullableField<T> = T extends null | undefined ? never : T"
+    },
+    {
+      "id": "implements-type-alias",
+      "front": "Can a class implements a type alias?",
+      "meaning": "Yes, when the type alias describes an object shape (methods and properties). Thinking type cannot be implemented for object shapes is a misconception.",
+      "example": "type AlsoPrintable = { print(): void };\nclass Doc2 implements AlsoPrintable { print() {} }"
+    },
+    {
+      "id": "implements-is-compile-check",
+      "front": "Does implements create a runtime interface object?",
+      "meaning": "No. implements is a check that the instance shape matches. It does not invent runtime interface objects — still erasure."
+    },
+    {
+      "id": "prefer-interface-oop-reading",
+      "front": "Why prefer interface for public OOP-style APIs?",
+      "meaning": "For the conventional implements reading — not because type cannot work for object shapes."
+    },
+    {
+      "id": "excess-property-both",
+      "front": "Does type skip excess property checks?",
+      "meaning": "No. Fresh object literals assigned to a target type get excess property checking whether the target was declared with interface or type. The rule is fresh literals plus target type, not the keyword. “I used type so excess checks don’t apply” is false.",
+      "example": "f({ x: 1, y: 2, z: 3 }); // Error — excess z (PointI)\ng({ x: 1, y: 2, z: 3 }); // Error — same (PointT)"
+    },
+    {
+      "id": "performance-folklore",
+      "front": "Are interfaces faster for the checker?",
+      "meaning": "Interfaces can be slightly cheaper for the checker in huge codebases in some historical/edge cases. Rarely decisive for app code. Do not lead an interview with “interfaces are faster” unless asked about compiler internals — lead with expressiveness and merging."
+    },
+    {
+      "id": "practical-default",
+      "front": "Your default: interface or type?",
+      "meaning": "Default to interface for public object shapes — props, DTOs, API responses — because extends reads clearly and declaration merging is occasionally genuinely useful (Express Request in Nest). Reach for type for unions, tuples, mapped/conditional types, or when intersections compose better than an extends chain. For a plain object with no unions they are nearly interchangeable; consistency matters more than the specific choice.",
+      "notes": "Preserved practical default."
+    },
+    {
+      "id": "runtime-erasure",
+      "front": "Do interfaces exist at runtime?",
+      "meaning": "No. Like type aliases, interfaces are erased. Runtime validation (zod, class-validator) is still a separate concern from the previous unit."
+    },
+    {
+      "id": "trap-always-one-keyword",
+      "front": "Always use interface, or always use type?",
+      "meaning": "Dogma without the merge/union distinction. Interviews care about real differences and a default you can defend, not a religious keyword rule."
+    },
+    {
+      "id": "connection-structural-both",
+      "front": "How does structural typing relate to both keywords?",
+      "meaning": "Both interface and type describe shapes under the same structural rules. Erasure still means neither is instanceof-able; runtime validation stays separate."
+    },
+    {
+      "id": "connection-merge-to-nest",
+      "front": "Declaration merging connects to what Nest story?",
+      "meaning": "Interface-only merging → Nest/Express Request augmentation. Need union/mapped/conditional → type alias. Object DTO plus extends → interface often clearest."
+    },
+    {
+      "id": "interview-fill-table",
+      "front": "What must you fill from memory in an interview?",
+      "meaning": "The comparison table: merge (interface only), unions/mapped/conditional (type only), extends vs &, implements for object shapes (both). Then a concrete Request-merge reason for interface, a union/mapped reason for type, a sane default, and that excess property checks apply to both."
+    }
+  ]
+}

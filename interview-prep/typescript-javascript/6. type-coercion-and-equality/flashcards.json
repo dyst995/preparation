@@ -1,0 +1,269 @@
+{
+  "title": "Type Coercion and Equality",
+  "subtitle": "Falsy values, == rules, === and Object.is",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "coercion-definition",
+      "front": "What is type coercion in JS?",
+      "meaning": "When JavaScript automatically converts a value from one type to another (to boolean, number, string, or a primitive) because an operator or API asked for that kind of value."
+    },
+    {
+      "id": "equality-operators-also-coerce",
+      "front": "=== vs == vs + / - / if (x) on coercion?",
+      "meaning": "=== compares without converting types. == converts first (abstract equality). Operators like +, -, and if (x) also coerce, each with different rules. Interview goal: predict common results and defend === by default without memorizing the entire spec algorithm."
+    },
+    {
+      "id": "kinds-you-coerce-between",
+      "front": "Everyday kinds of values you coerce between?",
+      "meaning": "Boolean (true/false); Number (0, 1, NaN, Infinity, -0); BigInt (0n, 1n); String ('', '0', 'false'); Nullish (null, undefined); Object ({}, [], functions, dates, …)."
+    },
+    {
+      "id": "toprimitive-first",
+      "front": "What happens before objects finish numeric/string coercion?",
+      "meaning": "Objects often become primitives first via ToPrimitive (usually valueOf / toString) before numeric or string coercion finishes."
+    },
+    {
+      "id": "eight-falsy",
+      "front": "All falsy values in JS?",
+      "meaning": "false, 0, -0, 0n, \"\", null, undefined, NaN. Everything else is truthy — including [], {}, '0', 'false', and ' ' (non-empty string)."
+    },
+    {
+      "id": "empty-array-truthy",
+      "front": "Boolean([])?",
+      "meaning": "true. Empty array is truthy; empty string \"\" is falsy — common interview trap.",
+      "example": "Boolean([]); // true"
+    },
+    {
+      "id": "truthy-traps",
+      "front": "Boolean({}) / '0' / 'false' / ' '?",
+      "meaning": "All true. Empty object is truthy; non-empty strings are truthy even if they look like false or zero; a space is a non-empty string.",
+      "example": "Boolean({}); Boolean('0'); Boolean('false'); Boolean(' '); // all true"
+    },
+    {
+      "id": "boolean-wrapper-truthy",
+      "front": "Boolean(new Boolean(false))?",
+      "meaning": "true — it is an object wrapper, and objects are truthy even when they wrap false.",
+      "example": "Boolean(new Boolean(false)); // true"
+    },
+    {
+      "id": "where-truthiness-used",
+      "front": "Where is truthiness used, and is ?? truthiness?",
+      "meaning": "if (x), while (x), x ? a : b, x && y, x || y. ?? is not truthiness — it only treats null/undefined as missing."
+    },
+    {
+      "id": "nullish-coalescing",
+      "front": "0 || 'default' vs 0 ?? 'default'?",
+      "meaning": "|| uses truthiness — 0 is falsy so 'default'. ?? only treats null/undefined as missing — 0 stays 0."
+    },
+    {
+      "id": "empty-string-nullish",
+      "front": "'' ?? 'default' and null ?? 'default'?",
+      "meaning": "'' ?? 'default' is '' (empty string is not nullish). null ?? 'default' is 'default'.",
+      "example": "'' ?? 'default'; // ''   null ?? 'default'; // 'default'"
+    },
+    {
+      "id": "zero-empty-valid-data",
+      "front": "Why is if (value) dangerous for 0 or ''?",
+      "meaning": "APIs returning 0 or '' as real data break if (value) checks. Prefer explicit checks (value == null, value === 0, value.length === 0) when zero/empty are valid."
+    },
+    {
+      "id": "explicit-vs-implicit",
+      "front": "Explicit vs implicit coercion — when prefer each?",
+      "meaning": "Explicit: Boolean(x), Number(x), String(x), !!x, +x — prefer for clarity and IO boundaries. Implicit: if (x), x + '', x == 1, +x in expressions — only as language idioms you fully control."
+    },
+    {
+      "id": "number-coercion-table",
+      "front": "Number('  12 '), Number(''), Number('12px'), Number(null), Number(undefined)?",
+      "meaning": "12, 0, NaN, 0, NaN respectively. Whitespace around digits is accepted; empty string becomes 0; junk suffix is NaN; null is 0; undefined is NaN.",
+      "example": "Number('  12 '); // 12  Number(''); // 0  Number('12px'); // NaN  Number(null); // 0  Number(undefined); // NaN"
+    },
+    {
+      "id": "string-null-undefined",
+      "front": "String(null) and String(undefined)?",
+      "meaning": "String(null) is 'null'; String(undefined) is 'undefined' — not empty string.",
+      "example": "String(null); // 'null'  String(undefined); // 'undefined'"
+    },
+    {
+      "id": "parseint-vs-number",
+      "front": "parseInt('12px', 10) vs Number('12px')?",
+      "meaning": "parseInt('12px', 10) → 12 (parses a numeric prefix). Number('12px') → NaN. Different tools, different jobs.",
+      "example": "parseInt('12px', 10); // 12  Number('12px'); // NaN"
+    },
+    {
+      "id": "strict-equality",
+      "front": "=== behavior?",
+      "meaning": "Different types → false immediately. Same type → compare with same-type rules, no coercion. Still: NaN !== NaN; +0 === -0. So === is “no coercion,” not perfect mathematical identity."
+    },
+    {
+      "id": "strict-mismatch-examples",
+      "front": "1 === '1', true === 1, null === undefined?",
+      "meaning": "All false — types differ, so === does not coerce.",
+      "example": "1 === '1'; // false  true === 1; // false  null === undefined; // false"
+    },
+    {
+      "id": "loose-equality-what",
+      "front": "What does == do when types differ?",
+      "meaning": "If types already match, behave like same-type comparison. If not, coerce toward a common type using the abstract equality algorithm, then compare. You need the interview patterns, not every spec branch."
+    },
+    {
+      "id": "null-undefined-loose",
+      "front": "null == undefined? null == 0?",
+      "meaning": "null == undefined is true (only loose equality pair). null == 0 and undefined == 0 are false — null/undefined only loosely equal each other."
+    },
+    {
+      "id": "null-eq-false",
+      "front": "null == false?",
+      "meaning": "false. null and undefined are loosely equal only to each other (and themselves), not to 0 or false.",
+      "example": "null == false; // false"
+    },
+    {
+      "id": "number-string-loose",
+      "front": "1 == '1', 0 == '', 0 == '0'?",
+      "meaning": "All true: number ↔ string, the string converts to number ('' → 0, '0' → 0, '1' → 1).",
+      "example": "1 == '1'; // true  0 == ''; // true  0 == '0'; // true"
+    },
+    {
+      "id": "boolean-loose",
+      "front": "0 == false and '0' == false?",
+      "meaning": "Both true in loose equality: boolean coerces to number (false→0), string coerces to number ('0'→0), then numeric compare. Same pattern: 1 == true is true (true→1).",
+      "example": "0 == false; // true  1 == true; // true  '0' == false; // true"
+    },
+    {
+      "id": "array-loose-false",
+      "front": "[] == false?",
+      "meaning": "true. false → 0; [] → ToPrimitive → '' → 0; so 0 == 0."
+    },
+    {
+      "id": "array-eq-comma-string",
+      "front": "[1] == 1 and [1,2] == '1,2'?",
+      "meaning": "Both true. Object ↔ primitive: the array ToPrimitive via toString/join, then compare again ([1] → '1' → 1; [1,2] → '1,2').",
+      "example": "[1] == 1; // true  [1,2] == '1,2'; // true"
+    },
+    {
+      "id": "nan-never-equals",
+      "front": "NaN == NaN?",
+      "meaning": "false. NaN is never == anything, including itself.",
+      "example": "NaN == NaN; // false"
+    },
+    {
+      "id": "eq-null-shorthand",
+      "front": "When is value == null OK?",
+      "meaning": "Deliberate shorthand for value === null || value === undefined. Otherwise prefer === in app code.",
+      "example": "if (x == null) return 'missing'; // null or undefined"
+    },
+    {
+      "id": "array-bang-array",
+      "front": "[] == ![]?",
+      "meaning": "true. ![] is false (array truthy). Then [] == false → both become 0 via boolean and array ToPrimitive to empty string to 0.",
+      "notes": "Walk the chain in interviews; default to === in code."
+    },
+    {
+      "id": "plus-concat-vs-add",
+      "front": "How does + choose concat vs add?",
+      "meaning": "After ToPrimitive: if either operand is string → string concatenation; else both to numbers and add. So 1+'1' is '11'; '5'-1 is 4."
+    },
+    {
+      "id": "plus-object-array-results",
+      "front": "1 + {}, 1 + [], [] + [], [] + {}?",
+      "meaning": "1 + {} is '1[object Object]'; 1 + [] is '1' ([] → ''); [] + [] is ''; [] + {} is '[object Object]'. After ToPrimitive, a string operand forces concatenation.",
+      "example": "1 + 1; // 2  '1' + 1; // '11'  1 + '1'; // '11'"
+    },
+    {
+      "id": "curly-plus-array-asi",
+      "front": "{} + [] — why avoid writing it?",
+      "meaning": "Depends on ASI / context — often number or string surprises. Prefer not to write this; it is not a reliable idiom."
+    },
+    {
+      "id": "minus-times-numeric",
+      "front": "Do - and * concatenate like +?",
+      "meaning": "No. -, *, / always go numeric. Only + concatenates when a string is involved after ToPrimitive.",
+      "example": "'5' - 1; // 4  '5' + 1; // '51'  '5' * '2'; // 10"
+    },
+    {
+      "id": "true-plus-true",
+      "front": "true + true?",
+      "meaning": "2. Neither operand is a string after ToPrimitive, so both booleans become numbers (true→1) and add.",
+      "example": "true + true; // 2"
+    },
+    {
+      "id": "unary-plus",
+      "front": "Unary + on '5', true, [], {}?",
+      "meaning": "Unary + forces number: +'5' → 5, +true → 1, +[] → 0, +{} → NaN.",
+      "example": "+'5'; // 5  +true; // 1  +[]; // 0  +{}; // NaN"
+    },
+    {
+      "id": "toprimitive-arrays",
+      "front": "[] and [1] in numeric context?",
+      "meaning": "[] → '' → 0 in many coercions; [1] → '1' → 1. Explains [1] == 1 and +[] === 0 style puzzles."
+    },
+    {
+      "id": "toprimitive-usual-objects",
+      "front": "Usual ToPrimitive for {} / [] / [1,2]?",
+      "meaning": "Prefer valueOf then toString depending on hint. What you usually observe: {} → '[object Object]' via toString; [] → '' via toString/join; [1,2] → '1,2'."
+    },
+    {
+      "id": "valueof-vs-tostring",
+      "front": "obj with valueOf 3 and toString 'x': obj + 1 vs String(obj)?",
+      "meaning": "obj + 1 is 4 — numeric hint prefers valueOf here for +. String(obj) is 'x'. You rarely invent custom valueOf in apps; you need it to explain array/object coercion puzzles.",
+      "example": "console.log(obj + 1); // 4  console.log(String(obj)); // 'x'"
+    },
+    {
+      "id": "nan-meaning",
+      "front": "Why does x === NaN never work?",
+      "meaning": "NaN means “invalid number.” IEEE-754 makes NaN unordered/not equal to anything, including itself. Number('oops') is NaN.",
+      "example": "NaN === NaN; // false  Number('oops'); // NaN"
+    },
+    {
+      "id": "number-isnan",
+      "front": "Check for NaN — x === NaN vs Number.isNaN?",
+      "meaning": "x === NaN never works (IEEE NaN unordered). Use Number.isNaN(x) — no coercion. Global isNaN('foo') is true because it coerces string to NaN.",
+      "example": "Number.isNaN(NaN); // true  Number.isNaN('foo'); // false  isNaN('foo'); // true"
+    },
+    {
+      "id": "object-is",
+      "front": "Object.is vs ===?",
+      "meaning": "Same except Object.is(NaN, NaN) true and Object.is(+0, -0) false; === treats +0 and -0 equal.",
+      "example": "Object.is(NaN, NaN); // true  Object.is(+0, -0); // false  +0 === -0; // true"
+    },
+    {
+      "id": "object-is-when-to-use",
+      "front": "When use Object.is vs day-to-day ===?",
+      "meaning": "Use Object.is when NaN identity or +0 vs -0 matters (numerical code and some algorithms; maps/sets keyed by identity rarely care about -0). Day-to-day equality: still ===, plus Number.isNaN when checking NaN. Object.is(x, NaN) is also a correct NaN check."
+    },
+    {
+      "id": "relational-lexicographic",
+      "front": "'10' > '9' vs 10 > '9'?",
+      "meaning": "<, >, <=, >= also coerce (often ToNumber / ToPrimitive). Strings compare lexicographically when both sides become strings: '10' > '9' is false (character comparison); 10 > '9' is true (numeric). Another reason not to mix types casually.",
+      "example": "'10' > '9'; // false  10 > '9'; // true"
+    },
+    {
+      "id": "prefer-number-isfinite",
+      "front": "Number.isNaN / Number.isFinite vs global isNaN / isFinite?",
+      "meaning": "Prefer Number.isNaN and Number.isFinite — they do not coerce first. Global isNaN / isFinite coerce and lie (isNaN('foo') === true)."
+    },
+    {
+      "id": "convert-at-boundaries",
+      "front": "Where should you convert types in real code?",
+      "meaning": "At system boundaries, explicitly (e.g. Number(req.query.page)). Use === / !==; value == null only as a deliberate nullish check (or value ??). Don't use truthiness to validate numbers that can be 0 or strings that can be ''."
+    },
+    {
+      "id": "eq-puzzles-not-style",
+      "front": "Are == puzzles a style to imitate?",
+      "meaning": "No. Treat == puzzles as interview literacy, not style to copy in app code. Default remains ===."
+    },
+    {
+      "id": "arrays-truthy-but-toprimitive",
+      "front": "Arrays/objects are truthy — why still == false and + puzzles?",
+      "meaning": "They are truthy in boolean context, but ToPrimitive often yields '' or '[object Object]', which then become 0 or strings in == and +. Truthiness and primitive coercion are different steps.",
+      "notes": "Connection: [] is truthy yet [] == false is true."
+    },
+    {
+      "id": "ts-boundaries-still-coerce",
+      "front": "Does TypeScript remove JS coercion?",
+      "meaning": "It reduces accidental mixed-type == at compile time, but runtime JS coercion still exists at boundaries (query params, JSON, APIs). This unit is about values and operators, separate from scope/this/prototypes."
+    }
+  ]
+}

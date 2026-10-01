@@ -1,0 +1,198 @@
+{
+  "title": "JavaScript Is Single-Threaded",
+  "subtitle": "One call stack per realm; async delegates to the host",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "single-thread-definition",
+      "front": "Single-threaded JS — precise claim?",
+      "meaning": "Per realm (tab main world, Worker, Node isolate): one JS call stack; at most one JS turn runs at a time. Sync code runs to completion before queued callbacks for that realm start."
+    },
+    {
+      "id": "foundation-for-async-units",
+      "front": "Why does this unit matter for event-loop / Promise questions?",
+      "meaning": "It is the foundation for the event loop, Promises, and async/await. If you get single-thread + host delegation wrong, every “predict the output” question becomes memorization instead of reasoning."
+    },
+    {
+      "id": "not-one-os-thread",
+      "front": "Does single-threaded JS mean the browser/Node has one OS thread?",
+      "meaning": "No. It does not mean the whole browser or Node process has only one OS thread. Host work can use other OS threads; the claim is about one JS call stack per realm."
+    },
+    {
+      "id": "not-no-background-io",
+      "front": "Can network/disk/crypto use background threads?",
+      "meaning": "Yes. The single-thread claim does not mean network, disk, or crypto never use background threads. Waiting and some host work happen outside the JS thread."
+    },
+    {
+      "id": "interview-phrasing",
+      "front": "Main-thread JS vs host concurrency vs parallel JS — phrasing?",
+      "meaning": "User JavaScript on the main thread is single-threaded. Concurrency of waiting and some host work happens outside that thread; concurrency of JS computation needs Workers (or multiple processes)."
+    },
+    {
+      "id": "call-stack-definition",
+      "front": "What is the JS call stack?",
+      "meaning": "The LIFO structure of function frames currently executing. While c runs inside b inside a, the stack is roughly a → b → c. When c returns, frames pop until the stack is empty for that turn of work.",
+      "example": "function a() { b(); } function b() { c(); } function c() { console.log('c'); } a();"
+    },
+    {
+      "id": "callbacks-need-empty-stack",
+      "front": "When can a queued callback start?",
+      "meaning": "Only when the engine is ready to start a new turn — which requires the stack from the previous turn to be empty. Nothing interleaves into the middle of a running function unless that function itself yields (e.g. await)."
+    },
+    {
+      "id": "await-not-os-block",
+      "front": "Does await pause the JS thread like an OS blocking wait?",
+      "meaning": "No. await schedules continuation for later rather than pausing the thread like an OS blocking wait inside the JS engine. The current turn can finish; the continuation runs on a later turn of the same thread."
+    },
+    {
+      "id": "async-not-multithread",
+      "front": "Does async mean another JS thread?",
+      "meaning": "No. Async hands waiting work (timers, I/O, network) to the host (Web APIs, libuv), returns immediately, and runs callbacks later on the same JS thread when the stack is empty and the event loop picks them."
+    },
+    {
+      "id": "host-api-sequence",
+      "front": "What happens when you call setTimeout / fetch / fs.readFile?",
+      "meaning": "You are not starting another JS thread that sits and waits. (1) JS calls a host API. (2) The host registers work. (3) The JS call returns immediately; the stack continues. (4) Later the host queues a callback/task/microtask. (5) The event loop runs that callback on the same single JS thread when allowed."
+    },
+    {
+      "id": "start-end-timeout",
+      "front": "log start; setTimeout(0); log end — order?",
+      "meaning": "start, end, then timeout. setTimeout only schedules; sync code in the same turn finishes first; callback runs in a later turn after stack clears (and after microtasks for that phase).",
+      "example": "console.log('start'); setTimeout(() => console.log('timeout'), 0); console.log('end'); // start, end, timeout"
+    },
+    {
+      "id": "non-blocking-io-meaning",
+      "front": "Non-blocking I/O in one sentence?",
+      "meaning": "JS thread doesn't sit waiting on slow I/O; host waits and enqueues callback when ready — many operations in flight, JS callbacks still serialized."
+    },
+    {
+      "id": "concurrent-vs-parallel-table",
+      "front": "Non-blocking I/O vs concurrent requests vs parallel JS?",
+      "meaning": "Non-blocking I/O: JS thread is not stuck waiting on slow I/O; host waits. Concurrent requests: many host operations in flight at once. Parallel JS on the main thread is false — still one stack. Parallel JS with Workers: separate stacks; communicate via messages."
+    },
+    {
+      "id": "where-concurrency-lives",
+      "front": "Where does concurrency happen if not JS stack?",
+      "meaning": "Browser Web APIs and rendering machinery; Node libuv/OS for I/O and thread pool ops. Many waits run elsewhere; your callback still runs single-threaded when it fires."
+    },
+    {
+      "id": "browser-web-apis",
+      "front": "Where does browser concurrency live, and why does a blocked main thread jank?",
+      "meaning": "Web APIs: timers, fetch/networking, DOM events, setTimeout, encoding, some crypto, etc. Rendering and compositing use other browser machinery; a blocked main JS thread still starves input handlers and often janks painting because those compete for the main thread's event loop turns."
+    },
+    {
+      "id": "node-libuv",
+      "front": "Where does Node concurrency live?",
+      "meaning": "libuv (+ OS APIs): network I/O, timers, filesystem (often via thread pool for some ops), DNS, etc. Your JS callbacks still serialize on the Node event loop thread unless you use worker_threads."
+    },
+    {
+      "id": "mental-diagram",
+      "front": "Mental diagram of JS vs host vs queues?",
+      "meaning": "Your JS (one call stack) schedules work on the host (Web APIs / libuv / OS). When ready, the host enqueues a callback onto task/microtask queues. The event loop picks next work and runs it on the same single JS stack. The host may use threads; your callback still runs single-threaded JS when it finally runs."
+    },
+    {
+      "id": "long-sync-freeze",
+      "front": "Why does a 3s busy while loop delay setTimeout(0)?",
+      "meaning": "Timer may fire in host time but JS callback can't start until the stack empties. Busy loop keeps stack occupied — UI/Node handlers starve even if timers are due."
+    },
+    {
+      "id": "freeze-while-occupied",
+      "front": "While a heavy loop occupies the stack, what cannot run?",
+      "meaning": "No other JS callback on that realm can run. Timer callbacks due “now” wait in queues. In the browser, event handlers, React updates scheduled as tasks, and often paint stay delayed → frozen UI. In Node, other request handlers on that loop wait → latency spikes under CPU-bound work."
+    },
+    {
+      "id": "start-end-timer-3s",
+      "front": "start; setTimeout(0); 3s busy loop; end — order?",
+      "meaning": "start, end, then (after ~3s of blocking) timer. The timer's delay elapsed long ago; the callback could not start until the stack emptied.",
+      "example": "console.log('start'); setTimeout(() => console.log('timer'), 0); while (Date.now() < end) {} console.log('end');"
+    },
+    {
+      "id": "practical-avoid-sync",
+      "front": "Practical consequences of long sync CPU?",
+      "meaning": "Prefer async I/O over sync readFileSync on servers. Break huge CPU work: chunking, requestIdleCallback/scheduling, Workers, or native addons. In React/RN, expensive sync work in render/effects blocks interactions. In NestJS, CPU-heavy work in a request handler blocks the event loop for other requests on that process."
+    },
+    {
+      "id": "settimeout-zero-not-immediate",
+      "front": "Why doesn't setTimeout(fn, 0) run immediately?",
+      "meaning": "Delay is minimum, not guarantee. Callback goes to timer/macrotask queue; loop runs it only with empty stack after current sync work — and after microtasks scheduled in that turn beat the next timer."
+    },
+    {
+      "id": "delay-is-minimum",
+      "front": "What does 0ms on setTimeout actually mean?",
+      "meaning": "“As soon as the timer is eligible and the loop gets to that task,” not “next CPU instruction.” setTimeout never runs its callback synchronously, even with a 0ms delay. Any currently running synchronous code, including code after the setTimeout call itself, runs first."
+    },
+    {
+      "id": "nested-timer-clamp",
+      "front": "Do browsers/Node ever run setTimeout(0) inline?",
+      "meaning": "No. Browsers may clamp nested timers; Node has its own timer phases — still never “inline sync.”"
+    },
+    {
+      "id": "sync-micro-timeout-order",
+      "front": "setTimeout(0); Promise.resolve().then(...); sync log?",
+      "meaning": "sync, then microtask, then timeout — preview of event-loop priority within one turn's aftermath.",
+      "example": "setTimeout(() => console.log('timeout'), 0); Promise.resolve().then(() => console.log('microtask')); console.log('sync'); // sync, microtask, timeout"
+    },
+    {
+      "id": "timeout-not-before-promises",
+      "front": "Is setTimeout(0) before all Promise callbacks?",
+      "meaning": "No. Microtasks (Promise .then, queueMicrotask) scheduled in the same turn run before the next timer macrotask. setTimeout(0) is not “before all Promise callbacks.” Full rules belong in the event-loop unit."
+    },
+    {
+      "id": "workers-escape",
+      "front": "Workers and the single-thread story?",
+      "meaning": "Each Worker is a separate realm with its own single JS thread and stack; message-passing, not shared call stacks. Main-thread JS stays single-threaded; parallelism is another realm."
+    },
+    {
+      "id": "worker-own-stack",
+      "front": "What does a Worker not share with the main thread?",
+      "meaning": "Lexical scope and this. Browser: Worker, SharedWorker. Node: worker_threads, or multiple processes/cluster. Each has its own JS thread and stack (still single-threaded inside the worker). Talks via structured clone / transferable messages (or shared memory in advanced cases)."
+    },
+    {
+      "id": "do-not-say-multithreaded",
+      "front": "Because Workers exist, is JS multi-threaded?",
+      "meaning": "Do not say that. Say: main-thread JS is single-threaded; parallelism is another realm. Each worker is still single-threaded JS inside itself."
+    },
+    {
+      "id": "async-function-thread",
+      "front": "async functions run on another thread?",
+      "meaning": "No — same thread until await; await schedules continuation later on that thread, not OS blocking wait inside the engine like a sync loop."
+    },
+    {
+      "id": "pending-fetch-not-js-wait",
+      "front": "Does a pending fetch mean JS is waiting in the background as JS?",
+      "meaning": "No. The network stack waits; your .then waits in a queue. Host waiting is not another JS thread sitting in your function."
+    },
+    {
+      "id": "single-thread-still-concurrency",
+      "front": "Does single-threaded mean no concurrency?",
+      "meaning": "No. Many host operations can be in flight; JS callbacks are serialized. Concurrency of waiting is real; parallel JS on the same stack is not."
+    },
+    {
+      "id": "promise-not-parallel-cpu",
+      "front": "Does creating a Promise parallelize CPU?",
+      "meaning": "No — work before first await is sync and blocking; Promise only models async completion and queues reactions."
+    },
+    {
+      "id": "blame-loop-vs-sync",
+      "front": "Long sync loop vs “the event loop is broken”?",
+      "meaning": "Don't blame the event loop when the real bug is a long sync loop. Queues cannot preempt running JS. A busy stack blocks every callback and the UI even if timers already fired."
+    },
+    {
+      "id": "closures-which-when",
+      "front": "Closures vs single-threading — which vs when?",
+      "meaning": "Closures still decide which variables a callback sees when it eventually runs. Single-threading decides when that callback is allowed to run relative to other JS."
+    },
+    {
+      "id": "await-same-model",
+      "front": "Does await invent threads?",
+      "meaning": "No. await does not invent threads; it schedules continuations on this same model: one JS stack, host waits, callbacks/continuations queued for later turns."
+    },
+    {
+      "id": "interview-one-liner",
+      "front": "Single-thread + async — strong one-liner?",
+      "meaning": "One JS stack runs at a time; async APIs ask the host to wait and queue callbacks for later, so a busy stack blocks every callback and the UI even if timers already fired."
+    }
+  ]
+}

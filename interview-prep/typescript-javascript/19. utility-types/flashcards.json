@@ -1,0 +1,200 @@
+{
+  "title": "Utility types",
+  "subtitle": "Partial, Pick/Omit, union tools, ReturnType, Nest DTO derivation",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "why-utilities",
+      "front": "Why do utility types exist?",
+      "meaning": "They are built-in generic types that transform other types so you keep a single source of truth (entity/DTO) and derive variants instead of duplicating 15 fields by hand. Add a field to User and derived DTOs pick it up unless you omitted it.",
+      "example": "type UpdateUserDto = Partial<Omit<User, 'id' | 'createdAt' | 'passwordHash'>>;"
+    },
+    {
+      "id": "mapped-conditional-awareness",
+      "front": "What are utility types under the hood?",
+      "meaning": "Mostly mapped and conditional types (advanced chapter). This unit is fluent use and Nest-style DTO derivation; knowing the sketches explains why they compose with keyof and unions."
+    },
+    {
+      "id": "partial-t",
+      "front": "What does Partial<T> do, and typical use?",
+      "meaning": "Makes all properties optional. Typical use: PATCH bodies and partial forms.",
+      "example": "type UserPatch = Partial<User>; // { id?: string; name?: string }"
+    },
+    {
+      "id": "partial-shallow",
+      "front": "Is Partial<T> deep?",
+      "meaning": "No — it is shallow. Nested objects are not deeply optional. A deep partial needs a custom mapped type (advanced)."
+    },
+    {
+      "id": "required-t",
+      "front": "What does Required<T> do, and typical use?",
+      "meaning": "Makes all properties required. Typical use: a fully filled config object.",
+      "example": "type Full = Required<{ a?: string; b?: number }>; // { a: string; b: number }"
+    },
+    {
+      "id": "readonly-t",
+      "front": "What does Readonly<T> do, and typical use?",
+      "meaning": "Makes all properties readonly. Typical use: immutable state shapes. Prevents reassignment of properties on that type.",
+      "example": "type ImmutableUser = Readonly<User>; // readonly id, readonly name"
+    },
+    {
+      "id": "readonly-shallow",
+      "front": "Does Readonly<T> freeze values at runtime?",
+      "meaning": "No. It is shallow and compile-time only — not deep immutability at runtime (still erasure). It is not Object.freeze."
+    },
+    {
+      "id": "pick-t",
+      "front": "What does Pick<T, K> do, and typical use?",
+      "meaning": "Keeps only keys K. Typical use: a form subset of a DTO. K must be (or extend) keyof T.",
+      "example": "type NameOnly = Pick<User, 'name'>;"
+    },
+    {
+      "id": "omit-t",
+      "front": "What does Omit<T, K> do, and typical use?",
+      "meaning": "Drops keys K. Typical use: strip id / secrets. It is the practical “everything except…” transformer.",
+      "example": "type WithoutId = Omit<User, 'id'>;"
+    },
+    {
+      "id": "pick-vs-omit",
+      "front": "Pick vs Omit — when which?",
+      "meaning": "Prefer Omit for “entity minus server fields”; prefer Pick when the allowlist is short and explicit. K for Pick must extend keyof T."
+    },
+    {
+      "id": "record-k-v",
+      "front": "What does Record<K, V> do, and typical use?",
+      "meaning": "An object type with keys K and values V. Typical use: dictionaries / maps — Record<string, User> or Record<'loading' | 'success' | 'error', string>.",
+      "example": "type UserMap = Record<string, User>;"
+    },
+    {
+      "id": "record-exhaustive",
+      "front": "Why Record of a literal union vs Record<string, V>?",
+      "meaning": "When K is a literal union, keys become a required property set — good for exhaustive maps (pair with satisfies/Record and discriminant unions). Record<string, V> allows any string key and is weaker."
+    },
+    {
+      "id": "exclude-t-u",
+      "front": "What does Exclude<T, U> do, and typical use?",
+      "meaning": "Union minus members assignable to U (distributes over members). Typical use: strip a variant.",
+      "example": "type Active = Exclude<'idle' | 'loading' | 'error', 'idle'>; // 'loading' | 'error'"
+    },
+    {
+      "id": "extract-t-u",
+      "front": "What does Extract<T, U> do, and typical use?",
+      "meaning": "Union keeping members assignable to U. Typical use: pull a variant. Also used on object unions: Extract<Event, { type: 'click' }>.",
+      "example": "type OnlyIdle = Extract<Status, 'idle'>; // 'idle'"
+    },
+    {
+      "id": "exclude-vs-omit",
+      "front": "Exclude vs Omit — which works on what?",
+      "meaning": "Exclude filters unions (distributive). Omit drops object keys (often thought of as Pick plus Exclude on keyof T). Do not confuse union filtering with key dropping."
+    },
+    {
+      "id": "nonnullable",
+      "front": "What does NonNullable<T> do?",
+      "meaning": "Removes null | undefined from T. Typical use: after a guard, or when modeling a required value. Equivalent idea: Exclude<T, null | undefined>.",
+      "example": "type U = NonNullable<string | null | undefined>; // string"
+    },
+    {
+      "id": "return-type",
+      "front": "What does ReturnType<F> do, and typical use?",
+      "meaning": "The return type of function type F. Typical use: derive from an existing function instead of duplicating the return interface by hand. F must be a function type, often typeof someFn.",
+      "example": "type Created = ReturnType<typeof createUser>;"
+    },
+    {
+      "id": "parameters",
+      "front": "What does Parameters<F> do, and typical use?",
+      "meaning": "The parameter tuple of function type F. Typical use: wrappers and proxies so argument types do not drift from the wrapped function.",
+      "example": "type Args = Parameters<typeof createUser>; // [string, number]"
+    },
+    {
+      "id": "return-type-overload",
+      "front": "What is the ReturnType trap on overloads?",
+      "meaning": "ReturnType on an overloaded function may pick an unexpected overload signature. Do not assume it always matches the overload you call at runtime."
+    },
+    {
+      "id": "awaited",
+      "front": "What does Awaited<T> do, and typical use?",
+      "meaning": "Unwraps Promise, including nested promises. Typical use: the resolved type of an async function, often composed as Awaited<ReturnType<typeof fn>>.",
+      "example": "type User = Awaited<Promise<Promise<{ id: string }>>>; // { id: string }"
+    },
+    {
+      "id": "awaited-returntype-async",
+      "front": "How do you type the resolved value of fetchUser?",
+      "meaning": "Awaited<ReturnType<typeof fetchUser>>. ReturnType of an async function is Promise<…>; Awaited unwraps to the inner value so you do not duplicate the User shape."
+    },
+    {
+      "id": "user-response-dto",
+      "front": "How do you derive a public User response DTO?",
+      "meaning": "Omit secrets: type UserResponseDto = Omit<User, 'passwordHash'>. Public response is Omit<Entity, SecretKeys> or a short Pick allowlist."
+    },
+    {
+      "id": "create-user-dto",
+      "front": "How do you derive CreateUserDto from User?",
+      "meaning": "Omit server keys, then & add client-only fields: Omit<User, 'id' | 'createdAt' | 'passwordHash'> & { password: string }. Compose with & when you need to add fields after omitting secrets."
+    },
+    {
+      "id": "update-user-dto",
+      "front": "How do you derive UpdateUserDto / PATCH from User?",
+      "meaning": "Partial<Omit<User, 'id' | 'createdAt' | 'passwordHash'>> — Omit removes non-client-settable fields; Partial makes the rest optional for PATCH. New User fields flow into the DTO automatically."
+    },
+    {
+      "id": "compose-and-add-fields",
+      "front": "Why & after Omit when replacing passwordHash?",
+      "meaning": "Omit drops passwordHash; & { password: string } adds the create-body field. Forgetting & after Omit is a common mistake when replacement fields are needed."
+    },
+    {
+      "id": "runtime-erasure",
+      "front": "Can you call Partial(user) at runtime?",
+      "meaning": "No. Utilities are types only and erased. There is no Partial() runtime function from TypeScript. Nest still needs class-validator or Zod for runtime validation — same erasure story."
+    },
+    {
+      "id": "patch-body-pattern",
+      "front": "Composition cheat: PATCH body?",
+      "meaning": "Partial<Omit<Entity, LockedKeys>>. Order for readability: usually Omit/Pick first, then Partial/Readonly, then & additions."
+    },
+    {
+      "id": "public-response-pattern",
+      "front": "Composition cheat: public response?",
+      "meaning": "Omit<Entity, SecretKeys> or Pick when the allowlist is short and explicit."
+    },
+    {
+      "id": "create-body-pattern",
+      "front": "Composition cheat: create body?",
+      "meaning": "Omit<Entity, ServerKeys> & { password: string } (or other client-only fields)."
+    },
+    {
+      "id": "composition-order",
+      "front": "Does utility composition order matter?",
+      "meaning": "For readability, usually Omit/Pick first, then Partial/Readonly, then & additions. That matches PATCH (Partial of an Omit) and create (Omit then &)."
+    },
+    {
+      "id": "under-hood-partial",
+      "front": "Sketch of Partial — do you need the full definition?",
+      "meaning": "type Partial<T> = { [K in keyof T]?: T[K] }. Sketch only — do not memorize full definitions yet. It explains composition with keyof.",
+      "example": "type Partial<T> = { [K in keyof T]?: T[K] };"
+    },
+    {
+      "id": "under-hood-pick",
+      "front": "Sketch of Pick?",
+      "meaning": "type Pick<T, K extends keyof T> = { [P in K]: T[P] }. Mapped over the chosen keys; K is constrained to keyof T.",
+      "example": "type Pick<T, K extends keyof T> = { [P in K]: T[P] };"
+    },
+    {
+      "id": "under-hood-exclude",
+      "front": "Sketch of Exclude?",
+      "meaning": "type Exclude<T, U> = T extends U ? never : T. Conditional type that distributes over union members — the bridge to the conditional-types chapter.",
+      "example": "type Exclude<T, U> = T extends U ? never : T;"
+    },
+    {
+      "id": "partial-vs-hand-optional",
+      "front": "Partial vs handwriting every field optional?",
+      "meaning": "Partial derives optionality from the entity so new fields flow in. Hand-writing optional bags duplicates fields and drifts when the entity changes — utilities exist to avoid that."
+    },
+    {
+      "id": "duplicating-dtos-by-hand",
+      "front": "Why not duplicate DTOs by hand because utilities feel scary?",
+      "meaning": "You lose the single-source-of-truth benefit. Prefer composing Partial/Omit/Pick/& from one entity; utilities are the fluent layer over mapped/conditional types."
+    }
+  ]
+}

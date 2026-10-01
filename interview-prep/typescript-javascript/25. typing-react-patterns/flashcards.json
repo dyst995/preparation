@@ -1,0 +1,203 @@
+{
+  "title": "Typing React patterns",
+  "subtitle": "Props, generics, useState trap, refs, events",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "react-ts-interview-surface",
+      "front": "What does React + TypeScript interview coverage focus on?",
+      "meaning": "Mostly props, hooks, and events. Interviewers probe union-constrained props (not loose string), generics on list-like components, the useState literal-widening trap, reducers typed with discriminated unions, the two useRef overloads (DOM vs mutable box), and typing forwardRef plus DOM events."
+    },
+    {
+      "id": "react-typing-prereqs",
+      "front": "What TypeScript topics does React typing assume?",
+      "meaning": "Generics, unions / discriminated unions, and narrowing. Those are the tools behind List<T>, variant unions, and reducer action switches."
+    },
+    {
+      "id": "props-are-object-type",
+      "front": "How should component props be typed?",
+      "meaning": "Props are a normal object type, usually an interface. Optional props use `?`. Runtime defaults live in the destructuring (`variant = 'primary'`), not in the type system as default values.",
+      "example": "function Button({ label, onPress, variant = 'primary', children }: ButtonProps)"
+    },
+    {
+      "id": "react-node-children",
+      "front": "What is React.ReactNode, and when vs ReactElement?",
+      "meaning": "ReactNode is anything React can render: elements, strings, numbers, arrays, null, undefined, and booleans (mostly ignored when rendering). Prefer it for children unless you need a stricter shape. ReactElement means a single element only."
+    },
+    {
+      "id": "children-string-only",
+      "front": "When type children as string instead of ReactNode?",
+      "meaning": "Use string when children must be text-only. Use ReactNode for flexible children and ReactElement when you require a single element."
+    },
+    {
+      "id": "variant-union-not-string",
+      "front": "Why type variant as 'primary' | 'secondary' instead of string?",
+      "meaning": "Union literals make typos and invalid variants compile errors. string only fails at runtime (wrong CSS class). Small detail, strong signal in reviews."
+    },
+    {
+      "id": "defaults-destructure",
+      "front": "Does variant?: in the props type set a runtime default?",
+      "meaning": "No. Optional `?` only allows omitting the prop. Defaults belong in destructuring (`variant = 'primary'`), not only in the type definition.",
+      "notes": "Putting default prop values only in the type is a common mistake."
+    },
+    {
+      "id": "generic-list",
+      "front": "How does List<T> stay typed without any in renderItem?",
+      "meaning": "T is inferred from items: T[] and checked against renderItem and keyExtractor. One reusable component stays typed for User, Product, etc., without any in callbacks.",
+      "example": "<List items={users} renderItem={(u) => <span>{u.name}</span>} keyExtractor={(u) => u.id} />"
+    },
+    {
+      "id": "list-inference-nudge",
+      "front": "Do callers usually write List<User> explicitly?",
+      "meaning": "Rarely. T is inferred from items (and checked against callbacks). Write an explicit type argument only when inference needs a nudge."
+    },
+    {
+      "id": "usestate-widening",
+      "front": "What type does useState('idle') infer?",
+      "meaning": "string — the literal widens. That will not catch invalid statuses. For a closed set, pass an explicit type argument: useState<'idle' | 'loading' | 'success' | 'error'>('idle').",
+      "example": "const [status, setStatus] = useState('idle'); // status: string"
+    },
+    {
+      "id": "usestate-why-widen",
+      "front": "Why does useState widen string/number/boolean literals?",
+      "meaning": "If TS inferred status as the literal 'idle', then setStatus('loading') would be a type error — the only assignable value would be 'idle'. Inference widens those literals to string / number / boolean for useState’s initial value so the setter is usable."
+    },
+    {
+      "id": "usestate-closed-vs-open",
+      "front": "When should useState stay string vs a status union?",
+      "meaning": "For a closed set of states, pass an explicit type argument (or as const patterns / const object maps). For open text (useState('') for an input), plain string is correct."
+    },
+    {
+      "id": "usestate-object-array-init",
+      "front": "Can object or array useState initials also be too loose?",
+      "meaning": "Yes — they can be looser than you intend. Annotate when the shape is a fixed state machine, same idea as status unions."
+    },
+    {
+      "id": "usereducer-discriminant",
+      "front": "How do discriminated union actions type a reducer?",
+      "meaning": "A discriminant like type narrows in switch so action.by exists only on increment/decrement branches, not on reset. Same pattern as Redux-style reducers. useReducer(reducer, initialState) then types dispatch to accept only valid Actions."
+    },
+    {
+      "id": "usereducer-exhaustiveness",
+      "front": "How can a missing reducer case become a type error?",
+      "meaning": "With strict / no implicit returns, missing a case can error if you do not return State on all paths — good pressure to handle every action."
+    },
+    {
+      "id": "useref-dom",
+      "front": "What does useRef<HTMLInputElement>(null) mean?",
+      "meaning": "Null-initialized element ref: React fills .current with the DOM node (or null). Typical for reading the node in effects and handlers. .current may be null until mount and after unmount.",
+      "example": "const inputRef = useRef<HTMLInputElement>(null);"
+    },
+    {
+      "id": "useref-mutable",
+      "front": "What does useRef(0) mean vs a DOM ref?",
+      "meaning": "Mutable-box ref: you read/write .current yourself for timerId, previous props, etc. It persists across renders without re-render. Changing .current does not trigger a render — do not use it when you mean state that should update the UI.",
+      "example": "const countRef = useRef(0);"
+    },
+    {
+      "id": "useref-interview-wording",
+      "front": "Do interviews care about RefObject vs MutableRefObject names?",
+      "meaning": "Exact RefObject vs MutableRefObject wording has shifted across @types/react / React 19. Interviews still want the two intents: null-initialized element ref vs mutable value ref."
+    },
+    {
+      "id": "forwardref-purpose",
+      "front": "What is forwardRef for?",
+      "meaning": "It exposes an inner DOM node (or child handle) to parents so they can hold a ref to the inner input, not just the wrapper component."
+    },
+    {
+      "id": "forwardref-order",
+      "front": "What is the type-parameter order of forwardRef?",
+      "meaning": "forwardRef<RefType, PropsType> — ref element type first, props second. Easy interview trap to swap them (Props first by mistake).",
+      "example": "React.forwardRef<HTMLInputElement, InputProps>(function Input({ label }, ref) { ... })"
+    },
+    {
+      "id": "forwardref-react19-prop",
+      "front": "Does React 19 still require forwardRef?",
+      "meaning": "React 19 can pass ref as a normal prop in some setups; many codebases still use forwardRef. Know the classic generic order either way."
+    },
+    {
+      "id": "change-event",
+      "front": "How do you type an input onChange handler?",
+      "meaning": "React.ChangeEvent<HTMLInputElement> so e.target.value is a typed string. Prefer these over any or untyped e, so e.target / e.currentTarget match the element.",
+      "example": "function onChange(e: React.ChangeEvent<HTMLInputElement>) { console.log(e.target.value); }"
+    },
+    {
+      "id": "form-event-submit",
+      "front": "How do you type form onSubmit?",
+      "meaning": "React.FormEvent<HTMLFormElement> for <form onSubmit>."
+    },
+    {
+      "id": "mouse-event-click",
+      "front": "How do you type a button click handler?",
+      "meaning": "React.MouseEvent<HTMLButtonElement> (or the element actually used)."
+    },
+    {
+      "id": "keyboard-event",
+      "front": "How do you type a keyboard handler on an input?",
+      "meaning": "React.KeyboardEvent<HTMLInputElement>."
+    },
+    {
+      "id": "currenttarget-delegated",
+      "front": "For delegated handlers, target or currentTarget?",
+      "meaning": "currentTarget is usually the safer typed element — it matches the element the handler is attached to."
+    },
+    {
+      "id": "jsx-infers-handler",
+      "front": "Must you annotate event handler parameters in JSX?",
+      "meaning": "No. You can inline without annotating if the JSX prop context infers the handler type.",
+      "example": "<input onChange={(e) => setValue(e.target.value)} />"
+    },
+    {
+      "id": "mistake-dom-event",
+      "front": "Why not type React handlers as DOM Event?",
+      "meaning": "Bare Event from the DOM lib lacks the React generic element, so e.target / e.currentTarget are not tied to the actual element. Use ChangeEvent<HTMLInputElement> and similar."
+    },
+    {
+      "id": "component-props-native",
+      "front": "What are ComponentProps<'button'> and ComponentPropsWithoutRef for?",
+      "meaning": "They extend native element props instead of re-declaring className, disabled, etc. — a supporting pattern for wrapping DOM elements."
+    },
+    {
+      "id": "props-with-children",
+      "front": "What does PropsWithChildren<P> add?",
+      "meaning": "It is P & { children?: ReactNode } — a helper for adding optional children to a props type."
+    },
+    {
+      "id": "async-click-handlers",
+      "front": "Can a click handler be async in TypeScript?",
+      "meaning": "Return type void | Promise<void> is fine. Do not pretend events wait on the promise unless you handle errors."
+    },
+    {
+      "id": "extras-are-supporting",
+      "front": "Are ComponentProps and PropsWithChildren the interview core?",
+      "meaning": "No. They show up in practice as supporting tools. In interviews stay focused on the curriculum list: props/children, generic lists, useState widening, useReducer action unions, the two useRef overloads, forwardRef generics, and event handler types."
+    },
+    {
+      "id": "mistake-any-renderitem",
+      "front": "Why is any on list renderItem a mistake?",
+      "meaning": "It throws away the item type. Use a generic List<T> so renderItem: (item: T) => React.ReactNode stays tied to items."
+    },
+    {
+      "id": "connections-unions-react",
+      "front": "How do union literals connect to React typing?",
+      "meaning": "Union literals type prop variants and useState status machines so invalid values fail at compile time."
+    },
+    {
+      "id": "connections-discriminated-reducer",
+      "front": "How do discriminated unions connect to useReducer?",
+      "meaning": "Discriminated unions plus narrowing type action objects so each switch branch sees only that action’s fields."
+    },
+    {
+      "id": "connections-generics-react",
+      "front": "How do generics connect to List and forwardRef?",
+      "meaning": "Generics plus inference type List<T> from items and type forwardRef<Ref, Props> with the ref element first."
+    },
+    {
+      "id": "connections-nullability-ref",
+      "front": "How does nullability show up with refs?",
+      "meaning": "ref.current is possibly null until mount (and after unmount), so you must account for null before using the DOM node."
+    }
+  ]
+}

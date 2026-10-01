@@ -1,0 +1,183 @@
+{
+  "title": "API DTO typing end to end",
+  "subtitle": "Entity, boundaries, Omit leak, FE sync",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "dto-discipline-five",
+      "front": "What discipline does end-to-end API DTO typing encode?",
+      "meaning": "One entity (or domain model) as the persistence source of truth; request DTOs validated at the HTTP boundary; response DTOs that actually omit secrets at runtime, not only in types; awareness of FE/BE sync (shared package / OpenAPI codegen); and why “typed response ⇒ safe” is a trap without validation or mapping."
+    },
+    {
+      "id": "api-dto-prereqs",
+      "front": "What units does this API DTO discipline sit on?",
+      "meaning": "Nest DTO patterns, type erasure, utility types / Omit, and unknown vs any."
+    },
+    {
+      "id": "three-layers",
+      "front": "Entity vs create DTO vs response DTO — who owns what?",
+      "meaning": "Entity owns DB / domain and often holds secrets like passwordHash. Create/update DTOs are inbound HTTP shapes: passwords in plain for input only, never hashes outbound. Response DTOs are outbound HTTP projections with no secrets."
+    },
+    {
+      "id": "entity-canonical-projections",
+      "front": "What is the canonical field list, and what are DTOs?",
+      "meaning": "The entity is the canonical field list. Request and response types are projections for directions of travel — inbound vs outbound — not a second copy of the whole domain object."
+    },
+    {
+      "id": "derive-means",
+      "front": "What can “derive” request/response types mean?",
+      "meaning": "Hand-written response/request classes aligned with the entity; Pick / Omit types for compile-time helpers (not sufficient alone for JSON); or codegen from OpenAPI/GraphQL so FE and BE share a schema."
+    },
+    {
+      "id": "types-on-body-erase",
+      "front": "Do @Body() types parse or validate JSON?",
+      "meaning": "No. Untrusted JSON enters as a plain object. Types on @Body() erase — they do not parse or validate."
+    },
+    {
+      "id": "validate-once-edge",
+      "front": "Where should you validate, and why once?",
+      "meaning": "Validate/parse once at the HTTP boundary. Inner service code trusts the DTO type because the edge already enforced it. Nest: class-validator plus ValidationPipe (transform, whitelist) on DTO classes. Elsewhere: zod / yup / Valibot schemas — parse → typed value or error."
+    },
+    {
+      "id": "zod-infer",
+      "front": "What is z.infer<typeof CreateUser> for?",
+      "meaning": "The schema is the runtime source of truth; the inferred type stays in sync with parse rules. Alternative to hand-duplicated interfaces for non-Nest stacks.",
+      "example": "type CreateUser = z.infer<typeof CreateUser>; const dto = CreateUser.parse(req.body);"
+    },
+    {
+      "id": "zod-parse-throws",
+      "front": "What does CreateUser.parse(req.body) do?",
+      "meaning": "It throws or returns validated data — parse at the edge, then inner code uses the typed value."
+    },
+    {
+      "id": "omit-leak",
+      "front": "Response typed Omit<User,'passwordHash'> but hash still in JSON — how?",
+      "meaning": "Types erase. Omit only changes what the compiler thinks. If the real object still has passwordHash, JSON.stringify includes it because serializers walk runtime keys. Fix: build an explicit new object/DTO with only public fields (do not cast the entity). In Nest, add @Exclude() plus ClassSerializerInterceptor as a runtime second layer."
+    },
+    {
+      "id": "serializers-walk-runtime-keys",
+      "front": "Why does returning user from toPublic still leak the hash?",
+      "meaning": "The function can compile because of excess-property / return-compatibility pitfalls, but the object still has the property. Omit changed the type, not the value.",
+      "example": "function toPublic(user: User): Omit<User, 'passwordHash'> { return user; } // JSON may still include passwordHash"
+    },
+    {
+      "id": "three-structural-fixes",
+      "front": "How do you prevent the Omit leak structurally?",
+      "meaning": "Explicitly map to a new object / UserResponseDto (preferred curriculum discipline); in Nest, @Exclude() on sensitive entity fields plus ClassSerializerInterceptor; never use return user as UserResponseDto as your only defense."
+    },
+    {
+      "id": "service-map-response",
+      "front": "What should UsersService.create return?",
+      "meaning": "Hash the password, save the User entity, then return a plain object with only public fields (id, name, email, createdAt). The entity never leaves the service layer directly as the HTTP payload so the runtime object genuinely lacks secrets.",
+      "example": "return { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt };"
+    },
+    {
+      "id": "entity-never-leaves-service",
+      "front": "May the entity leave the service layer as the HTTP payload?",
+      "meaning": "No. Always map to a response DTO so the runtime object genuinely lacks secrets. Returning entities from controllers “because the return type omits secrets” is the leak."
+    },
+    {
+      "id": "e2e-flow",
+      "front": "What is the end-to-end DTO flow both directions?",
+      "meaning": "Client JSON → validate CreateUserDto (pipe / zod) → service hashes password and saves User → map to UserResponseDto (no passwordHash) → optional ClassSerializerInterceptor → JSON response. On the client: fetch should parse with zod/unknown narrow into UI types (shared package or local mirrors)."
+    },
+    {
+      "id": "both-directions-boundary",
+      "front": "Are both inbound and outbound API edges boundaries?",
+      "meaning": "Yes. Inbound validation and outbound stripping/mapping on the server; the frontend should not blindly trust network JSON either."
+    },
+    {
+      "id": "shared-types-package",
+      "front": "How does a shared types package keep FE/BE in sync?",
+      "meaning": "A monorepo packages/api-types (or similar) imported by Nest and React so both sides use the same TypeScript shapes instead of copy-paste interfaces."
+    },
+    {
+      "id": "openapi-codegen",
+      "front": "How does OpenAPI/Swagger codegen keep FE/BE in sync?",
+      "meaning": "The backend schema generates a TypeScript client plus types, so the client tracks the published HTTP contract instead of a hand-copied User interface."
+    },
+    {
+      "id": "graphql-codegen",
+      "front": "How does GraphQL codegen keep FE/BE in sync?",
+      "meaning": "The GraphQL schema generates typed operations and hooks, so operations stay aligned with the schema rather than duplicated models."
+    },
+    {
+      "id": "duplicate-types-drift",
+      "front": "What is the risk of duplicating User types by hand?",
+      "meaning": "They drift. Fine only for tiny apps. Prefer schema-first or shared DTOs over copy-paste interface User in two repos with no process."
+    },
+    {
+      "id": "why-drift-hurts",
+      "front": "Why does FE/BE type drift hurt in practice?",
+      "meaning": "The frontend might expect createdAt: string ISO while the backend sends Date serialization quirks, or a field is renamed on one side only. That is the interview-level reason to prefer shared DTOs or codegen."
+    },
+    {
+      "id": "shared-types-no-parse",
+      "front": "Do shared TypeScript types validate network JSON?",
+      "meaning": "No. Shared types still do not validate runtime JSON — types erase on both sides. Pair them with zod on the client or a generated client that decodes."
+    },
+    {
+      "id": "as-response-trap",
+      "front": "Why is (await res.json()) as UserResponseDto unsafe?",
+      "meaning": "The assertion lies — there is no check that JSON matches. A backend bug or proxy can add fields; XSS-ish assumptions and logic bugs follow. Types erase on both sides. Safer: unknown → schema parse (UserResponseSchema.parse) → typed value, the same boundary idea as Nest pipes.",
+      "example": "const data = (await res.json()) as UserResponseDto; setUser(data); // trap"
+    },
+    {
+      "id": "fe-parse-unknown",
+      "front": "What is the safer frontend pattern for API JSON?",
+      "meaning": "Treat the payload as unknown, then schema-parse (e.g. UserResponseSchema.parse) to a typed value. Same boundary idea as Nest pipes."
+    },
+    {
+      "id": "nest-inbound-outbound",
+      "front": "What are Nest’s inbound vs outbound DTO layers?",
+      "meaning": "Inbound: class-validator DTO classes plus ValidationPipe. Outbound: explicit response mapping and/or @Exclude plus ClassSerializerInterceptor. Compile-time Omit is not a security control."
+    },
+    {
+      "id": "whitelist-extra-keys",
+      "front": "What happens if you forget ValidationPipe whitelist?",
+      "meaning": "Extra body keys can reach persistence if not stripped. whitelist removes properties without decorator metadata — part of boundary hardening."
+    },
+    {
+      "id": "one-mega-type",
+      "front": "Why not one type for entity + create + update + response?",
+      "meaning": "Anti-pattern: secrets and optional PATCH fields get conflated. Derive projections from a canonical entity or schema instead."
+    },
+    {
+      "id": "mistake-validate-only-ui-or-types",
+      "front": "Is validating only in the UI or only in TypeScript types enough?",
+      "meaning": "No. The HTTP boundary must parse/validate untrusted JSON. UI checks and TS annotations do not replace a pipe or schema parse on the server (and the client should parse responses too)."
+    },
+    {
+      "id": "mistake-as-security-control",
+      "front": "Is as UserResponseDto or as Omit<…> a security control?",
+      "meaning": "No. Casts and Omit do not strip runtime fields. Mapping to a new object or serializer exclusion does."
+    },
+    {
+      "id": "connections-erasure-omit",
+      "front": "How does erasure explain the Omit leak?",
+      "meaning": "Erasure means Omit and casts do not strip JSON fields. The compiler’s view of the object is not what JSON.stringify walks."
+    },
+    {
+      "id": "connections-nest-inbound",
+      "front": "What Nest tools are the inbound boundary?",
+      "meaning": "DTO classes plus ValidationPipe (class-validator / class-transformer) — the request-validation half of the discipline."
+    },
+    {
+      "id": "connections-outbound-boundary",
+      "front": "What tools are the outbound boundary?",
+      "meaning": "An explicit map to a response DTO, and/or @Exclude plus ClassSerializerInterceptor, so secrets never ride the serialized object."
+    },
+    {
+      "id": "connections-unknown-zod-fe",
+      "front": "How does unknown + zod on the frontend fit this unit?",
+      "meaning": "It is the same boundary idea as Nest pipes, applied to responses: do not trust res.json(), parse untrusted data into a typed value."
+    },
+    {
+      "id": "connections-shared-openapi",
+      "front": "What does a shared package or OpenAPI buy you?",
+      "meaning": "It reduces type drift across frontend and backend. It still does not validate runtime JSON by itself — pair with parse/codegen decoders."
+    }
+  ]
+}

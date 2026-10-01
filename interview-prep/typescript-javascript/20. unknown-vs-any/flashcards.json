@@ -1,0 +1,166 @@
+{
+  "title": "unknown vs any",
+  "subtitle": "Boundaries, contagion, catch, JSON.parse",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "core-difference",
+      "front": "any vs unknown in one line?",
+      "meaning": "any means “trust me, don’t check”; unknown means “prove it before you use it.” Both mean the value could be anything; the difference is discipline."
+    },
+    {
+      "id": "any-allows-operations",
+      "front": "What does any allow that unknown does not?",
+      "meaning": "any opts out of checking: method calls and property access are allowed, including chains that will fail at runtime. unknown still means “I don’t know”; you must narrow or assert before use.",
+      "example": "let a: any = 'hello'; a.nonExistentMethod(); a.foo.bar.baz; // compile ok"
+    },
+    {
+      "id": "unknown-must-narrow",
+      "front": "Why is u.toUpperCase() an error when u is unknown?",
+      "meaning": "unknown forbids operations until you prove the type. After typeof u === 'string', toUpperCase is allowed. Use unknown at boundaries (JSON, catch, untyped APIs); treat any as a last resort.",
+      "example": "let u: unknown = 'hello'; u.toUpperCase(); // Error — if (typeof u === 'string') u.toUpperCase();"
+    },
+    {
+      "id": "assignability-table",
+      "front": "Assign to any/unknown vs assign from them — table?",
+      "meaning": "Assign to either: almost anything (both are roughly top types). Assign from any to a precise type: allowed without checks. Assign from unknown to a precise type: error unless narrowed or asserted. Call methods: allowed on any, error on unknown until narrowed. Spreads unsafety: any yes (contagious), unknown no (forces proofs)."
+    },
+    {
+      "id": "any-contagion",
+      "front": "Why is any contagious?",
+      "meaning": "Anything that touches any often becomes any too — return values, inferred locals — so one any can disable large regions of the program.",
+      "example": "function f(x: any) { return x.foo; } const y = f(1); y.bar; // still any — no error"
+    },
+    {
+      "id": "unknown-not-assign-to-string",
+      "front": "Can you assign unknown to string without a check?",
+      "meaning": "No. unknown does not assign freely to string, User, or other precise types. After typeof x === 'string', const s: string = x is ok.",
+      "example": "function g(x: unknown) { const s: string = x; } // Error"
+    },
+    {
+      "id": "assignability",
+      "front": "How is any a bottom-ish escape as well as a top type?",
+      "meaning": "Both any and unknown can receive almost any value (top-ish). any is also assignable to most types without proof — unsound by design. unknown is not assignable to other types without narrowing or assertion, which is why unknown preserves safety and any does not."
+    },
+    {
+      "id": "implicit-any",
+      "front": "How does any sneak in with noImplicitAny off?",
+      "meaning": "With noImplicitAny off (or weak inference), untyped parameters become any. function add(a, b) { return a + b } types a and b as any.",
+      "example": "// noImplicitAny: false\nfunction add(a, b) { return a + b; }"
+    },
+    {
+      "id": "fix-noimplicitany",
+      "front": "How do you stop implicit any on parameters?",
+      "meaning": "Enable strict / noImplicitAny; annotate parameters or rely on contextual typing."
+    },
+    {
+      "id": "untyped-libs",
+      "front": "How do untyped libraries introduce any?",
+      "meaning": "Modules without types default to any exports (depending on noImplicitAny / skipLibCheck / allowJs). Missing @types/… is a classic infection source. Fix: add types, write a minimal .d.ts, or wrap the API behind a typed facade that takes unknown and validates."
+    },
+    {
+      "id": "json-parse",
+      "front": "What does JSON.parse typically return, and the safe pattern?",
+      "meaning": "any, historically / typically. Assign to unknown, then validate with a type predicate or Zod. Prefer validate over as User right after parse.",
+      "example": "const data: unknown = JSON.parse(s); if (isUser(data)) { /* data is User */ }"
+    },
+    {
+      "id": "json-validate-not-cast",
+      "front": "Why not JSON.parse(s) as User?",
+      "meaning": "It compiles with no runtime proof. The notes prefer validate (predicate or UserSchema.parse) over a blind assertion immediately after parse."
+    },
+    {
+      "id": "as-any-ts-ignore",
+      "front": "Which silence tricks leak any?",
+      "meaning": "as any and // @ts-ignore to silence errors. Other leaks: Object.keys / some DOM APIs returning wide types (less extreme than any, but similar “widen then cast” habits), generic defaults T = any, and loosely typed test mocks."
+    },
+    {
+      "id": "object-keys-wide",
+      "front": "How are Object.keys and some DOM APIs like any leaks?",
+      "meaning": "They return wide types — less extreme than any, but they encourage the same widen-then-cast habit. Treat them as a source of unsound shortcuts, not as unknown-safe APIs."
+    },
+    {
+      "id": "generic-default-any",
+      "front": "Why is T = any a leak?",
+      "meaning": "A generic default written as T = any reintroduces contagious any whenever callers omit the type argument. Prefer T = unknown (as in Page<T = unknown>) when a default is needed."
+    },
+    {
+      "id": "catch-unknown",
+      "front": "What is catch (err) under useUnknownInCatchVariables / strict-ish defaults?",
+      "meaning": "err is unknown. Thrown values can be anything — not only Error. any would allow err.message even when err is a string. unknown forces instanceof Error (or similar) before property access.",
+      "example": "catch (err) { if (err instanceof Error) console.error(err.message); else console.error(String(err)); }"
+    },
+    {
+      "id": "thrown-not-only-error",
+      "front": "Why is catch the most “anything can show up” path?",
+      "meaning": "You can throw strings, objects, or Error. That is why unknown is the right discipline: prove structure (instanceof Error) or stringify, instead of assuming .message exists."
+    },
+    {
+      "id": "catch-e-any-habit",
+      "front": "Why is catch (e: any) a mistake?",
+      "meaning": "It is an old habit that opts catch back into contagious any. Prefer the unknown catch variable and narrow."
+    },
+    {
+      "id": "boundary-pattern",
+      "front": "Where should you use unknown?",
+      "meaning": "At boundaries: JSON, catch, external APIs, message ports. Boundary in: unknown → narrow/validate → typed domain. Boundary out: serialize known types; don’t trust round-trips without parsing."
+    },
+    {
+      "id": "log-unknown",
+      "front": "Can you pass unknown around without narrowing?",
+      "meaning": "Yes, as a passthrough until inspected — logValue(v: unknown) may console.log(v) because logging does not require structure. You cannot operate on it as structured data (v.foo) without checks."
+    },
+    {
+      "id": "when-any-ok",
+      "front": "When do people still use any, honestly?",
+      "meaning": "Rare, conscious cases: migrating a huge JS file (temporary); truly unrepresentable interop (then wrap and shrink the blast radius); exhausted type-system edge cases (document why; prefer unknown + assert). Never as the default for “I’ll fix types later” in new Nest/React code."
+    },
+    {
+      "id": "preference-order",
+      "front": "What is the preferred order instead of reaching for any?",
+      "meaning": "1) unknown + narrowing, 2) generics, 3) proper typings, 4) any only with a comment and a ticket to remove it."
+    },
+    {
+      "id": "assert-vs-narrow",
+      "front": "const user = u as User after JSON.parse — safer than any?",
+      "meaning": "It compiles with no runtime proof. Assertions are sometimes needed, but they are not safer than any if you assert wrongly. Prefer predicates or Zod, then assertion only at a validated boundary."
+    },
+    {
+      "id": "object-vs-unknown",
+      "front": "Object or {} vs unknown for unvalidated input?",
+      "meaning": "Prefer unknown for “yet unvalidated.” Object and {} have different assignability quirks and do not force the same narrowing discipline."
+    },
+    {
+      "id": "disable-noimplicitany",
+      "front": "Is turning off noImplicitAny a valid way to save time?",
+      "meaning": "No. It is a listed misconception. Silent any on parameters infects the function and anything that consumes its returns."
+    },
+    {
+      "id": "one-any-poisons",
+      "front": "What happens if one helper is typed with any?",
+      "meaning": "That any poisons an entire feature: return types and inferred locals stay any, so crashes have no compile signal. unknown would have forced proofs at the use sites."
+    },
+    {
+      "id": "erasure-json",
+      "front": "Why doesn’t a User type validate JSON.parse?",
+      "meaning": "Erasure: types do not exist at runtime and do not validate JSON. unknown forces the validation step (typeof / instanceof / predicates / zod) you actually need before a typed value."
+    },
+    {
+      "id": "strict-blocks-silent-any",
+      "front": "What do strict and noImplicitAny block?",
+      "meaning": "Silent any — untyped parameters and weak inference that would otherwise disable checking without you noticing."
+    },
+    {
+      "id": "unknown-same-as-any-myth",
+      "front": "Are unknown and any the same because both mean “anything”?",
+      "meaning": "Same “could be anything,” opposite checking rules. any skips checking and infects dependents; unknown requires narrowing before use."
+    },
+    {
+      "id": "sneaky-any-sources",
+      "front": "List sneaky any sources and mitigations?",
+      "meaning": "Implicit any (enable strict/noImplicitAny); untyped libs (@types, .d.ts, unknown facade); JSON.parse (unknown + validate); as any / @ts-ignore; T = any defaults; loose mocks. Prefer unknown + narrowing over blind as."
+    }
+  ]
+}

@@ -1,0 +1,224 @@
+{
+  "title": "Promises",
+  "subtitle": "States, chaining, combinators, microtasks",
+  "frontLabel": "Prompt",
+  "modeForward": "Prompt → meaning",
+  "modeReverse": "Meaning → prompt",
+  "cards": [
+    {
+      "id": "promise-definition",
+      "front": "What is a Promise?",
+      "meaning": "An object representing the eventual success value or failure reason of an async operation. It lets you attach handlers that run later as microtasks instead of nesting callbacks."
+    },
+    {
+      "id": "why-promises-exist",
+      "front": "Why Promises instead of callback pyramids?",
+      "meaning": "Callback-style async nests and has awkward error paths and no standard composition. Promises give one object for not-done-yet / ok / failed, chainable handlers, standard combinators, and integration with async/await."
+    },
+    {
+      "id": "three-states",
+      "front": "Promise states and settlement?",
+      "meaning": "pending → fulfilled with value or rejected with reason. Exactly one transition out of pending. After that, further resolve/reject calls are ignored; later handlers still run with the settled result, scheduled as microtasks."
+    },
+    {
+      "id": "executor-sync",
+      "front": "When does the Promise executor run?",
+      "meaning": "Synchronously when the Promise is constructed. resolve/reject are typically called later from host callbacks, but the executor function itself runs immediately."
+    },
+    {
+      "id": "resolve-vs-reject",
+      "front": "resolve(x) vs reject(r)?",
+      "meaning": "resolve(x) fulfills with x, or adopts state if x is thenable/Promise (flatten). reject(r) rejects with reason r."
+    },
+    {
+      "id": "executor-sync-throw",
+      "front": "throw inside new Promise executor?",
+      "meaning": "Rejects the Promise — same as calling reject. Executor runs synchronously when the Promise is constructed.",
+      "example": "new Promise(() => { throw new Error('boom'); }).catch(e => console.log(e.message)); // 'boom'"
+    },
+    {
+      "id": "promise-resolve-reject",
+      "front": "Promise.resolve / Promise.reject?",
+      "meaning": "Promise.resolve(1) is already fulfilled with 1. Promise.resolve(otherPromise) adopts otherPromise (flatten). Promise.reject(err) is already rejected. Use them to wrap values or normalize maybe-Promise APIs into a real Promise."
+    },
+    {
+      "id": "settlement-immutable",
+      "front": "Can you re-resolve a settled Promise?",
+      "meaning": "No. Once fulfilled or rejected, the outcome is immutable. You cannot re-resolve to a new value. Handlers attached later still run with the settled result as microtasks."
+    },
+    {
+      "id": "then-onfulfilled-onrejected",
+      "front": "What does .then(onFulfilled, onRejected) do?",
+      "meaning": "Returns a new Promise. If the source fulfills, onFulfilled runs as a microtask. If the source rejects and onRejected is provided, that runs instead. Missing handlers pass the outcome through to the returned Promise."
+    },
+    {
+      "id": "then-returns-new",
+      "front": "Does .then mutate the original Promise?",
+      "meaning": "No — .then/.catch/.finally each return a new Promise; chaining builds a chain of those returned Promises. Thinking .then mutates the original is a common mistake."
+    },
+    {
+      "id": "catch-equals-then",
+      "front": "What is .catch equivalent to?",
+      "meaning": ".catch(onRejected) is equivalent to .then(undefined, onRejected). Prefer .catch for readability when you only handle errors."
+    },
+    {
+      "id": "finally-behavior",
+      "front": ".finally role?",
+      "meaning": "Runs on either fulfillment or rejection (for cleanup). Downstream still fulfills with the original value if onFinally succeeds and doesn't return a rejecting Promise. Downstream rejects with the original reason if the source rejected, unless onFinally throws/rejects, which can override."
+    },
+    {
+      "id": "finally-not-business",
+      "front": "What belongs in .finally?",
+      "meaning": "Cleanup — hide spinners, release locks. Don't put primary result logic only in finally."
+    },
+    {
+      "id": "values-flow-forward",
+      "front": "What you return from onFulfilled becomes?",
+      "meaning": "The fulfillment value of the Promise returned by that .then — unless you return a Promise/thenable, which is flattened. Example: resolve(1).then(n => n + 1).then(n => n * 2) logs 4.",
+      "example": "Promise.resolve(1).then(n => n + 1).then(n => n * 2) // 4"
+    },
+    {
+      "id": "flatten-return-promise",
+      "front": "Return Promise from .then handler?",
+      "meaning": "Adopted/flattened — next .then receives the inner fulfillment value, not a nested Promise. You do not get Promise<Promise<T>> in the handler chain. Adoption waits for the inner Promise. Same idea as Promise.resolve(otherPromise).",
+      "example": "Promise.resolve(1).then(n => Promise.resolve(n + 1)).then(n => console.log(n)); // 2"
+    },
+    {
+      "id": "error-propagation",
+      "front": "throw in .then — what happens downstream?",
+      "meaning": "Returned Promise rejects with that error. Returning Promise.reject(err) is the same. Rejection skips .then handlers that omit onRejected until a .catch or .then(..., onRejected). A handling .catch that recovers (returns a value) fulfills the next link — errors stop propagating."
+    },
+    {
+      "id": "skipped-then-on-reject",
+      "front": "Does a rejecting .then skip later onFulfilled-only thens?",
+      "meaning": "Yes — only onFulfilled is skipped until a catch or onRejected. Errors propagate like try/catch across the chain.",
+      "example": "fetchUser().then(() => { throw new Error('transform failed'); }).then(user => console.log(user)).catch(err => console.error(err));"
+    },
+    {
+      "id": "catch-recovery-fulfills",
+      "front": "What if .catch returns a value?",
+      "meaning": "It recovers: the next link fulfills with that value; the error stops propagating.",
+      "example": "Promise.reject(new Error('x')).catch(() => 'recovered').then(v => console.log(v)); // 'recovered'"
+    },
+    {
+      "id": "sync-throw-vs-async-reject",
+      "front": "Sync throw in handler vs async reject?",
+      "meaning": "Both become rejections of the chain. The difference is timing/source; handlers still see a rejection."
+    },
+    {
+      "id": "then-microtask",
+      "front": "Promise.resolve().then after sync — when runs?",
+      "meaning": "Promise reactions (.then/.catch/.finally) run as microtasks after the current call stack clears, before the next macrotask (setTimeout, etc.). Settlement is often async from the consumer's point of view even for Promise.resolve(1) — handlers still don't run inline; they queue.",
+      "example": "Promise.resolve().then(() => console.log('micro')); setTimeout(() => console.log('macro'), 0); console.log('sync'); // sync, micro, macro"
+    },
+    {
+      "id": "promise-all",
+      "front": "Promise.all policy?",
+      "meaning": "Resolves when all fulfill; rejects when any one rejects (fail-fast). Result is an array of values in the same order. Typical use: I need everything; any failure is fatal. Empty array fulfills immediately with []. One rejection rejects the whole all; other in-flight work may still continue — all ignores their outcomes unless you cancel separately."
+    },
+    {
+      "id": "promise-allsettled",
+      "front": "Promise.allSettled vs all for partial UI?",
+      "meaning": "allSettled always fulfills once all settle; it never rejects solely because a child rejected. Result is an array of {status, value} or {status, reason}. Need every outcome to render partial data. all drops the successful result on one rejection.",
+      "example": "await Promise.allSettled([fetchA(), fetchB()]); // { status: 'fulfilled', value } | { status: 'rejected', reason }"
+    },
+    {
+      "id": "allsettled-interview-scenario",
+      "front": "Profile + settings in parallel; render if either succeeds?",
+      "meaning": "Promise.allSettled — you need both outcomes regardless of individual failure, so you can render what arrived and fallback the rest. Promise.all would drop the successful result on one rejection. Promise.any is for at least one success; you don't need all outcomes."
+    },
+    {
+      "id": "promise-race",
+      "front": "Promise.race?",
+      "meaning": "Settles when the first input settles (fulfill or reject). Result is that first value/reason. Typical use: timeouts; first result wins. First settlement wins including rejection — a fast failure beats a slow success."
+    },
+    {
+      "id": "race-timeout-pattern",
+      "front": "How do you timeout a Promise with race?",
+      "meaning": "Promise.race([promise, timeoutPromise]) where timeout rejects after ms. First settlement wins — including a fast rejection from either side.",
+      "example": "function withTimeout(promise, ms) { const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)); return Promise.race([promise, timeout]); }"
+    },
+    {
+      "id": "promise-any",
+      "front": "Promise.any?",
+      "meaning": "Resolves on the first fulfillment. Rejects only when all reject → AggregateError. Result is the first fulfilled value. Typical use: any success is enough. Opposite mood from all: success-biased vs all-must-succeed.",
+      "example": "await Promise.any([mirror1(), mirror2(), mirror3()]);"
+    },
+    {
+      "id": "race-vs-any",
+      "front": "race vs any when first result is rejection?",
+      "meaning": "race rejects with that first rejection; any keeps waiting for a fulfillment unless all fail. Using race when you meant any is a common mistake."
+    },
+    {
+      "id": "combinator-failure-policies",
+      "front": "Match combinators to failure policy?",
+      "meaning": "all: fail fast (any rejection). allSettled: collect all outcomes (never rejects from a child). race: first settle (fulfill or reject). any: first success (AggregateError if all fail). Match failure policy to the product requirement."
+    },
+    {
+      "id": "unhandled-rejection",
+      "front": "Unhandled Promise rejection?",
+      "meaning": "A settled rejected Promise with no rejection handler yet — runtime warnings / hard fails depending on environment. Always end chains that can reject: doWork().catch(handle), not a bare doWork() if it can reject."
+    },
+    {
+      "id": "catch-mid-chain-swallows",
+      "front": "Does a mid-chain .catch swallow and continue?",
+      "meaning": "Yes unless it rethrows. load().then(transform).catch(showError).then(maybeContinue) — the catch handles load OR transform failures, then maybeContinue runs after catch unless catch rethrows. Know whether that swallow is intended.",
+      "notes": "Prefer recovery points you intend."
+    },
+    {
+      "id": "thenables-brief",
+      "front": "What is a thenable?",
+      "meaning": "Anything with a .then method can be adopted by resolve / Promise.resolve. Some libraries return thenables. You rarely implement them; know that flattening applies to thenables, not only instanceof Promise."
+    },
+    {
+      "id": "trap-all-cancels-siblings",
+      "front": "Does Promise.all cancel siblings on failure?",
+      "meaning": "No. It rejects the combined Promise; siblings may still finish unless you abort separately."
+    },
+    {
+      "id": "trap-nesting-instead-of-return",
+      "front": "Nesting getX().then inside .then vs returning getX()?",
+      "meaning": "then(() => { getX().then(...) }) breaks flattening and readability. Return the Promise: then(() => getX()) so the chain flattens and errors propagate."
+    },
+    {
+      "id": "trap-then-runs-sync",
+      "front": "Does .then run synchronously after Promise.resolve?",
+      "meaning": "No — still a microtask after the current stack clears, even when the Promise is already fulfilled."
+    },
+    {
+      "id": "trap-ignore-aggregate-error",
+      "front": "What if every Promise.any input rejects?",
+      "meaning": "The any Promise rejects with AggregateError. Don't ignore that case."
+    },
+    {
+      "id": "trap-all-for-partial-ui",
+      "front": "Why not Promise.all for partial UI data?",
+      "meaning": "all loses successful branches on one rejection. Use allSettled when you need every outcome."
+    },
+    {
+      "id": "combinators-overlap-waiting",
+      "front": "Do combinators run handler JS in parallel?",
+      "meaning": "No. Single-threading still means handlers don't run in parallel JS. Combinators overlap waiting (host I/O), not parallel CPU on one stack. Closures still capture bindings used inside handlers."
+    },
+    {
+      "id": "promise-to-event-loop",
+      "front": "How do Promises connect to the event loop?",
+      "meaning": "Async work completes in the host → Promise settles → .then/.catch scheduled as microtasks → the event loop drains them before the next macrotask."
+    },
+    {
+      "id": "chain-like-try-catch",
+      "front": "How is Promise chaining like try/catch?",
+      "meaning": "Return value / throw in a handler makes the next Promise in the chain fulfill or reject — like try/catch control flow across async turns."
+    },
+    {
+      "id": "async-await-same-model",
+      "front": "How does async/await relate (next unit)?",
+      "meaning": "Syntax over Promises — same settlement model and microtask continuations, not a second thread or new settlement model."
+    },
+    {
+      "id": "interview-should-be-able",
+      "front": "Promise interview bar?",
+      "meaning": "Define states and settle once; explain chaining, flattening, and error propagation with a short example; fill the combinator table from memory and pick for scenarios; spot swallowed vs recovered errors mid-chain; tie .then to microtasks vs setTimeout."
+    }
+  ]
+}
