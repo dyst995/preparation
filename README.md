@@ -12,4 +12,6 @@ cd website && npm install && npm run dev
 - [interview-dsa/](./interview-dsa/) — algorithms by pattern
 - [website/](./website/) — notes reader (theory + optional flashcards)
 
-GitHub Pages deploys from [`.github/workflows/pages.yml`](./.github/workflows/pages.yml) on push to `master`. One-time: **Settings → Pages → Source → GitHub Actions**.
+GitHub Pages publishes the built site from the `gh-pages` branch (workflow [`.github/workflows/pages.yml`](./.github/workflows/pages.yml) on push to `master`).
+
+If the site 404s, set **Settings → Pages → Deploy from a branch → `gh-pages` / `/ (root)`**.

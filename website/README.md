@@ -16,12 +16,13 @@ Repo is [dyst995/preparation](https://github.com/dyst995/preparation). The site 
 
 **https://dyst995.github.io/preparation/**
 
-Push to `master` runs [`.github/workflows/pages.yml`](../.github/workflows/pages.yml): it builds with `BASE_PATH=/preparation/` and deploys static `dist/` (catalog + notes baked into `data/`). `404.html` is a copy of `index.html` so unknown paths still load the app.
+Push to `master` runs [`.github/workflows/pages.yml`](../.github/workflows/pages.yml): it builds with `BASE_PATH=/preparation/` and pushes static `dist/` to the `gh-pages` branch.
 
 One-time setup in the GitHub repo:
 
-1. **Settings → Pages → Build and deployment → Source:** GitHub Actions
-2. Push (or run the workflow manually)
+1. **Settings → Pages → Build and deployment → Source:** Deploy from a branch
+2. **Branch:** `gh-pages` / `/ (root)`
+3. Push (or run the workflow manually). Wait for the `gh-pages` branch to appear, then refresh the Pages setting if the branch dropdown was empty.
 
 Local production check:
 
