@@ -6,29 +6,9 @@
   "modeReverse": "Meaning → prompt",
   "cards": [
     {
-      "id": "nest-stack-surface",
-      "front": "What Nest + TypeScript patterns do interviews probe?",
-      "meaning": "Nest sits on TypeScript plus Express (or Fastify) plus decorators. The patterns that matter: DTO classes as the joint compile-time type and runtime validation source of truth; why class not interface/type; generic services/repositories; custom param decorators; typed guards/interceptors; and ConfigService.get<T>() so config is not secretly any."
-    },
-    {
-      "id": "nest-typing-prereqs",
-      "front": "What TypeScript topics does Nest DTO typing assume?",
-      "meaning": "Type erasure / structural typing, declaration merging (Request.user), and generics."
-    },
-    {
-      "id": "dto-compile-and-runtime",
-      "front": "What dual role do Nest DTO classes play?",
-      "meaning": "They are the joint compile-time type and runtime validation source of truth, via class-validator and class-transformer."
-    },
-    {
       "id": "dto-must-be-class",
       "front": "Why Nest DTOs are classes, not interfaces?",
-      "meaning": "Interfaces and types erase. Decorators like @IsEmail() need a real runtime target so metadata can attach via reflect-metadata. A class compiles to a constructor function, so it carries both compile-time checking and runtime validation metadata. ValidationPipe reads that metadata; an interface leaves nothing to decorate."
-    },
-    {
-      "id": "metadata-reflect",
-      "front": "What does ValidationPipe reflect on a DTO class?",
-      "meaning": "Decorator metadata on the prototype/constructor — rules like “this property should be an email / min length 8.” The pipe reflects that and runs checks. No class means no place to hang those rules, so no automatic validation from decorators."
+      "meaning": "Interfaces and types erase. Decorators like @IsEmail() need a runtime target so metadata can attach via reflect-metadata. A class compiles to a constructor, so it is both the compile-time type and the runtime validation source of truth. ValidationPipe reads that metadata; an interface leaves nothing to decorate."
     },
     {
       "id": "pipeline-untrusted-body",
@@ -38,13 +18,13 @@
     {
       "id": "validation-pipe-flow",
       "front": "What is the ValidationPipe DTO pipeline?",
-      "meaning": "HTTP body arrives as a plain object. With transform: true, class-transformer instantiates the DTO class. class-validator reads decorator metadata and validates. The controller method then receives a typed DTO instance, or Nest throws 400.",
+      "meaning": "HTTP body arrives as a plain object. With transform: true, class-transformer instantiates the DTO class. class-validator reads decorator metadata and validates. The controller then receives a typed DTO instance, or Nest throws 400.",
       "example": "app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));"
     },
     {
       "id": "transform-instantiates",
       "front": "What does ValidationPipe transform: true do?",
-      "meaning": "It turns the plain JSON object into a real class instance via class-transformer, so decorator metadata and validation run on a CreateUserDto (not a leftover POJO)."
+      "meaning": "It turns the plain JSON object into a real class instance via class-transformer, so decorator metadata and validation run on a CreateUserDto, not a leftover POJO."
     },
     {
       "id": "whitelist-strips",
@@ -55,27 +35,17 @@
     {
       "id": "body-without-pipe",
       "front": "Does @Body() dto: CreateUserDto validate without a pipe?",
-      "meaning": "No. Without the pipe plus a class DTO, dto: CreateUserDto is only a TypeScript annotation — erasure means nothing validates at runtime. You need ValidationPipe (or manual parse) for enforcement."
+      "meaning": "No. Without the pipe plus a class DTO, dto: CreateUserDto is only a TypeScript annotation — erasure means nothing validates at runtime."
     },
     {
       "id": "omit-vs-serializer",
       "front": "Is Omit<User,'passwordHash'> enough to hide a hash in JSON?",
-      "meaning": "No. Compile-time Omit only constrains what you write in TS. If you return userEntity and Nest JSON-serializes the real object, passwordHash can still leak. Safer: a response DTO class plus ClassSerializerInterceptor with @Exclude() / @Expose() from class-transformer."
-    },
-    {
-      "id": "type-safety-not-filter",
-      "front": "Interview line: is type safety an output filter?",
-      "meaning": "Type safety alone is not an output filter. TypeScript DTO / Omit types catch mistakes in your code; serializer plus @Exclude strips sensitive fields at runtime before JSON."
-    },
-    {
-      "id": "exclude-expose-serializer",
-      "front": "What runtime tools strip sensitive response fields in Nest?",
-      "meaning": "ClassSerializerInterceptor plus @Exclude() / @Expose() from class-transformer on entity/DTO fields, usually together with a response DTO class — not Omit alone."
+      "meaning": "No. Compile-time Omit only constrains what you write in TS. If you return userEntity, Nest JSON-serializes the real object and passwordHash can still leak. Type safety is not an output filter. Safer: a response DTO class plus ClassSerializerInterceptor with @Exclude() / @Expose()."
     },
     {
       "id": "generic-crud-service",
       "front": "Why CrudService<TEntity, TCreate, TUpdate>?",
-      "meaning": "Generics keep entity, create DTO, and update DTO roles distinct: CreateUserDto is inbound and validated, User/entity is the persistence shape, UserResponseDto is outbound safe fields. Avoid one any-ish “user” object for the whole stack."
+      "meaning": "Generics keep roles distinct: CreateUserDto is inbound and validated, User/entity is persistence, UserResponseDto is outbound safe fields. Avoid one any-ish “user” object for the whole stack."
     },
     {
       "id": "repository-entity-class",
@@ -89,14 +59,9 @@
       "example": "export const CurrentUser = createParamDecorator((data: unknown, ctx: ExecutionContext): User => { ... return request.user as User; });"
     },
     {
-      "id": "current-user-data-arg",
-      "front": "What is the data argument to createParamDecorator?",
-      "meaning": "It is the optional argument to @CurrentUser('email')-style usage. Type it if you use it, e.g. data: keyof User | undefined."
-    },
-    {
       "id": "current-user-without-guard",
       "front": "What goes wrong if @CurrentUser() is typed User but no guard sets req.user?",
-      "meaning": "The type lies. The decorator only reads request.user; without a guard or middleware assigning it, you get a typed hole at runtime. Pair the decorator with a guard that sets user and with Request.user augmentation."
+      "meaning": "The type lies. Without a guard or middleware assigning request.user, you get a typed hole at runtime. Pair the decorator with a guard that sets user and with Request.user augmentation."
     },
     {
       "id": "can-activate",
@@ -106,73 +71,23 @@
     {
       "id": "execution-context-switch",
       "front": "What is ExecutionContext for?",
-      "meaning": "An abstract wrapper around the current request. Use switchToHttp(), switchToRpc(), or switchToWs() to get the right request. Typing getRequest<Request>() (or a custom request type) avoids any on req."
-    },
-    {
-      "id": "guards-not-plain-middleware",
-      "front": "Are Nest guards just untyped Express middleware?",
-      "meaning": "No. Nest gives ExecutionContext so you can switch transport and type the request instead of treating guards and interceptors as untyped Express middleware."
+      "meaning": "An abstract wrapper around the current request. Use switchToHttp() (or rpc/ws) and type getRequest<Request>() so req is not any. Guards are not untyped Express middleware."
     },
     {
       "id": "nest-interceptor",
       "front": "What is the NestInterceptor signature?",
-      "meaning": "intercept(context: ExecutionContext, next: CallHandler) returns Observable. next.handle() is an Observable (RxJS) of the handler result. Map or transform responses here, or use ClassSerializerInterceptor for DTO serialization."
-    },
-    {
-      "id": "interceptor-rxjs-level",
-      "front": "How much RxJS do you need for interceptor interviews?",
-      "meaning": "You do not need deep RxJS. Know the signatures and that interceptors wrap the stream before and after the handler."
+      "meaning": "intercept(context: ExecutionContext, next: CallHandler) returns Observable. next.handle() is the handler result stream. Map/transform here, or use ClassSerializerInterceptor for DTO serialization. You do not need deep RxJS — know the wrap-before-and-after shape."
     },
     {
       "id": "config-get-generic",
       "front": "Does config.get<number>('PORT') parse the env value?",
-      "meaning": "No. get<T> is a type assertion-shaped generic — it does not coerce strings from env. Use transform in config validation (Joi/Zod/class-validator on a config class) for real parsing. The generic documents intent and improves call-site checking; validation still belongs at config load.",
+      "meaning": "No. get<T> is a type-assertion-shaped generic — it does not coerce strings from env. Use transform in config validation (Joi/Zod/class-validator) for real parsing. Omitting <T> often leaves values loosely typed.",
       "example": "const port = this.config.get<number>('PORT'); // number | undefined"
     },
     {
       "id": "config-get-or-throw",
       "front": "get vs getOrThrow on ConfigService?",
       "meaning": "get<T>(key) is typically T | undefined. getOrThrow<T>(key) is for keys that must exist, e.g. getOrThrow<string>('DATABASE_URL')."
-    },
-    {
-      "id": "config-without-generic",
-      "front": "What happens if you omit <T> on config.get?",
-      "meaning": "Values are often loosely typed. Prefer get<T> / getOrThrow<T> with an explicit T, or a typed config object so keys are not free-form strings everywhere."
-    },
-    {
-      "id": "typed-config-object",
-      "front": "How else can you type Nest config besides get<T>?",
-      "meaning": "A typed config object via a custom config factory / ConfigType<typeof appConfig> so keys are not free-form strings at every call site."
-    },
-    {
-      "id": "e2e-request-picture",
-      "front": "What is the Nest request/response typing picture end to end?",
-      "meaning": "HTTP JSON → ValidationPipe plus CreateUserDto (class + decorators) → controller (@Body dto: CreateUserDto) → service generics / business logic → entity / DB → response DTO plus serializer (strip secrets) → JSON out."
-    },
-    {
-      "id": "e2e-auth-path",
-      "front": "How does typed CurrentUser fit the auth path?",
-      "meaning": "A guard sets req.user, you declare global Express.Request.user via declaration merging, then @CurrentUser() user: User in the controller."
-    },
-    {
-      "id": "connections-erasure-decorators",
-      "front": "How does type erasure force DTO classes?",
-      "meaning": "Interfaces cannot hold decorator metadata because they vanish at compile time. reflect-metadata plus decorators on a class constructor are what ValidationPipe and the serializer can actually read."
-    },
-    {
-      "id": "connections-declaration-merging",
-      "front": "How does declaration merging connect to CurrentUser?",
-      "meaning": "Merging Express.Request with a user field is what makes request.user known to TypeScript when the decorator and controllers read it."
-    },
-    {
-      "id": "connections-generics-nest",
-      "front": "Where do generics show up in Nest typing?",
-      "meaning": "CrudService-style entity/DTO parameters, Repository<Entity>, and ConfigService get<T> / getOrThrow<T>."
-    },
-    {
-      "id": "connections-omit-not-runtime",
-      "front": "Does Omit or Pick strip passwordHash at runtime?",
-      "meaning": "No. Omit / Pick are compile-time only. They are not a runtime exclude of passwordHash from JSON."
     }
   ]
 }

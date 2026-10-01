@@ -8,23 +8,8 @@
     {
       "id": "portable-baseline",
       "front": "Shared async model browser/Node/RN JS?",
-      "meaning": "One JS thread per realm/worker; sync code runs to stack empty; Promise reactions and await resumes are microtasks; setTimeout is a task/timer-style macrotask; long sync work blocks that JS thread's callbacks.",
+      "meaning": "One JS thread per realm/worker; sync code runs to stack empty; Promise reactions and await resumes are microtasks; setTimeout is a timer-style macrotask; long sync work blocks that JS thread's callbacks. Node/RN add host APIs and extra native threads — they do not replace this model.",
       "notes": "Keep the event-loop unit as the primary model; this unit is Node/Nest/RN deltas."
-    },
-    {
-      "id": "unit-awareness-framing",
-      "front": "Is this unit a second full event-loop course?",
-      "meaning": "No. It is awareness plus interview framing. The core JS model stays portable; you add host scheduling details and what sits beside the JS thread, not a replacement event-loop theory."
-    },
-    {
-      "id": "what-changes-by-platform",
-      "front": "What actually changes across browser, Node, and RN?",
-      "meaning": "Host scheduling details (Node phases, process.nextTick) and what sits beside the JS thread: RN native UI/bridge, and Nest's HTTP lifecycle plus exception filters. The call stack, micro vs macro, Promises, and async/await stay the same."
-    },
-    {
-      "id": "platform-adds-not-replaces",
-      "front": "Do Node/RN platform notes replace the JS async story?",
-      "meaning": "No. They add APIs and host threads. They do not replace one-thread-per-realm, microtasks, or macrotasks for your JS."
     },
     {
       "id": "nexttick-before-promise",
@@ -33,160 +18,65 @@
       "example": "setTimeout(..., 0); Promise.resolve().then(...); process.nextTick(...); console.log('sync');\n// sync, nextTick, promise, timeout (typical)"
     },
     {
-      "id": "nexttick-why-exists",
-      "front": "Why does process.nextTick exist?",
-      "meaning": "Historically it runs something immediately after this operation, before I/O. Libraries and older patterns still use it. Know it for interviews and Nest/Node debugging, not as your default defer."
-    },
-    {
       "id": "nexttick-starvation",
       "front": "Recursive process.nextTick?",
       "meaning": "Flooding nextTick starves I/O and timers even harder than a Promise microtask flood — the nextTick queue never yields to the rest of the loop. Do not build recursive nextTick pumps."
     },
     {
       "id": "prefer-portable-microtasks",
-      "front": "What should app code use instead of nextTick?",
-      "meaning": "Prefer queueMicrotask or Promises for portable “run soon after this turn” intent. Reserve nextTick for interviews and debugging Node/Nest, not application-level defer."
-    },
-    {
-      "id": "nexttick-not-browser",
-      "front": "Is process.nextTick on web or RN JS?",
-      "meaning": "No. It is not a browser API and is not on RN JS globals unless polyfilled. RN does not give you Node's nextTick semantics on the JS thread."
+      "front": "When should you use process.nextTick?",
+      "meaning": "Know it for interviews and Node/Nest debugging — it is Node-only (not browser or RN JS unless polyfilled). Prefer queueMicrotask or Promises in app code. Historically it runs immediately after this operation, before I/O; it is not your default defer."
     },
     {
       "id": "node-phases-awareness",
       "front": "Node loop phases — interview level?",
-      "meaning": "Awareness, not memorization-critical: timers → pending callbacks → idle/prepare → poll → check (setImmediate) → close. Between phases (when appropriate) Node drains nextTick then microtasks. Exact interleaving is deeper than most interviews require.",
-      "notes": "Do not treat phases as more important than microtask vs macrotask for day-to-day predict-the-output."
-    },
-    {
-      "id": "phase-timers",
-      "front": "Node timers phase runs what?",
-      "meaning": "Due setTimeout and setInterval callbacks. Interview bucket: setTimeout / setInterval → timers phase."
-    },
-    {
-      "id": "phase-pending-idle",
-      "front": "Node pending callbacks and idle/prepare?",
-      "meaning": "Pending callbacks are some system callbacks. Idle/prepare is internal. Awareness only — do not recite every edge."
-    },
-    {
-      "id": "phase-poll",
-      "front": "Node poll phase?",
-      "meaning": "Retrieve new I/O events; wait for connections/data. I/O callbacks are mostly poll-related."
-    },
-    {
-      "id": "phase-close",
-      "front": "Node close callbacks phase?",
-      "meaning": "Close callbacks such as socket.on('close'). Last simplified phase after check."
-    },
-    {
-      "id": "api-bucket-microtasks",
-      "front": "Promise and queueMicrotask — Node bucket?",
-      "meaning": "Microtasks. They are not a Node phase name; they drain between phases after nextTick when appropriate."
+      "meaning": "Awareness, not memorization-critical: timers (setTimeout/setInterval) → pending callbacks → idle/prepare → poll (I/O) → check (setImmediate) → close. Between phases Node drains nextTick then Promise microtasks. Day-to-day predict-the-output still starts from sync → nextTick → microtasks → macrotasks.",
+      "notes": "Do not treat phases as more important than microtask vs macrotask."
     },
     {
       "id": "setimmediate-node",
       "front": "setImmediate?",
-      "meaning": "Node-specific check-phase deferred callback — macrotask-like, not sync. Interview bucket: setImmediate → check phase (Node).",
+      "meaning": "Node-specific check-phase deferred callback — macrotask-like, not sync. Not a web standard; RN has no setImmediate. Interview bucket: setImmediate → check phase (Node).",
       "notes": "Not a web standard; RN has no setImmediate."
     },
     {
       "id": "timeout-vs-immediate-dont-rely",
       "front": "setImmediate vs setTimeout(0) order?",
       "meaning": "Both are “soon, not sync.” Relative order can depend on how you entered the loop (timers vs check). Do not memorize fragile ordering puzzles or rely on timeout(0) vs immediate races in production.",
-      "notes": "Say: both defer to a later macrotask-like turn; setImmediate is Node-specific check-phase; prefer clear APIs."
-    },
-    {
-      "id": "browsers-no-setimmediate",
-      "front": "Do browsers have setImmediate?",
-      "meaning": "No as a standard. Legacy prefixes do not count as your model. setImmediate is Node check-phase."
-    },
-    {
-      "id": "cheat-settimeout-all-platforms",
-      "front": "setTimeout on browser vs Node vs RN JS?",
-      "meaning": "Yes on all three. In Node it is the timers phase; in browser and RN JS it is still a timer-style macrotask in the portable model."
+      "notes": "Say: both defer to a later macrotask-like turn; setImmediate is Node-specific check-phase."
     },
     {
       "id": "nest-awaits-handler",
       "front": "Nest async controller — what gets awaited?",
-      "meaning": "Controllers/services are often async. Nest awaits the handler Promise in the request pipeline when you return a Promise or use async. Throw or a rejected Promise inside that awaited path goes to Nest exception filters → HTTP error response if configured.",
+      "meaning": "Nest awaits the handler Promise when you return a Promise or use async. Throw or a rejected Promise on that awaited path goes to exception filters → HTTP error. Signal domain/HTTP errors by throwing on that path.",
       "example": "@Get(':id') async findOne(...) { return this.users.findById(id); } // Promise → Nest waits"
-    },
-    {
-      "id": "nest-throw-intentionally",
-      "front": "How should Nest handlers signal domain/HTTP errors?",
-      "meaning": "Let Nest await the main handler Promise and throw domain/HTTP exceptions intentionally so filters can turn them into the HTTP error response."
     },
     {
       "id": "nest-fire-forget",
       "front": "void analytics.track() in Nest handler — risk?",
-      "meaning": "A fire-and-forget Promise inside the handler with no catch is an unhandled rejection. It may log or crash Node depending on flags; the HTTP response may already be “success.” Supervise with .catch or a job queue.",
+      "meaning": "A fire-and-forget Promise with no catch is an unhandled rejection. Nest only supervises the Promise it awaits. The HTTP response may already be success; a later rejection may log or crash Node depending on flags, and the client will not see it. Supervise with .catch or a job queue.",
       "example": "void this.analytics.track(dto).catch((err) => this.logger.error(err));\nreturn this.service.create(dto);"
-    },
-    {
-      "id": "nest-error-after-response",
-      "front": "Error in a Nest background task after the response was sent?",
-      "meaning": "Same unhandled-rejection risk. The client will not see it unless you wire logging/monitoring. The response may already have succeeded."
-    },
-    {
-      "id": "nest-not-all-async-safe",
-      "front": "Does Nest make all async safe?",
-      "meaning": "No. Only the Promise Nest awaits is on the happy path. Stray Promises are yours — omitting .catch on track() reinvent the unhandled-rejection bug on the server."
     },
     {
       "id": "nest-cpu-block",
       "front": "Heavy sync work in Nest async handler?",
-      "meaning": "async does not move CPU off the event loop. Heavy sync work in a handler blocks other requests on that Node process — same single-thread lesson as a browser UI freeze, different symptom (latency)."
-    },
-    {
-      "id": "nest-queues-workers",
-      "front": "Heavy or slow Nest side work that must not block the loop?",
-      "meaning": "Use queues/workers so that work is not done as sync CPU or unsupervised Promises on the request thread."
+      "meaning": "async does not move CPU off the event loop. Heavy sync in a handler blocks other requests on that Node process — same single-thread story as a UI freeze, different symptom (latency). Put heavy or slow side work on queues/workers, not as sync CPU or unsupervised Promises on the request thread."
     },
     {
       "id": "rn-event-loop",
       "front": "Does React Native have a different event loop than the browser?",
-      "meaning": "No for JS. The JS thread runs on a standard engine (Hermes or JSC) with the same single-threaded event loop, call stack, and micro/macrotask model. Promises, async/await, and setTimeout behave as in browser or Node. What differs is the native side.",
+      "meaning": "No for JS. The JS thread runs Hermes or JSC with the same single-threaded loop, call stack, and micro/macrotask model. Promises, async/await, and setTimeout match browser or Node. Hermes does not change await semantics. What differs is the native side.",
       "notes": "Interview answer to keep verbatim-ready."
     },
     {
-      "id": "rn-layers-table",
-      "front": "RN JS thread vs native UI vs bridge/JSI?",
-      "meaning": "JS thread: React tree, Promises, timers, most app logic. UI/native threads: native views, layout, many platform APIs. Bridge/JSI: crossing between JS and native."
+      "id": "rn-not-multithreaded-js",
+      "front": "Is RN multi-threaded JS?",
+      "meaning": "Native is multi-threaded; your JS is still one stack per runtime. JS thread: React tree, Promises, timers, most app logic. Native UI threads: views, layout, many platform APIs. Bridge/JSI crosses between them — that does not give JS a different Promise or event-loop model."
     },
     {
       "id": "rn-busy-js-jank",
       "front": "Large JS work on the RN JS thread?",
       "meaning": "A busy JS loop still janks interaction and logic scheduling — same as the web main thread. Native work may run in parallel while JS waits, but your .then still runs on the JS thread when the message comes back."
-    },
-    {
-      "id": "rn-no-special-promise",
-      "front": "Does RN invent a special Promise runtime?",
-      "meaning": "No. The whole async chapter transfers. From JS async behavior, Promises, async/await, and setTimeout match browser or Node."
-    },
-    {
-      "id": "rn-not-multithreaded-js",
-      "front": "Is RN multi-threaded JS?",
-      "meaning": "Native is multi-threaded; your JS is still one stack per runtime. Do not confuse native parallelism with parallel JS on the RN JS thread."
-    },
-    {
-      "id": "hermes-await-same-model",
-      "front": "Does Hermes have a different await model?",
-      "meaning": "No for the programming model. Engine differences exist (perf, GC); async/await semantics match the standard JS model."
-    },
-    {
-      "id": "trap-rn-bridge-different-loop",
-      "front": "Does the RN native bridge change Promise/event-loop semantics?",
-      "meaning": "No. Do not believe RN has a different Promise or event-loop model because work crosses a bridge/JSI. JS still uses the same loop; native is beside it."
-    },
-    {
-      "id": "cheat-single-js-thread",
-      "front": "Single JS thread — browser vs Node vs RN?",
-      "meaning": "Yes on all three: per tab/worker in the browser, per isolate/worker_thread in Node, and the JS thread in RN."
-    },
-    {
-      "id": "cheat-extra-ui-thread",
-      "front": "Extra UI thread — browser vs Node/Nest vs RN?",
-      "meaning": "Browser has compositor and related threads. Node/Nest as an HTTP server does not have that UI thread. RN has a native UI thread beside JS."
     },
     {
       "id": "unhandled-node-vs-browser",
@@ -196,32 +86,12 @@
     {
       "id": "react-no-auto-catch",
       "front": "React vs Nest on async errors?",
-      "meaning": "Nest awaits controller Promises. React does not auto-catch async handlers — try/catch or .catch in handlers/effects is your job. Framework await is N/A in the browser column of the cheat sheet."
+      "meaning": "Nest awaits controller Promises. React does not auto-catch async handlers — try/catch or .catch in handlers/effects is your job."
     },
     {
-      "id": "trap-phases-over-microtasks",
-      "front": "Are Node phases more important than micro vs macro for predict-the-output?",
-      "meaning": "No. Day-to-day ordering still starts from the portable model: sync, then nextTick (Node), then Promise microtasks, then macrotasks. Treating phases as the first tool is a common mistake."
-    },
-    {
-      "id": "connection-portable-deltas",
-      "front": "How do Node, Nest, and RN extend the portable async model?",
-      "meaning": "Portable JS: event loop + Promises + async/await. Node adds nextTick, phases, and setImmediate. Nest adds HTTP lifecycle awaiting handler Promises. RN adds native UI/bridge beside the same JS loop."
-    },
-    {
-      "id": "connection-starvation-family",
-      "front": "nextTick flood vs microtask flood vs browser paint?",
-      "meaning": "Same starvation family: nextTick/microtask floods starve timers/I/O on Node, or starve paint on the browser. Do not treat them as unrelated bugs."
-    },
-    {
-      "id": "connection-unhandled-concurrency",
-      "front": "Unhandled rejection in Nest — which other unit?",
-      "meaning": "It is the concurrency-pitfalls unhandled-rejection bug with Nest/Node production severity — possible process crash, not only a missed UI update."
-    },
-    {
-      "id": "interview-cpu-same-as-ui-freeze",
-      "front": "Server latency under CPU load vs UI freeze?",
-      "meaning": "Tie them to the same single-thread story: long sync in a Nest handler blocks other requests on that process, just as long sync on the web/RN JS thread blocks callbacks and interaction."
+      "id": "cheat-single-js-thread",
+      "front": "Browser vs Node vs RN — thread and timer APIs?",
+      "meaning": "Single JS thread on all three (tab/worker, isolate/worker_thread, RN JS thread). Extra UI thread: browser compositor, RN native UI; Node HTTP has none. setTimeout exists on all three. process.nextTick and setImmediate are Node-only."
     }
   ]
 }

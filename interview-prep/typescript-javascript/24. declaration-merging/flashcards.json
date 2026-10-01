@@ -8,12 +8,7 @@
     {
       "id": "merging-definition",
       "front": "What is declaration merging?",
-      "meaning": "TypeScript combines multiple declarations that share the same name into one definition. The most common case: two interface declarations with the same name in the same scope become one interface with all members."
-    },
-    {
-      "id": "augmentation-definition",
-      "front": "What is augmentation?",
-      "meaning": "Using declaration merging on purpose to extend types you do not own — Express Request, library Config, Window — without editing node_modules."
+      "meaning": "TypeScript combines multiple declarations that share the same name into one definition. The most common case: two interface declarations with the same name in the same scope become one interface with all members. You use it on purpose (augmentation) to extend types you do not own — Express Request, library Config, Window — without editing node_modules."
     },
     {
       "id": "interface-merge-basics",
@@ -22,25 +17,10 @@
       "example": "interface User { id: string } interface User { email: string } // { id: string; email: string }"
     },
     {
-      "id": "why-merging-exists",
-      "front": "Why does interface merging exist?",
-      "meaning": "Split definitions across files, such as open-ended plugin APIs; third-party extension without forking type packages; and incremental ambient types for JS libraries."
-    },
-    {
-      "id": "compile-not-runtime",
-      "front": "Does merging set req.user at runtime?",
-      "meaning": "No — merging is compile-time only. It does not change runtime objects. Middleware or guards must still assign req.user; types can lie if you forget runtime behavior. Erasure means types do not attach runtime properties."
-    },
-    {
       "id": "type-no-merge",
-      "front": "Can type aliases merge?",
-      "meaning": "No — duplicate type alias names are compile errors (Duplicate identifier). Augmentation targets must be mergeable interfaces, not closed type aliases.",
+      "front": "Can type aliases merge or be augmented?",
+      "meaning": "No — duplicate type alias names are compile errors (Duplicate identifier). If a library exports type Config, you generally cannot reopen it. Augmentation targets must be mergeable interfaces. Library authors often expose interface for config and request shapes so apps can augment.",
       "example": "type A = { id: string }; type A = { email: string }; // Error"
-    },
-    {
-      "id": "cannot-augment-type-alias",
-      "front": "If a library exports type Config, can you reopen it?",
-      "meaning": "Generally no. You cannot augment a type alias with another type Config, or by reopening an interface of the same name in a way that merges into that alias. Library authors often expose interface for config and request shapes so apps can augment."
     },
     {
       "id": "why-libraries-use-interface",
@@ -48,69 +28,31 @@
       "meaning": "So consumers can module-augment and add fields without forking types. Type aliases for config block reopen-and-merge patterns and force intersection wrappers or a library redesign."
     },
     {
-      "id": "function-namespace-merge",
-      "front": "What does merging a function with a namespace give you?",
-      "meaning": "The function stays callable, and the namespace adds nested types under the same name — createApp.Options. Classic pattern for APIs that are both a value and a container of related types (React historically, some builders).",
-      "example": "function createApp() { ... } namespace createApp { export interface Options { port?: number } }"
-    },
-    {
-      "id": "class-namespace-merge",
-      "front": "What does class plus namespace merging provide?",
-      "meaning": "Static-ish companion types living under the class name, e.g. Router.Params as Record<string, string> exported from namespace Router.",
-      "example": "class Router {} namespace Router { export type Params = Record<string, string> }"
-    },
-    {
-      "id": "enum-namespace-merge",
-      "front": "What does enum plus namespace merging add?",
-      "meaning": "Functions or other values under the enum object, e.g. Color.isWarm(c) alongside Color.Red. The enum remains the runtime object; the namespace contributes extra members.",
-      "example": "enum Color { Red, Green } namespace Color { export function isWarm(c: Color) { return c === Color.Red } }"
-    },
-    {
-      "id": "namespace-merge-awareness",
-      "front": "Is declaration merging only for interfaces?",
-      "meaning": "No. Value and namespace combinations exist — function, class, and enum plus namespace. Interview depth is knowing that; day-to-day Nest/Express work is almost always interface merging via augmentation."
+      "id": "compile-not-runtime",
+      "front": "Does merging set req.user at runtime?",
+      "meaning": "No — merging is compile-time only. It does not change runtime objects. Middleware or guards must still assign req.user; types can lie if you forget runtime behavior. Erasure means types do not attach runtime properties."
     },
     {
       "id": "module-augmentation",
       "front": "What does declare module 'some-library' { interface Config } do?",
-      "meaning": "It opens that module's type scope. An interface with the same name as an existing interface in that module merges. Everywhere Config from that module is used, your fields appear. You extend exported types without touching the package source.",
+      "meaning": "It opens that module's type scope. An interface with the same name as an existing interface in that module merges. The target must be a mergeable interface, not a closed type alias. A side-effect import (import 'some-library') helps the augmentation attach to the library module.",
       "example": "declare module 'some-library' { interface Config { myCustomOption?: boolean } }"
-    },
-    {
-      "id": "module-aug-must-be-interface",
-      "front": "Must the augmentation target be an interface?",
-      "meaning": "Yes. The target must be a mergeable interface, not a closed type alias. Same rule as local merging: types do not merge."
-    },
-    {
-      "id": "side-effect-import",
-      "front": "Why import 'some-library' in an augmentation file?",
-      "meaning": "A side-effect import, or ensuring the file is treated as a module, helps the augmentation attach to the library module instead of floating as an unrelated declaration."
     },
     {
       "id": "wrong-module-name",
       "front": "What happens if the declare module string is wrong?",
-      "meaning": "Silent failure: you get your own local interface that never merges with the library. Wrong target — augmenting 'express' versus the actual namespace or module that defines Request — is the same class of bug."
-    },
-    {
-      "id": "express-correct-target",
-      "front": "Which Request should you augment for Express?",
-      "meaning": "The interface the types actually use, in the correct module or global scope — not a parallel Request. Express Request historically lives under namespace Express / @types/express; people sometimes augment express-serve-static-core. The Nest curriculum example uses global namespace Express."
+      "meaning": "Silent failure: you get your own local interface that never merges with the library. Wrong target — augmenting 'express' versus the actual namespace or module that defines Request — is the same class of bug. Express Request historically lives under namespace Express / @types/express; the Nest curriculum example uses global namespace Express."
     },
     {
       "id": "declare-global-express",
-      "front": "What does declare global { namespace Express { interface Request } } do?",
-      "meaning": "From inside a module, it adds declarations to the global scope so they merge with @types/express Request. A .d.ts typically imports User, wraps the merge in declare global, and may export {} to keep the file a module.",
+      "front": "How do you type req.user on Express Request (Nest)?",
+      "meaning": "Declaration merging via global augmentation: a .d.ts with declare global { namespace Express { interface Request { user?: User } } } export {}. TypeScript merges into @types/express Request. Purely compile-time; middleware or a guard must still assign req.user. Do not patch node_modules types.",
       "example": "declare global { namespace Express { interface Request { user?: User } } } export {};"
     },
     {
       "id": "why-declare-global",
       "front": "Why is declare global needed in a file with import or export?",
-      "meaning": "A file with top-level import or export is a module. Declarations inside a module are not global by default. declare global explicitly adds them to the global scope so they merge with @types/express Express.Request."
-    },
-    {
-      "id": "export-empty-object",
-      "front": "Why write export {} in a .d.ts augmentation file?",
-      "meaning": "export {} or any import/export forces 'this file is a module' so you do not accidentally create a script that pollutes differently than intended. Pair it with declare global when you still need global merges."
+      "meaning": "A file with top-level import or export is a module, so declarations are not global by default. Skipping declare global leaves them module-scoped and they never merge with Express.Request. export {} forces 'this file is a module' so you do not accidentally create a script; pair it with declare global when you still need global merges."
     },
     {
       "id": "window-dom-augment",
@@ -119,24 +61,9 @@
       "example": "declare global { interface Window { __APP_CONFIG__?: { apiUrl: string } } } export {};"
     },
     {
-      "id": "nest-request-user-pattern",
-      "front": "How do you type req.user in Nest plus Express?",
-      "meaning": "A types/express.d.ts with declare global { namespace Express { interface Request { user?: User } } }. After an auth guard or middleware assigns req.user = someUser, controllers using @Req() req: Request see req.user typed — without editing Express's own .d.ts."
-    },
-    {
-      "id": "strong-interview-answer",
-      "front": "Interview answer: how do you add user to Express Request?",
-      "meaning": "Declaration merging via global augmentation — a .d.ts with declare global { namespace Express { interface Request { user?: User } } }. TypeScript merges into @types/express Request because same-named interfaces combine. Purely compile-time; runtime still requires middleware or a guard to assign req.user."
-    },
-    {
       "id": "nest-user-optional",
       "front": "Should Request.user be optional?",
       "meaning": "Prefer user?: User if unauthenticated requests exist. Required user on all Request references is noisy if many routes are public. Use a narrower typed request or an assertion after auth when you want user required on protected handlers."
-    },
-    {
-      "id": "types-can-lie",
-      "front": "Does augmentation run middleware?",
-      "meaning": "No. Augmentation does not run middleware. Types can lie if you forget to attach user at runtime. Compile-time merge is not runtime behavior."
     },
     {
       "id": "tsconfig-include",
@@ -154,49 +81,14 @@
       "meaning": "No. A wrapper type or Nest @CurrentUser() decorator is often cleaner than putting everything on Request. Use augmentation when you truly need the shared Request name; otherwise prefer a dedicated parameter decorator."
     },
     {
-      "id": "dont-fork-node-modules",
-      "front": "Should you patch node_modules types to add Request.user?",
-      "meaning": "Avoid it. Forking or patching node_modules types is listed as the wrong approach — augmentation exists so you do not edit the package."
-    },
-    {
       "id": "local-request-trap",
       "front": "What happens if you declare interface Request { user } in a random .ts file?",
       "meaning": "You create a different Request unless you augment the scope Express actually uses. A local interface does not merge with Express's global Request."
     },
     {
-      "id": "forget-declare-global-trap",
-      "front": "What if an ambient file is already a module and you skip declare global?",
-      "meaning": "Declarations stay module-scoped and do not merge with globals. Forgetting declare global when the file already has import or export is a listed mistake — opposite of a script that pollutes unintentionally."
-    },
-    {
-      "id": "required-user-public-routes",
-      "front": "Why is required user on all Request references a trap?",
-      "meaning": "Many routes are public. Making user required everywhere leads to noisy optional chaining or unsafe assumptions. Keep user optional on the global Request, then narrow after auth."
-    },
-    {
-      "id": "connections-interface-path",
-      "front": "How do interface, merging, and Express Request.user connect?",
-      "meaning": "An interface is mergeable, which enables declaration merging, which enables module augmentation and declare global, which is how Nest types Express Request.user."
-    },
-    {
-      "id": "connections-type-alias",
-      "front": "What does a non-mergeable type alias force instead of augmentation?",
-      "meaning": "Intersection wrappers or a library redesign. You cannot reopen a type alias the way you reopen an interface."
-    },
-    {
-      "id": "connections-erasure-middleware",
-      "front": "How does erasure connect to req.user?",
-      "meaning": "Types do not attach runtime properties, so middleware is still required. Merging Request.user only changes what TypeScript believes, not what Express assigns."
-    },
-    {
-      "id": "connections-esm-module",
-      "front": "How do ESM modules connect to declare global?",
-      "meaning": "A file with import is a module, so its declarations are not global by default. You need declare global to merge into Window or Express.Request from that file."
-    },
-    {
-      "id": "interview-five-points",
-      "front": "What five claims should you be able to make in an interview?",
-      "meaning": "Define declaration merging and give the Express Request example; explain why libraries prefer interface for extensible config; distinguish module vs global augmentation; say clearly compile-time merge is not runtime behavior; mention the .d.ts must be in the project and target the correct scope."
+      "id": "namespace-merge-awareness",
+      "front": "Is declaration merging only for interfaces?",
+      "meaning": "No. Value and namespace combinations exist — function, class, and enum plus namespace (e.g. createApp.Options, Color.isWarm). Interview depth is knowing that; day-to-day Nest/Express work is almost always interface merging via augmentation."
     }
   ]
 }

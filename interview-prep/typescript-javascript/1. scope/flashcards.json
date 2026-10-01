@@ -6,36 +6,21 @@
   "modeReverse": "Meaning → prompt",
   "cards": [
     {
-      "id": "scope-question",
-      "front": "What question does scope answer?",
-      "meaning": "Where an identifier is allowed to be used, and which binding a name resolves to. In JavaScript that answer is almost always lexical: relationships between scopes are fixed by where code is written."
-    },
-    {
       "id": "lexical-vs-dynamic",
       "front": "Lexical vs dynamic scope in JS?",
-      "meaning": "JavaScript uses lexical (static) scope for variables: which outer bindings a function sees is fixed by where it was written in source, not by who called it at runtime. Dynamic scope would resolve free variables from the caller's environment; JS does not do that for variables (this is a separate mechanism)."
+      "meaning": "JavaScript uses lexical (static) scope for variables: which outer bindings a function sees is fixed by where it was written, not by who called it. Dynamic scope would resolve free variables from the caller’s environment; JS does not do that for variables."
     },
     {
       "id": "inner-called-from-outer",
       "front": "inner() defined at top level, called from outer() — which x does inner log?",
-      "meaning": "The x from where inner was defined (e.g. global), not outer's local x. Call site does not change the lexical scope chain; only nesting at definition time does.",
+      "meaning": "The x from where inner was defined (e.g. global), not outer’s local x. Call site does not change the lexical scope chain.",
       "example": "const x = 1; function outer() { const x = 2; inner(); } function inner() { console.log(x); } // logs 1"
     },
     {
       "id": "inner-defined-inside-outer",
       "front": "inner() defined inside outer() — which x does inner log?",
-      "meaning": "outer's x (e.g. 2). Because inner is nested in outer's source, outer's lexical environment is on inner's scope chain.",
+      "meaning": "outer’s x (e.g. 2). Because inner is nested in outer’s source, outer’s lexical environment is on inner’s scope chain.",
       "example": "const x = 1; function outer() { const x = 2; function inner() { console.log(x); } inner(); } // logs 2"
-    },
-    {
-      "id": "lexical-lookups-predictable",
-      "front": "Why are free-variable lookups predictable in JS?",
-      "meaning": "Same function, same free variables, every call — because the outer scopes a function can see are fixed at parse/compile time from source nesting. Call sites do not rewrite that map. That stability is also why closures keep access to the bindings of the lexical environment where the function was created."
-    },
-    {
-      "id": "scope-mental-model",
-      "front": "Write time vs runtime for scope — mental model?",
-      "meaning": "Write time draws the nesting diagram. Runtime walks that diagram upward to find names. The call stack answers “who called me?”; the scope chain answers “which variables can I see?”"
     },
     {
       "id": "this-vs-lexical-scope",
@@ -44,62 +29,20 @@
     },
     {
       "id": "global-module-scope-kind",
-      "front": "What creates global / module scope, and what lives there?",
-      "meaning": "Created by script or module top level. Typical bindings: top-level var/function (script), let/const/class (script or module), and imports (module)."
-    },
-    {
-      "id": "function-scope-kind",
-      "front": "What creates function scope, and what lives there?",
-      "meaning": "Entering a function creates it. Typical bindings: parameters, var, and function declarations inside the function. Nested functions always get their own function scope for var/params, regardless of blocks."
-    },
-    {
-      "id": "block-scope-kind",
-      "front": "What creates block scope, and what lives there?",
-      "meaning": "A { ... } — including if/for/while/switch bodies and bare blocks. Typical bindings: let, const, class, and (in modules/strict contexts) some other bindings."
-    },
-    {
-      "id": "why-block-scope-es6",
-      "front": "Why did ES6 add block scope?",
-      "meaning": "Older JS had essentially function and global scope for var. let/const added block scope so loop counters, temporary values, and conditional bindings stop leaking into the whole function."
+      "front": "Global vs function vs block scope — what creates each?",
+      "meaning": "Global/module: script or module top level (top-level var/function in scripts; let/const/class; imports in modules). Function: entering a function — parameters, var, and function declarations live there even if written inside nested blocks. Block: a { } (if/for/while/switch/bare); let, const, and class bind to the nearest block."
     },
     {
       "id": "var-vs-let-block",
       "front": "var vs let/const scope?",
-      "meaning": "var is function-scoped (or global at top level); let and const are block-scoped to the nearest { }. A var inside an if still exists after the if in the same function; let/const do not leak out of the block.",
-      "example": "if (true) { var a = 1; let b = 2; } console.log(a); // 1 — console.log(b) ReferenceError"
+      "meaning": "var is function-scoped (or global at top level) and ignores { }; let/const are block-scoped to the nearest { }. var x = 1; var x = 2; is allowed; redeclaring let/const in the same scope is SyntaxError. Nested let with the same name is shadowing, not redeclaration.",
+      "example": "if (true) { var a = 1; let b = 2; } console.log(a); // 1 — console.log(b) ReferenceError\nvar x = 1; { var x = 2; } console.log(x); // 2"
     },
     {
       "id": "var-if-false-undefined",
       "front": "var a inside if (flag) — log a after the if when flag is false?",
-      "meaning": "undefined, not ReferenceError. var is hoisted to the function, so the binding exists even if the assignment never ran. If flag was true, a is 1. let b in that block never left the block — logging b is ReferenceError.",
+      "meaning": "undefined, not ReferenceError. var is hoisted to the function, so the binding exists even if the assignment never ran. let b in that block never left the block — logging b is ReferenceError.",
       "example": "function example(flag) { if (flag) { var a = 1; let b = 2; } console.log(a); }"
-    },
-    {
-      "id": "var-ignores-blocks",
-      "front": "Does { } create a new scope for var?",
-      "meaning": "No. Blocks do not create var scopes. var hoists to the enclosing function or global scope, so nested blocks share one var binding.",
-      "notes": "Common interview trap: thinking var is block-scoped because it sits inside braces."
-    },
-    {
-      "id": "var-redeclaration",
-      "front": "Can you redeclare var in the same scope?",
-      "meaning": "Yes. var x = 1; var x = 2; is allowed. let/const redeclared in the same scope is a SyntaxError.",
-      "example": "var x = 1; var x = 2; // ok\nlet y = 1; // let y = 2; SyntaxError"
-    },
-    {
-      "id": "let-const-no-redeclare",
-      "front": "let y = 1; then let y = 2; in the same scope?",
-      "meaning": "SyntaxError. Redeclaration of let/const in the same scope is illegal. Same name in different (nested) scopes is shadowing, not redeclaration."
-    },
-    {
-      "id": "var-vs-let-hoist-tdz",
-      "front": "var vs let/const hoisting (scope table)?",
-      "meaning": "var is hoisted and initialized to undefined. let/const: the binding exists early, but it is in the TDZ until the declaration line (see Hoisting unit)."
-    },
-    {
-      "id": "top-level-var-on-global-object",
-      "front": "Does top-level var attach to the global object?",
-      "meaning": "Yes in a classic (non-module) script. Top-level let/const do not become global-object properties, even in classic scripts."
     },
     {
       "id": "const-vs-let-reassign",
@@ -109,8 +52,7 @@
     {
       "id": "for-let-per-iteration",
       "front": "Why does for (let i = ...) fix the setTimeout loop bug?",
-      "meaning": "for (let i = ...) creates a new i binding per iteration (language rule for this loop form). Each closure closes over a different binding, so async callbacks see that iteration's index instead of one shared function-scoped i from var.",
-      "notes": "Full treatment lives with Closures; the scope fact is one shared function-scoped i vs per-iteration block bindings."
+      "meaning": "for (let i = ...) creates a new i binding per iteration. Each closure closes over a different binding. var gives one function-scoped i shared by every callback, which is the 3, 3, 3 bug (closures unit)."
     },
     {
       "id": "lexical-environment",
@@ -118,154 +60,42 @@
       "meaning": "The engine-level backing of a scope: an EnvironmentRecord mapping identifier → binding, plus an outer link to the parent lexical environment (or null). That outer chain is the scope chain."
     },
     {
-      "id": "when-environments-created",
-      "front": "When are lexical environments created?",
-      "meaning": "Entering a function (params, var, inner function decls); entering a block that needs it (let/const/class); starting a script/module (global or module environment); evaluating catch (err) for the err binding. Runtime creates environment instances as those scopes are entered; parent links follow lexical nesting, not an arbitrary later call."
-    },
-    {
-      "id": "catch-err-environment",
-      "front": "Does catch (err) create a scope?",
-      "meaning": "Yes — a block-like environment that holds the err binding. That is why a catch parameter can shadow names only inside the catch block."
-    },
-    {
-      "id": "eval-with-edge-scopes",
-      "front": "eval / with and scope — interview awareness?",
-      "meaning": "They are special forms / edge cases that can affect scope; you mostly avoid them. Do not use them as the model for how normal identifier lookup works."
-    },
-    {
       "id": "scope-chain-lookup",
       "front": "How does identifier lookup work?",
-      "meaning": "Start in the current lexical environment; if the name is missing, follow the outer link to the parent environment and repeat until global/module or ReferenceError (in modern/strict code for bare reads). That chain is the scope chain."
-    },
-    {
-      "id": "assign-resolved-vs-unresolved",
-      "front": "Assignment to a resolved name vs an unresolvable name?",
-      "meaning": "Assignment to an already resolved binding updates that binding. Assignment to an unresolvable name is a different story: implicit global in sloppy mode, ReferenceError in strict mode."
-    },
-    {
-      "id": "lookup-not-eager-copy",
-      "front": "Does inner copy outer values when looking them up?",
-      "meaning": "No. inner walks the scope chain when the identifier is evaluated. Closures keep the environments alive so that walk still works after outer returns.",
-      "example": "inner logs globalName, outerName, midName via chain global ← outer ← mid ← inner"
-    },
-    {
-      "id": "two-calls-one-outer",
-      "front": "two() defines local value and calls one() — what does one log?",
-      "meaning": "The outer 'outer' binding. one was defined where value means the outer binding; two's local value is irrelevant to one.",
-      "example": "let value = 'outer'; function one() { console.log(value); } function two() { let value = 'inner'; one(); } two(); // 'outer'"
+      "meaning": "Start in the current lexical environment; if the name is missing, follow the outer link and repeat until global/module or ReferenceError. Inner does not copy outer values — it walks the chain when the identifier is evaluated. Assignment to a resolved binding updates that binding."
     },
     {
       "id": "shadowing",
       "front": "What is shadowing?",
-      "meaning": "An inner scope declares the same name as an outer scope. Lookup stops at the nearest binding; the outer variable still exists but is hidden under that name until the inner scope ends. Requires nested scopes — redeclaring let in the same scope is a SyntaxError."
-    },
-    {
-      "id": "shadowing-does-not-delete",
-      "front": "Does shadowing delete the outer variable?",
-      "meaning": "No. The outer binding remains; the inner name just hides it. After the inner scope ends, the outer name is visible again.",
+      "meaning": "An inner scope declares the same name as an outer scope. Lookup stops at the nearest binding; the outer variable still exists and is visible again after the inner scope ends. Parameters shadow the same way. Redeclaring let in the same scope is SyntaxError, not shadowing.",
       "example": "const x = 'outer'; function f() { const x = 'inner'; console.log(x); } // 'inner'\nf(); console.log(x); // 'outer'"
     },
     {
-      "id": "params-shadow",
-      "front": "Do parameters shadow outer names?",
-      "meaning": "Yes. Parameters shadow outer names the same way an inner declaration does. In loops/callbacks, a new binding can intentionally shadow — or, with var, fail to create a new binding when you expected one."
-    },
-    {
-      "id": "var-block-same-binding",
-      "front": "var x = 1; { var x = 2; } console.log(x) — result?",
-      "meaning": "2. The block does not create a new var binding — it is the same function/global binding, not a shadow in a new var scope.",
-      "example": "var x = 1; { var x = 2; } console.log(x); // 2"
-    },
-    {
-      "id": "let-block-shadow-output",
-      "front": "let y = 1; { let y = 2; log y } then log y?",
-      "meaning": "2 inside the block, then 1 outside. The inner let is a real shadow — a different block binding.",
-      "example": "let y = 1; { let y = 2; console.log(y); } // 2\nconsole.log(y); // 1"
-    },
-    {
-      "id": "catch-param-shadow",
-      "front": "Where does a catch parameter shadow?",
-      "meaning": "Only in the catch block. The err binding is block-like and does not leak past catch."
+      "id": "catch-err-environment",
+      "front": "Does catch (err) create a scope?",
+      "meaning": "Yes — a block-like environment that holds the err binding. The catch parameter shadows only inside the catch block and does not leak past it."
     },
     {
       "id": "module-vs-script-scope",
       "front": "Classic script vs ES module top-level scope?",
-      "meaning": "Classic scripts share a global environment; top-level var/function become global object properties. ES modules get their own module scope (strict, top-level let/const are not globalThis properties), and top-level this is undefined in modules.",
-      "notes": "Two modules do not accidentally share top-level let bindings."
-    },
-    {
-      "id": "script-vs-module-let-const-class",
-      "front": "Top-level let/const/class in a classic script vs a module?",
-      "meaning": "Classic script: they are global bindings but not global-object properties. Module: they are module-local (not global at all). That is why const API_URL in a module is not on window."
-    },
-    {
-      "id": "script-default-sloppy",
-      "front": "Default mode: classic script vs ES module?",
-      "meaning": "Classic script is sloppy unless you add \"use strict\". ES modules are always strict. Module scope plus strictness change globals, this, and visibility across files compared with a script tag."
-    },
-    {
-      "id": "script-vs-module-top-level-this",
-      "front": "Top-level this in a classic script vs a module?",
-      "meaning": "Classic script: the global object (usually). ES module: undefined."
+      "meaning": "Classic scripts share a global environment; default sloppy unless \"use strict\"; top-level this is the global object. ES modules get their own module scope, are always strict, and top-level this is undefined. Two modules do not share top-level let bindings."
     },
     {
       "id": "globalthis-environments",
-      "front": "What is globalThis, and what did people use before?",
-      "meaning": "The standard way to refer to the global object across environments. Browser: historically window (also self, frames nuances). Node: historically global. Web Workers: self. Prefer globalThis in portable code."
+      "front": "What is globalThis?",
+      "meaning": "The standard way to refer to the global object across environments. Browser historically window; Node historically global; workers self. Prefer globalThis in portable code."
     },
     {
       "id": "globalthis-vs-bindings",
       "front": "Does every global binding appear on globalThis?",
-      "meaning": "No. Top-level let/const in scripts are global bindings but not properties of globalThis. Top-level var and function declarations in classic scripts do become globalThis properties. Module bindings are not global at all. Only bindings that are also global-object properties show up as globalThis.x (var/function in classic scripts, or explicit globalThis.x = ...).",
+      "meaning": "No. Classic script: top-level var/function become globalThis properties; top-level let/const/class are global bindings but not global-object properties. Module bindings are not global at all — const API_URL in a module is not on window.",
       "example": "var fromVar = 1; let fromLet = 2; // classic script: globalThis.fromVar === 1; globalThis.fromLet === undefined"
     },
     {
-      "id": "why-global-object-matters",
-      "front": "Why does the global object still matter?",
-      "meaning": "Libraries sometimes attach APIs to it; accidental globals pollute it; feature detection and polyfills often touch globalThis."
-    },
-    {
       "id": "implicit-global",
-      "front": "Assignment to undeclared name in sloppy mode?",
-      "meaning": "Creates an implicit global — a property on the global object. In strict mode (including ES modules), the same assignment throws ReferenceError. Prefer const/let and modules to avoid this.",
+      "front": "Assignment to an undeclared name?",
+      "meaning": "Sloppy mode: creates an implicit global (a property on the global object). Strict mode, including ES modules: ReferenceError. Prefer const/let and modules.",
       "example": "function leak() { leaked = 42; } leak(); globalThis.leaked // 42 sloppy; ReferenceError if 'use strict'"
-    },
-    {
-      "id": "prefer-declare-no-undef",
-      "front": "Practical rule for undeclared assignment?",
-      "meaning": "Treat it as a bug. Prefer modules (strict by default), linters (no-undef), and always declare with const/let."
-    },
-    {
-      "id": "undeclared-read-vs-tdz",
-      "front": "Reading a never-declared name vs reading let/const before its line?",
-      "meaning": "Never-declared: ReferenceError (do not rely on old sloppy weirdness). let/const before the declaration line: also ReferenceError, but due to TDZ — the binding exists but is uninitialized. Same error name, different cause (Hoisting unit)."
-    },
-    {
-      "id": "scope-vs-call-stack",
-      "front": "Does the call stack determine variable scope?",
-      "meaning": "No — that would be dynamic scoping. The scope chain comes from lexical nesting where functions were defined. The call stack answers who called me; the scope chain answers which variables I can see.",
-      "notes": "Call site matters for this, not for free variable lookup."
-    },
-    {
-      "id": "closures-not-copy",
-      "front": "Do closures copy outer values at creation?",
-      "meaning": "No. Closures retain references to lexical environments and read live bindings when they run. Combined with a shared var loop binding, that produces every callback logging the final i.",
-      "notes": "Prerequisite link to the closures unit."
-    },
-    {
-      "id": "closures-are-fn-plus-env",
-      "front": "Are closures a separate magic feature from scope?",
-      "meaning": "No. Closures are functions plus retained lexical environments. A function keeps access to outer bindings after return because those environments stay reachable through the function."
-    },
-    {
-      "id": "hoisting-when-not-where",
-      "front": "How does hoisting/TDZ relate to scope?",
-      "meaning": "Scope is where a binding lives. Hoisting/TDZ describe when a binding becomes usable inside a scope you already have."
-    },
-    {
-      "id": "var-leak-loop-spoken",
-      "front": "Function vs block scope — spoken interview framing?",
-      "meaning": "Function scope means a var is visible everywhere inside the enclosing function, regardless of nested if/for blocks. Block scope (let/const) confines the binding to the nearest { }. That matters most in loops and conditionals: var leaks and gets shared across closures — the classic every setTimeout logs the last value bug. Default to const, use let when reassignment is needed, treat var as legacy. Lookup follows the lexical scope chain from where the function was defined; the caller doesn't change that."
     }
   ]
 }

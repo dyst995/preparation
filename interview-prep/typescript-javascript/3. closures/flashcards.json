@@ -11,9 +11,9 @@
       "meaning": "A function that retains access to variables from its enclosing lexical scopes when executed outside those scopes. Mechanically, the function keeps a link to outer lexical environment(s); lookup still walks the scope chain, and those environments stay alive while the function is reachable."
     },
     {
-      "id": "closures-whenever-outer",
-      "front": "Do you opt into closures, or do they always happen?",
-      "meaning": "They happen whenever a function can refer to bindings from an outer scope — not an optional advanced feature. Interviews test lexical scope plus live bindings, not a slogan."
+      "id": "closure-not-return-only",
+      "front": "Is a closure only when a function returns a function?",
+      "meaning": "No. Returning is common, but any escaping use counts: pass to setTimeout, store on an object, export. The interesting case is when the function outlives the outer execution — not a special “inner function” type."
     },
     {
       "id": "make-counter-output",
@@ -22,21 +22,9 @@
       "example": "function makeCounter() { let count = 0; return function increment() { count += 1; return count; }; }"
     },
     {
-      "id": "closure-internal-steps",
-      "front": "How does makeCounter work internally (mental model)?",
-      "meaning": "(1) makeCounter() creates an environment record containing count. (2) increment is created with [[Environment]] pointing at that record. (3) makeCounter returns increment; the call frame is gone, but the environment remains reachable through the function. (4) Later increment() looks up count via that saved outer environment and updates it. Interview need: live link to outer bindings, not a photocopy of values."
-    },
-    {
       "id": "capture-by-reference",
       "front": "Closure: copy values or live bindings?",
-      "meaning": "Live bindings, not snapshots. The closure closes over the variable slot; reads see the current value and writes update the same slot. Multiple inner functions from one scope share those bindings.",
-      "example": "shared() returns a and b; b() increments n; a() returns 1 — same n binding."
-    },
-    {
-      "id": "make-toggle-same-binding",
-      "front": "t.flip() then t.read() — same on binding?",
-      "meaning": "Yes. flip sets on = !on (true); read returns the same binding, not a stale copy — also true.",
-      "example": "const t = makeToggle(); t.flip(); // true\nt.read(); // true"
+      "meaning": "Live bindings, not snapshots. The closure closes over the variable slot; reads see the current value and writes update the same slot. Multiple inner functions from one outer call share those bindings."
     },
     {
       "id": "shared-a-sees-b-updates",
@@ -52,19 +40,8 @@
     {
       "id": "closed-over-object-mutate",
       "front": "hold(data) then data.n = 2; get().n?",
-      "meaning": "2 — same object. The binding holds a reference to the object. Mutating properties is visible to everyone who closed over that binding; reassigning the binding is a different operation.",
+      "meaning": "2 — same object. The binding holds a reference. Mutating properties (or arr.push) is visible to everyone who closed over that binding; reassigning the binding is a different operation.",
       "example": "function hold(obj) { return () => obj; } const get = hold(data); data.n = 2; get().n // 2"
-    },
-    {
-      "id": "closure-walks-scope-chain",
-      "front": "Which outer bindings can a closure reach?",
-      "meaning": "Any outer lexical binding it needs: enclosing function(s), blocks (let/const), module scope — following normal lookup rules. Call site still does not change which outer variables it sees."
-    },
-    {
-      "id": "greet-lexical-prefix",
-      "front": "const greet = outer('hi'); greet('Ada') — and if you call greet elsewhere?",
-      "meaning": "'MyApp:hi:Ada'. inner closes over prefix from outer and app from module/global. Moving greet around and calling it elsewhere does not attach a different prefix.",
-      "example": "function outer(prefix) { return function inner(name) { return `${app}:${prefix}:${name}`; }; }"
     },
     {
       "id": "separate-makecounter",
@@ -75,48 +52,19 @@
     {
       "id": "var-settimeout-333",
       "front": "for (var i=0; i<3; i++) setTimeout(() => console.log(i), 0)?",
-      "meaning": "Logs 3, 3, 3. One function-scoped i is shared by all closures; the loop finishes synchronously with i === 3 before timeouts run; each callback reads that same live binding.",
-      "notes": "Classic trap — closures working correctly with wrong scope shape."
-    },
-    {
-      "id": "loop-bug-causal-chain",
-      "front": "Causal chain of the var + setTimeout loop bug?",
-      "meaning": "(1) var i is one function-scoped binding for the whole loop. (2) Each arrow closes over that same i. (3) The loop finishes synchronously; i is 3. (4) Timeouts run later; each callback reads the current i → 3. Closures doing exactly what they always do (live bindings) plus shared scope from var."
+      "meaning": "Logs 3, 3, 3. One function-scoped i is shared by all closures; the loop finishes synchronously with i === 3 before timeouts run; each callback reads that same live binding. Closures are working correctly. Event-loop timing decides when i is read; scope decides which binding. Pulling var i outside the for header is still 3, 3, 3.",
+      "notes": "Classic trap — live bindings plus shared var scope."
     },
     {
       "id": "fix-let-loop",
-      "front": "Fix the var + setTimeout loop bug (preferred)?",
-      "meaning": "Use for (let i = 0; ...): creates a fresh i binding per iteration, so each closure captures a different binding holding that iteration's index → 0, 1, 2.",
-      "notes": "Not because let snapshots — because per-iteration bindings."
-    },
-    {
-      "id": "fix-iife",
-      "front": "Pre-ES6 fix for shared var in a loop?",
-      "meaning": "IIFE with parameter per iteration: (function(j) { setTimeout(() => console.log(j), 0); })(i). Parameter j is a new per-call binding; the callback closes over j, not shared i. Same idea: new binding per iteration, created manually.",
+      "front": "Fixes for the var + setTimeout loop bug?",
+      "meaning": "Preferred: for (let i = 0; ...) — a fresh i binding per iteration → 0, 1, 2. Pre-ES6: IIFE (function (j) { setTimeout(() => console.log(j), 0); })(i), or a factory scheduleLog(j) / forEach callback param. Same idea: a new binding per iteration, not a snapshot of let.",
       "example": "for (var i = 0; i < 3; i++) { (function (j) { setTimeout(() => console.log(j), 0); })(i); }"
     },
     {
-      "id": "fix-factory-param",
-      "front": "scheduleLog(i) factory fix for the loop bug?",
-      "meaning": "Passing i copies the number into parameter j for that call. The closure captures j (a per-call binding), so timeouts log 0, 1, 2.",
-      "example": "function scheduleLog(j) { setTimeout(() => console.log(j), 0); } for (var i = 0; i < 3; i++) scheduleLog(i);"
-    },
-    {
-      "id": "var-i-outside-loop",
-      "front": "var i; for (i = 0; i < 3; i++) setTimeout log i?",
-      "meaning": "Still 3, 3, 3 — same shared binding. Pulling var outside the for header does not create per-iteration bindings.",
-      "example": "var i; for (i = 0; i < 3; i++) { setTimeout(() => console.log(i), 0); }"
-    },
-    {
-      "id": "foreach-fresh-param",
-      "front": "[0,1,2].forEach with setTimeout on param i?",
-      "meaning": "Logs 0, 1, 2 because the forEach callback parameter is a fresh binding per invocation — same separate-binding idea as let per iteration or IIFE param.",
-      "notes": "Contrast with shared var outside the loop."
-    },
-    {
-      "id": "loop-bug-spoken",
-      "front": "var + setTimeout loop — spoken interview answer?",
-      "meaning": "It logs 3, 3, 3. var is function-scoped, so there's a single i shared by all three closures, and by the time the timeouts fire the loop has already finished with i equal to 3. The cleanest fix is switching to let, which creates a fresh binding per iteration so each closure captures its own value. Alternatively, wrap the body in an IIFE that takes i as a parameter, which was the pre-ES6 idiom."
+      "id": "let-not-snapshot",
+      "front": "Does let in a loop work because it snapshots?",
+      "meaning": "No. It creates distinct bindings per iteration; each closure’s binding holds that iteration’s value."
     },
     {
       "id": "module-pattern",
@@ -125,102 +73,27 @@
       "example": "createBank(initial) returns deposit/getBalance closing over balance; acct.deposit(50) // 150"
     },
     {
-      "id": "memoization-closure",
-      "front": "How does memoize use closures?",
-      "meaning": "The returned function and a cache Map live in the same closure; each call reads/writes the shared cache binding for the lifetime of the memoized function."
-    },
-    {
       "id": "curry-partial",
       "front": "How does currying / partial apply use closures?",
       "meaning": "The inner function retains the outer parameter binding. multiply(2) returns a function that still sees a === 2; double(5) is 10.",
       "example": "function multiply(a) { return function (b) { return a * b; }; } const double = multiply(2); double(5); // 10"
     },
     {
-      "id": "debounce-timer-binding",
-      "front": "Why debounce needs a closure?",
-      "meaning": "Repeated calls must share one timer id binding in closed-over state so clearTimeout/setTimeout coordinate across invocations of the returned wrapper. this/apply belong to the this unit; the closure point is the shared timer binding."
+      "id": "memoization-closure",
+      "front": "How do memoize and debounce use closures?",
+      "meaning": "Memoize: the returned function and a cache Map share a closed-over binding for the lifetime of the wrapper. Debounce: repeated calls share one timer id binding so clearTimeout/setTimeout coordinate across invocations."
     },
     {
       "id": "stale-closure-react",
-      "front": "Stale closure in React (one sentence)?",
-      "meaning": "A callback retained an old render's lexical environment (props/state bindings) while you expected the latest; fix by recreating the function when deps change, functional updates, or refs — still grounded in live bindings + which environment the function points at."
-    },
-    {
-      "id": "react-empty-deps-interval",
-      "front": "useEffect setInterval logging count with [] deps?",
-      "meaning": "The interval forever sees the first render's count. Each render recreates functions that close over that render's props/state; empty deps means the effect's callback keeps the old environment.",
+      "front": "Stale closure in React?",
+      "meaning": "A callback retained an old render’s lexical environment (props/state bindings) while you expected the latest. Empty-deps useEffect + setInterval logging count forever sees the first render’s count. Fix by recreating the function when deps change, functional updates, or refs — still live bindings plus which environment the function points at, not React magic.",
       "example": "useEffect(() => { const id = setInterval(() => console.log(count), 1000); return () => clearInterval(id); }, []);"
     },
     {
       "id": "closure-memory",
       "front": "What stays in memory with a closure?",
-      "meaning": "While the function is reachable, outer environments it needs for lookup stay reachable too — captured bindings (and potentially large unused data in that environment unless optimized away; don't rely on optimization for correctness)."
-    },
-    {
-      "id": "huge-vs-token-gc",
-      "front": "load() closes over token but not huge — what must stay?",
-      "meaning": "token must stay while authHeader is reachable. Ideally huge can be collected if unused by the closure — engines can optimize unused bindings, but you must not rely on that for correctness.",
+      "meaning": "While the function is reachable, outer environments it needs for lookup stay reachable too. Long-lived callbacks (listeners, intervals, effects without cleanup) and unbounded memo caches keep those environments forever. Engines may drop unused bindings, but do not rely on that for correctness.",
       "example": "function load() { const huge = new Array(1e6).fill(0); const token = 'abc'; return function authHeader() { return `Bearer ${token}`; }; }"
-    },
-    {
-      "id": "leak-shaped-patterns",
-      "front": "Closure leak-shaped patterns?",
-      "meaning": "Long-lived callbacks (event listeners, intervals, React effects without cleanup) holding large closed-over data; caches in memoization that grow without bounds; subscriptions registered once that close over whole component trees or large objects. Closures can extend object lifetime; leaks happen when something long-lived keeps those functions (and thus their environments) forever."
-    },
-    {
-      "id": "closure-not-return-only",
-      "front": "Is a closure only when a function returns a function?",
-      "meaning": "No. Returning is common, but any escaping use counts: pass to setTimeout, store on an object, export. The interesting case is when they outlive the outer execution."
-    },
-    {
-      "id": "not-only-inner-functions",
-      "front": "Are only inner functions closures?",
-      "meaning": "In JS, functions that use outer variables are closed over those environments. The interesting case is when they outlive the outer execution — not a special “inner function” type."
-    },
-    {
-      "id": "let-not-snapshot",
-      "front": "Does let in a loop work because it snapshots?",
-      "meaning": "No. It creates distinct bindings per iteration; each closure’s binding holds that iteration’s value."
-    },
-    {
-      "id": "closures-vs-this",
-      "front": "Are closures the same as this binding?",
-      "meaning": "No. this is mostly call-site; closures are lexical variable environments. Different mechanisms. Closures capture variables lexically; ordinary this is not a variable lookup."
-    },
-    {
-      "id": "loop-bug-not-broken",
-      "front": "Does the 3,3,3 loop bug mean closures are broken?",
-      "meaning": "No. The bug is one shared var binding read later. Closures are doing exactly what they always do with live bindings."
-    },
-    {
-      "id": "two-fns-share-outer-env",
-      "front": "Two functions returned from one outer call — isolated state?",
-      "meaning": "No. They share the outer environment unless you create separate bindings. Assuming isolation is a common mistake."
-    },
-    {
-      "id": "arr-push-vs-reassign",
-      "front": "Closed-over array: arr.push vs reassigning arr?",
-      "meaning": "The binding holds a reference to the object. Mutating with push is visible to everyone who closed over that binding; reassigning the binding is a different operation. Easy confusion when debugging closed-over objects."
-    },
-    {
-      "id": "ignore-cleanup-keeps-alive",
-      "front": "Why does ignoring setInterval / listener cleanup matter for closures?",
-      "meaning": "Those long-lived callbacks keep closures (and captured data) alive. Leaks happen when something long-lived keeps the functions and thus their environments forever."
-    },
-    {
-      "id": "stale-not-react-magic",
-      "front": "Cached callback closing over props forever — React magic?",
-      "meaning": "No. It is lexical capture: a single cached callback that closes over props forever is stale. Blame the environment the function still points at, not React magic."
-    },
-    {
-      "id": "event-loop-when-scope-which",
-      "front": "Event loop vs scope for a closed-over binding?",
-      "meaning": "Event-loop timing decides when the closed-over binding is read; scope decides which binding. Hoisting/TDZ still apply inside the scopes you close over; they do not redefine what a closure is."
-    },
-    {
-      "id": "why-closures-exist",
-      "front": "Why closures exist (testable uses)?",
-      "meaning": "They make functions first-class useful: return behavior that still knows its configuration and private state. Mechanism behind partial application, module privacy, React effect callbacks, and most “factory that returns a function” APIs. They also explain bugs when shared or stale bindings surprise you."
     }
   ]
 }

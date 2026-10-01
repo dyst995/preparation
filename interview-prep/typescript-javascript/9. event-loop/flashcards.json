@@ -8,22 +8,12 @@
     {
       "id": "event-loop-definition",
       "front": "What is the event loop?",
-      "meaning": "How a single-threaded JS runtime decides what runs next after the current call stack empties. This unit is the scheduler; the host queues callbacks, and the loop picks them when the stack is empty."
+      "meaning": "How a single-threaded JS runtime decides what runs next after the current call stack empties. The host queues callbacks; the loop picks them only when the stack is empty. This unit is the scheduler, not Promise settlement."
     },
     {
       "id": "three-pieces",
       "front": "Event loop: three structures?",
-      "meaning": "Call stack (what is running right now — sync, LIFO), macrotask/task queue (timers, I/O, script turns, many host callbacks), microtask queue (Promise jobs, queueMicrotask, async/await continuations). Queues run only when the stack for the current turn is empty."
-    },
-    {
-      "id": "unit-is-scheduler",
-      "front": "How do Promises/async fit this unit?",
-      "meaning": "Here they matter only as queue citizens. Prerequisite is single-threaded JS (one stack; host queues callbacks). The Promises unit explains how jobs get into the microtask queue and how values/errors propagate."
-    },
-    {
-      "id": "call-stack-what",
-      "front": "What is the call stack?",
-      "meaning": "It holds active function frames. The engine runs the top frame. Synchronous work pushes and pops frames until that turn of work is done. LIFO: last call on top."
+      "meaning": "Call stack (what is running now — sync, LIFO). Macrotask/task queue (timers, I/O, script turns, many host callbacks). Microtask queue (Promise jobs, queueMicrotask, async/await continuations). Queues run only when the current turn's stack is empty."
     },
     {
       "id": "nothing-mid-function",
@@ -47,146 +37,48 @@
       "notes": "Common trap: treating the delay argument as exact."
     },
     {
-      "id": "io-ui-macrotasks",
-      "front": "I/O callbacks and UI events — which queue?",
-      "meaning": "Macrotasks. I/O (network, disk) is host-dependent. UI events and rendering-related tasks are in the simplified browser model."
-    },
-    {
-      "id": "setimmediate-node",
-      "front": "setImmediate in the interview model?",
-      "meaning": "Node check-phase macrotask — not web standard. Don't memorize fragile order vs setTimeout(0); both defer after sync + microtasks. timeout vs immediate order can vary with timing."
-    },
-    {
-      "id": "messagechannel-macrotask",
-      "front": "MessageChannel / postMessage scheduling trick?",
-      "meaning": "Sometimes used to schedule a macrotask sooner than timers. Still a macrotask, not a microtask."
-    },
-    {
-      "id": "one-macrotask-at-a-time",
-      "front": "How many macrotasks run per cycle step?",
-      "meaning": "Pull one task, run it to completion (stack fills and empties). Then drain all microtasks before the next single macrotask."
-    },
-    {
       "id": "microtask-sources",
       "front": "What schedules microtasks?",
-      "meaning": "promise.then/catch/finally (reaction jobs), queueMicrotask(fn) (explicit), await resume after the awaited value settles, MutationObserver callbacks (browser). process.nextTick is Node-only and runs even before ordinary microtasks."
-    },
-    {
-      "id": "microtasks-bookkeeping",
-      "front": "Why do microtasks exist as a priority?",
-      "meaning": "To finish related bookkeeping before yielding to timers, UI, or I/O. If every Promise.then waited behind every timer and paint, chains would feel randomly delayed."
+      "meaning": "promise.then/catch/finally, queueMicrotask(fn), await resume after the awaited value settles, MutationObserver (browser). process.nextTick is Node-only and runs even before ordinary microtasks."
     },
     {
       "id": "why-two-queue-levels",
       "front": "Why two queue priorities, not one?",
-      "meaning": "If Promise reactions waited behind every timer and paint, chains would feel randomly delayed. If everything were microtasks, a busy Promise chain could starve rendering forever — and that starvation is still possible if you abuse microtasks."
-    },
-    {
-      "id": "drain-microtasks-rule",
-      "front": "Critical rule after each macrotask?",
-      "meaning": "Drain the entire microtask queue — including microtasks scheduled while draining — until empty, before the next macrotask (and before browser paint in the simplified model). That one fact resolves most predict-the-output questions."
+      "meaning": "Microtasks finish related Promise bookkeeping before yielding to timers, UI, or I/O. If reactions waited behind every timer and paint, chains would feel randomly delayed. If everything were a microtask, a busy chain could starve rendering — and that starvation is still possible if you abuse microtasks."
     },
     {
       "id": "loop-algorithm",
       "front": "Event loop algorithm (memorize)?",
-      "meaning": "1) Run the current sync script / current macrotask to completion. 2) Drain the entire microtask queue including new ones added while draining. 3) Browser: pending rendering/UI if it is time to paint. 4) Pull the next single macrotask. 5) Go back to step 2.",
+      "meaning": "1) Run the current sync script / current macrotask to completion (one at a time). 2) Drain the entire microtask queue — including microtasks scheduled while draining — until empty. 3) Browser: pending rendering/UI if it is time to paint. 4) Pull the next single macrotask. 5) Go back to step 2. That drain-all-microtasks rule resolves most predict-the-output questions.",
       "example": "while (alive) { runNextMacrotask(); while (microtasks) runNextMicrotask(); maybeRender(); }"
-    },
-    {
-      "id": "node-phases-if-asked",
-      "front": "Should you recite Node event-loop phases?",
-      "meaning": "Node's internal phases (timers, poll, check, …) are a finer map of macrotask kinds. For interviews, the microtask-vs-macrotask rule is the load-bearing model; mention Node phases only if asked."
     },
     {
       "id": "classic-12345",
       "front": "Sync; setTimeout(0); Promise.then chain; sync — order?",
-      "meaning": "1 sync start, 5 sync end, 3 promise 1, 4 promise 2, 2 timeout. Whole script is the initial macrotask (logs 1, schedules timer, schedules first Promise microtask, logs 5). Then drain microtasks including the nested then; then the timer.",
+      "meaning": "1, 5, 3, 4, 2. Whole script is the initial macrotask (logs 1, schedules timer, schedules first Promise microtask, logs 5). Then drain all microtasks, including the nested .then (3 then 4). Then the timer macrotask (2). Nested .then still beats the next timer; Promise.then from the same turn always beats setTimeout(0).",
       "example": "console.log 1; setTimeout 2; Promise.then 3 then 4; console.log 5 → 1, 5, 3, 4, 2"
-    },
-    {
-      "id": "chained-then-before-timer",
-      "front": "Does a nested .then still beat the next timer?",
-      "meaning": "Yes. promise 1 runs as a microtask; its .then schedules promise 2 as another microtask; that still runs before any timer because draining includes microtasks added while draining.",
-      "notes": "Trap: ignoring nested .then and thinking the timer sneaks in between."
-    },
-    {
-      "id": "prediction-variant-ebcad",
-      "front": "Timeout A; Promise then B then C; timeout D; log E — order?",
-      "meaning": "E, B, C, A, D. Sync E first; then all microtasks from this turn (B then C, including the flattened inner Promise.resolve); both timeouts after those microtasks.",
-      "example": "setTimeout A; Promise.then { log B; return Promise.resolve(); }.then C; setTimeout D; log E → E B C A D"
-    },
-    {
-      "id": "two-timeouts-after-micro",
-      "front": "Two setTimeout(0) in one script — order after microtasks?",
-      "meaning": "Both macrotasks queued in order during the script → A then D after all microtasks from that turn complete."
     },
     {
       "id": "await-microtask",
       "front": "async f: log f1; await null; log f2 — with sync caller?",
-      "meaning": "s1, f1, s2, f2. Code before the first await runs synchronously as part of the current turn; the rest is scheduled like a Promise.then (microtask) once the awaited value is settled. f2 loses to leftover sync (s2).",
+      "meaning": "s1, f1, s2, f2. Code before the first await runs synchronously as part of the current turn; the rest is scheduled like a Promise.then (microtask) once the awaited value is settled. await does not block the JS thread — it exits the current sync portion so other JS can run. Continuations beat later setTimeout(0).",
       "example": "log s1; f(); log s2 → s1, f1, s2, f2"
-    },
-    {
-      "id": "await-beats-timeout",
-      "front": "Does an await continuation beat setTimeout(0)?",
-      "meaning": "Yes. Continuations are microtasks, so they beat later setTimeout(0) macrotasks. Full Promise states belong in the Promises unit; the loop only cares that continuations are microtasks."
-    },
-    {
-      "id": "await-not-block-thread",
-      "front": "Does await block the JS thread?",
-      "meaning": "No. It schedules a continuation and exits the current sync portion; other JS can run before resume. Thinking await blocks the thread is a common misconception."
     },
     {
       "id": "microtask-starvation",
       "front": "Can microtasks block setTimeout forever?",
-      "meaning": "Yes — if a microtask keeps scheduling more microtasks (e.g. a .then that recursively queues another .then), the queue never empties, so the loop never reaches the next macrotask or, in a browser, the next paint. UI looks frozen though timers are scheduled.",
+      "meaning": "Yes — if a microtask keeps scheduling more microtasks, the queue never empties, so the loop never reaches the next macrotask or (in a browser) the next paint. UI looks frozen though timers are scheduled. Prefer bounded work per turn; chunk CPU across macrotasks (setTimeout(0), MessageChannel, rAF) when you need to yield.",
       "example": "function flood() { Promise.resolve().then(flood); } flood(); setTimeout(() => console.log('never'), 0);"
-    },
-    {
-      "id": "starvation-practical-chunk",
-      "front": "How do you avoid microtask starvation in practice?",
-      "meaning": "Prefer bounded work per turn. Don't implement tight loops only with Promise microtasks when UI responsiveness matters. Chunk CPU work across macrotasks — setTimeout(0), MessageChannel, requestAnimationFrame for frames — when you need to yield."
     },
     {
       "id": "process-nexttick-node",
       "front": "process.nextTick vs Promise microtask (Node)?",
-      "meaning": "nextTick queue drains before ordinary Promise microtasks — Node-only, not web. Flooding nextTick starves I/O/timers even harder than Promise floods. Nest/Node interviews love this distinction."
-    },
-    {
-      "id": "nexttick-typical-order",
-      "front": "nextTick, Promise.then, setTimeout(0), setImmediate — typical order?",
-      "meaning": "Typical: nextTick, then promise. Then timeout vs immediate order can vary with timing. The stable teaching point is nextTick before promise — do not treat timeout vs immediate as a guaranteed order.",
-      "example": "setImmediate; setTimeout 0; Promise.then; nextTick → nextTick, promise, then timeout/immediate vary"
-    },
-    {
-      "id": "nexttick-not-web-portable",
-      "front": "Should portable code use process.nextTick?",
-      "meaning": "No — it is not a web API. Prefer queueMicrotask or Promises for portable code. Know nextTick because Nest/Node interviews love it and because nextTick floods starve even sooner than Promise floods."
-    },
-    {
-      "id": "microtasks-before-paint",
-      "front": "Where does browser paint sit in the simplified model?",
-      "meaning": "Between macrotasks, browsers may paint when appropriate — after microtasks drain. Model: microtasks before paint opportunity before the next task. You don't need the full HTML event-loop spec."
-    },
-    {
-      "id": "timeout-yields-paint",
-      "front": "setTimeout(0) vs endless .then for yielding to paint?",
-      "meaning": "A microtask flood delays paint (starvation). Work scheduled only as setTimeout(0) yields more readily to rendering than endless .then chains."
-    },
-    {
-      "id": "predict-method",
-      "front": "How to predict mixed async output?",
-      "meaning": "1) Run all sync code in the current macrotask; note what gets queued where. 2) Drain all microtasks (and microtasks they spawn). 3) Run the oldest/next macrotask; repeat from step 2. Classify each callback as macrotask vs microtask (and nextTick before microtasks on Node)."
+      "meaning": "One awareness card, not phase trivia: nextTick drains before ordinary Promise microtasks (Node-only). Flooding nextTick starves I/O/timers even harder. setImmediate is a Node check-phase macrotask, not web; timeout vs immediate order can vary — don't memorize it. Don't recite timers/poll/check phases; the load-bearing model is still macrotask vs microtask drain-all. Prefer queueMicrotask/Promises for portable code."
     },
     {
       "id": "classify-callback-queue",
       "front": "Classify setTimeout, setImmediate, then, queueMicrotask, await, nextTick?",
-      "meaning": "setTimeout/setInterval: macrotask. setImmediate (Node): macrotask (check). promise.then/catch/finally: microtask. queueMicrotask: microtask. await resume: microtask. process.nextTick: before microtasks (Node)."
-    },
-    {
-      "id": "promise-beats-timeout",
-      "front": "After same sync turn: Promise.then vs setTimeout(0)?",
-      "meaning": "Promise microtasks always run before the next timer macrotask — common interview trap assuming setTimeout(0) runs first."
+      "meaning": "setTimeout/setInterval: macrotask. setImmediate (Node): macrotask (check). promise.then/catch/finally: microtask. queueMicrotask: microtask. await resume: microtask. process.nextTick: before microtasks (Node). I/O callbacks and UI events: macrotasks."
     },
     {
       "id": "microtasks-not-parallel",
@@ -194,34 +86,9 @@
       "meaning": "No. Still one stack; they run one after another. Parallel JS is not how the queues work."
     },
     {
-      "id": "node-not-browser",
-      "front": "Is Node's loop the same as the browser's?",
-      "meaning": "Do not assume Node === browser. process.nextTick and setImmediate are Node-specific. The shared interview model is still macrotask vs microtask drain-all."
-    },
-    {
       "id": "host-finished-vs-ran",
       "front": "I/O finished vs callback ran?",
       "meaning": "Host finishing only enqueues; the event loop decides when JS runs the callback — stack must be empty and scheduling rules satisfied."
-    },
-    {
-      "id": "closures-what-loop-when",
-      "front": "Closures vs event loop for a callback?",
-      "meaning": "Closures answer which variables a callback sees when it finally runs. The event loop answers when that callback is allowed to run."
-    },
-    {
-      "id": "scheduler-vs-promise-jobs",
-      "front": "Event loop unit vs Promises unit?",
-      "meaning": "This unit is the scheduler (what runs next). The Promises unit explains how jobs get into the microtask queue and how values/errors propagate."
-    },
-    {
-      "id": "interview-narrate-cycle",
-      "front": "What should you be able to draw/narrate?",
-      "meaning": "Draw stack + macrotask queue + microtask queue and narrate one full cycle; state drain-all-microtasks without hesitation; predict sync + setTimeout + Promise + chained .then; explain starvation and UI freeze; place await continuation in the microtask bucket; mention nextTick only as Node-before-microtasks when relevant."
-    },
-    {
-      "id": "strong-closer",
-      "front": "Strong event-loop closer (one-liner)?",
-      "meaning": "One task runs to completion; then every microtask — including ones scheduled during that drain — runs before the next timer or I/O task. That's why Promise callbacks beat setTimeout(0)."
     }
   ]
 }

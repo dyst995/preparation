@@ -8,54 +8,29 @@
     {
       "id": "concurrency-in-single-thread",
       "front": "Does single-threaded JS still have concurrency?",
-      "meaning": "Yes — many async operations can be in flight at once. Pitfalls come from completion order, forgotten error handlers, missing cancellation, and APIs that look async-friendly but aren't (.forEach). This unit is about bugs you ship in React/RN/Nest, not inventing threads."
-    },
-    {
-      "id": "single-thread-races",
-      "front": "Single-threaded — no races?",
-      "meaning": "Wrong for apps. The danger is usually not multi-threaded memory races. Two async operations were started; the older one finishes after the newer one and still updates UI/state. Completion-order races still happen with many in-flight Promises."
-    },
-    {
-      "id": "latency-not-send-order",
-      "front": "Does network latency preserve send order?",
-      "meaning": "No. Your event loop runs whichever callback becomes ready first. Send order ≠ completion order."
+      "meaning": "Yes — many async operations can be in flight at once. The danger is usually not multi-threaded memory races. Two operations start; the older one finishes after the newer one and still updates UI/state. Send order ≠ completion order: the event loop runs whichever callback becomes ready first."
     },
     {
       "id": "search-race",
       "front": "Type 'a' then 'ab' — older results win?",
-      "meaning": "Classic completion-order race: two requests in flight; latency doesn't preserve send order; response for 'a' may arrive after 'ab' and overwrite state with stale data.",
+      "meaning": "Classic stale-fetch / completion-order race: two requests in flight; latency doesn't preserve send order; response for 'a' may arrive after 'ab' and overwrite state. Same family: tab switching, rapid filter changes, React effect re-runs without cleanup, double-clicked submit, Nest shared mutable cache without versioning.",
       "example": "type a → request A; type ab → request B; B returns setResults(ab); A returns setResults(a) — stale wins"
-    },
-    {
-      "id": "same-family-races",
-      "front": "Where else does the search-box race show up?",
-      "meaning": "Tab switching, rapid filter changes, React effect re-runs without cleanup, double-clicked submit, Nest handler using shared mutable cache without versioning."
     },
     {
       "id": "ignore-stale-id",
       "front": "Fix: request id / generation counter?",
-      "meaning": "Keep a monotonically increasing generation (or latest query). Increment on each new request; after await, only setState if id === latest. Stops applying stale data; doesn't cancel network unless paired with abort. Wasted bandwidth/CPU may continue.",
+      "meaning": "Keep a monotonically increasing generation (or latest query). Increment on each new request; after await, only setState if id === latest. React effect equivalent: let cancelled = false; cleanup sets cancelled = true; ignore then/setState when cancelled. Stops applying stale data; doesn't cancel network unless paired with abort. Wasted bandwidth/CPU may continue.",
       "example": "let latest = 0; const id = ++latest; const results = await fetchResults(query); if (id !== latest) return;"
-    },
-    {
-      "id": "effect-cancelled-flag",
-      "front": "React effect cleanup for fetch race?",
-      "meaning": "let cancelled = false; in then check !cancelled before setState; cleanup sets cancelled = true on re-run/unmount — ignore stale when query/deps change. Stops applying stale data, not the network work unless paired with abort."
     },
     {
       "id": "abort-controller",
       "front": "AbortController for search?",
-      "meaning": "Abort previous controller when a new query starts; pass signal to fetch; catch AbortError as expected control flow, not a user-facing failure. Reduces wasted work vs ignore-only."
-    },
-    {
-      "id": "abort-how-works",
-      "front": "How does AbortController work?",
-      "meaning": "abort() signals all consumers of that signal. fetch (and many modern APIs) reject with AbortError / DOMException. Treat abort as control flow, not a user-facing failure."
+      "meaning": "Abort previous controller when a new query starts; pass signal to fetch. abort() signals all consumers of that signal; fetch rejects with AbortError / DOMException. Treat abort as expected control flow, not a user-facing failure (noisy toasts on every keystroke). Reduces wasted work vs ignore-only."
     },
     {
       "id": "abort-vs-ignore",
       "front": "Abort vs ignore-stale?",
-      "meaning": "Abort stops/cancels in-flight I/O where supported; ignore-stale only prevents bad UI updates. Abort reduces waste; a generation check still helps if some APIs can't abort or if multiple code paths can set state. Use both when needed."
+      "meaning": "Abort stops/cancels in-flight I/O where supported; ignore-stale only prevents bad UI updates. Abort reduces waste; a generation check still helps if some APIs can't abort or if multiple code paths can set state. Use both when needed. Search/typeahead: debounce + AbortController (+ ignore-stale). Effect load by id: abort or cancelled flag in cleanup."
     },
     {
       "id": "react-query-why",
@@ -63,20 +38,10 @@
       "meaning": "They automate query keys + cancellation / ignore stale. Knowing the manual pattern (request id + AbortController) proves you understand why they exist — don't rely only on library magic without being able to explain query keys / cancel."
     },
     {
-      "id": "search-interview-answer",
-      "front": "User types quickly; older shorter-query results flash — what and fix?",
-      "meaning": "Classic race: multiple requests in flight; completion order ≠ send order; older response overwrites newer state. Fix with a request id/ref that only commits the latest, and/or AbortController to cancel the previous fetch when a new search starts. Libraries like React Query solve this with query keys and cancellation."
-    },
-    {
       "id": "unhandled-rejection-what",
       "front": "What is an unhandled Promise rejection?",
-      "meaning": "A Promise rejects and nothing handles it in time — no .catch, no await inside try/catch on a caller that actually waits. Fire-and-forget async function that throws is a typical leak.",
+      "meaning": "A Promise rejects and nothing handles it in time — no .catch, no await inside try/catch on a caller that actually waits. Fire-and-forget async that throws is a typical leak. Node: warnings; can crash depending on version / --unhandled-rejections. Browsers/RN: easy to miss; silent failed features.",
       "example": "async function risky() { throw new Error('boom'); } risky(); // unhandled rejection risk"
-    },
-    {
-      "id": "unhandled-by-environment",
-      "front": "Unhandled rejections in Node vs browsers/RN vs production?",
-      "meaning": "Node: warnings; can crash the process depending on version / --unhandled-rejections strictness. Browsers/RN: easy to miss; silent failed features; noisy console in dev. Production: works-on-my-machine empty catches elsewhere; ops only see partial symptoms."
     },
     {
       "id": "unhandled-rejection-rule",
@@ -91,18 +56,13 @@
     {
       "id": "foreach-async-trap",
       "front": "items.forEach(async item => await save(item)); then log done?",
-      "meaning": "done runs before saves finish — forEach ignores returned Promises, doesn't await. All async visitors are started; their Promises float away (often unhandled if save rejects).",
+      "meaning": "done runs before saves finish — forEach expects a sync visitor and ignores returned Promises. All async visitors start; their Promises float away (often unhandled if save rejects).",
       "example": "items.forEach(async (item) => { await save(item); }); console.log('done'); // done first"
-    },
-    {
-      "id": "foreach-expects-sync",
-      "front": "Why doesn't forEach await?",
-      "meaning": "forEach expects a sync visitor. It does not inspect or await a returned Promise."
     },
     {
       "id": "foreach-fixes",
       "front": "Fixes for forEach(async)?",
-      "meaning": "Sequential: for (const item of items) await save(item). Parallel: await Promise.all(items.map(item => save(item))). Partial OK: await Promise.allSettled(...). Limited concurrency: pool / batch helper."
+      "meaning": "Sequential: for (const item of items) await save(item). Parallel: await Promise.all(items.map(item => save(item))). Partial OK: await Promise.allSettled(...). Limited concurrency: pool / batch helper. Bulk save: all / allSettled / pool — not forEach + async."
     },
     {
       "id": "map-without-all",
@@ -110,25 +70,9 @@
       "meaning": "You get an array of Promises — must await Promise.all (or allSettled) if you need completion or error handling as one unit. Avoid map(async) without combining if you need completion."
     },
     {
-      "id": "debounce-definition",
-      "front": "What is debounce (concurrency shaping)?",
-      "meaning": "Run after activity settles — e.g. search: wait until typing pauses. Conceptual: onInput → reset timer → after 300ms quiet → fetch once. Fewer in-flight requests; pairs well with AbortController on the single latest call. Typical UX: search autocomplete. Strongly reduces starts.",
-      "notes": "Not only a perf micro-optimization — reduces how many async operations you start, which reduces races and server load."
-    },
-    {
-      "id": "throttle-definition",
-      "front": "What is throttle (concurrency shaping)?",
-      "meaning": "Run at most once per interval while activity continues — e.g. scroll handlers, resize, some tracking. Conceptual: onScroll → allow one handler per 100ms; drop or coalesce extras. Typical UX: scroll position sync. Caps rate of starts."
-    },
-    {
       "id": "debounce-vs-throttle",
       "front": "Debounce vs throttle for concurrency?",
-      "meaning": "Debounce: fires after a quiet period (typeahead) — fewer starts. Throttle: regularly during continuous events (scroll) — caps rate of starts. Both reduce in-flight async work and race surface. Neither replaces abort/ignore-stale alone if a slow response can still outrun a later one — but fewer flights make races rarer."
-    },
-    {
-      "id": "debounce-the-async-start",
-      "front": "Debounce setState but fetch every keypress?",
-      "meaning": "Wrong. Debounce the async start, not only the render. Launching fetch on every keypress still creates races and load."
+      "meaning": "Debounce: run after activity settles (typeahead wait until typing pauses) — fewer starts. Throttle: at most once per interval while activity continues (scroll, resize) — caps rate of starts. Both reduce in-flight async work and race surface. Neither replaces abort/ignore-stale if a slow response can still outrun a later one. Debounce the async start, not only the render — fetch on every keypress still creates races."
     },
     {
       "id": "react-strict-mode-effects",
@@ -144,51 +88,6 @@
       "id": "nest-shared-mutable",
       "front": "Shared mutable state in Nest — race?",
       "meaning": "Concurrent requests on one Node process share module-level variables. A request-scoped latest flag on a singleton service can cross wires — prefer per-request locals, not globals, for cancellation tokens."
-    },
-    {
-      "id": "serial-vs-overlap",
-      "front": "This unit vs accidental sequential await?",
-      "meaning": "Opposite failure mode: the async/await unit is awaiting too serially. Here the failure is too much overlap without coordination."
-    },
-    {
-      "id": "defense-search-typeahead",
-      "front": "Preferred defense for search / typeahead?",
-      "meaning": "Debounce + AbortController (+ ignore-stale)."
-    },
-    {
-      "id": "defense-effect-by-id",
-      "front": "Preferred defense for effect load by id?",
-      "meaning": "Abort or cancelled flag in cleanup."
-    },
-    {
-      "id": "defense-cannot-abort",
-      "front": "Must apply only latest, can't abort?",
-      "meaning": "Generation / request id — ignore stale responses even if the network finishes."
-    },
-    {
-      "id": "defense-must-not-lose-errors",
-      "front": "Must not lose errors — which rule?",
-      "meaning": "Never bare fire-and-forget. Every Promise has a home: await in try/catch or explicit .catch."
-    },
-    {
-      "id": "defense-bulk-save",
-      "front": "Preferred defense for bulk save?",
-      "meaning": "all / allSettled / pool — not forEach + async."
-    },
-    {
-      "id": "trap-abort-error-as-failure",
-      "front": "Catching AbortError as a real failure?",
-      "meaning": "Noisy toasts on every keystroke. Treat abort as expected control flow, not a user-facing failure."
-    },
-    {
-      "id": "event-loop-when-this-which",
-      "front": "Event loop vs this unit?",
-      "meaning": "Event loop explains when callbacks run; this unit explains which completion is still valid when several are queued. Stale handler closes over / setState wrong generation → race bug."
-    },
-    {
-      "id": "interview-should-be-able",
-      "front": "Concurrency-pitfalls interview bar?",
-      "meaning": "Narrate the search-box race with a timeline; implement ignore-stale and AbortController and contrast them; explain unhandled rejections and every Promise has a home; fix forEach(async) with for...of or Promise.all; position debounce/throttle as concurrency control; name what React Query automates without hand-waving."
     }
   ]
 }

@@ -16,90 +16,40 @@
       "meaning": "CommonJS: classic Node (require / module.exports) and many compiled Nest/TS backends. ES Modules: browsers, modern Node, what you write in React/RN source, and what bundlers prefer to analyze."
     },
     {
-      "id": "why-modules-exist",
-      "front": "Why do modules exist (without vs with)?",
-      "meaning": "Without: shared files pollute one global scope, dependency order is manual (script tags), tree-shaking and clear public APIs are hard. With: each file has module scope, dependencies are declared, tools can bundle, split, and sometimes drop unused exports."
-    },
-    {
-      "id": "cjs-syntax",
-      "front": "CJS export/import syntax?",
-      "meaning": "require(id) loads a module. Export with module.exports = { add } or exports.add = add — exports is an alias to module.exports initially. You can also module.exports = function main() {} for a single function.",
-      "example": "const math = require('./math'); math.add(1, 2);"
+      "id": "cjs-runtime",
+      "front": "When does require() resolve and run, and what does the cache return?",
+      "meaning": "At runtime when that line executes — synchronous load, module body runs top-to-bottom, cached module.exports returned on later requires of the same resolved path. require is an ordinary call, so it can be conditional or a computed path — a bundler cannot always prove which files are needed.",
+      "example": "const math = require('./math'); if (cond) require('./a'); require(somehowGetPath());"
     },
     {
       "id": "exports-alias-footgun",
-      "front": "exports.foo = 1 after module.exports = function() {}?",
-      "meaning": "After replacing module.exports entirely, exports may no longer be the same object — a CJS footgun. Assigning exports.foo then does not update what require returns.",
-      "notes": "Use module.exports = ... to replace the export; don't reassign exports itself."
-    },
-    {
-      "id": "cjs-runtime",
-      "front": "When does require() resolve and run?",
-      "meaning": "At runtime when that line executes — synchronous load, module body runs top-to-bottom, cached module.exports returned on subsequent requires. Can be conditional or dynamic string path."
-    },
-    {
-      "id": "cjs-cached",
-      "front": "What does the CJS module cache return?",
-      "meaning": "After first load, later require of the same resolved path returns the same exports object. Node resolves id to a file, loads it or returns cached module.exports; whatever sits on module.exports when evaluation finishes is the return value."
-    },
-    {
-      "id": "cjs-dynamic-require",
-      "front": "Can require be conditional or use a computed path?",
-      "meaning": "Yes. require is an ordinary function call: if (cond) require('./a') and require(somehowGetPath()) are legal in CJS. That is why a bundler cannot always prove which files are needed without executing logic.",
-      "example": "if (cond) { require('./a'); } require(somehowGetPath());"
-    },
-    {
-      "id": "esm-syntax",
-      "front": "ESM named, default, and namespace import syntax?",
-      "meaning": "export function add, export const VERSION, export default function main. Import with import main, { add, VERSION } from './math.mjs' or import * as math from './math.mjs'."
-    },
-    {
-      "id": "esm-declarations-not-calls",
-      "front": "Are static import/export runtime function calls?",
-      "meaning": "No — they are declarations (except dynamic import()). Specifiers are static strings, not variables. Static imports are hoisted and evaluated before the module body runs; the dependency graph is known up front."
+      "front": "exports.foo = 1 after module.exports = function() {}? What is wrong with exports = ...?",
+      "meaning": "exports is only an alias to module.exports initially. Replacing module.exports leaves exports pointing at the old object, so later exports.foo does not update what require returns. exports = ... breaks the alias; use module.exports = ... to replace the export.",
+      "notes": "Use module.exports = ... to replace; exports.foo = 1 is only safe while exports still points at module.exports."
     },
     {
       "id": "esm-static",
-      "front": "ESM import/export resolution timing?",
-      "meaning": "Parse/link time: static import specifiers build a dependency graph, link live bindings, evaluate in dependency order. Enables tree-shaking and predictable splitting; static import is not a runtime function call."
-    },
-    {
-      "id": "esm-evaluate-order",
-      "front": "ESM graph steps after parse?",
-      "meaning": "Parse files and find static imports; load the dependency graph; link exports to imports (live bindings); evaluate modules in post-order (dependencies first), respecting cycles with special rules."
+      "front": "Are static import/export runtime calls — when do they resolve?",
+      "meaning": "No — they are declarations (except dynamic import()). Specifiers are static strings. Parse/link time: build a dependency graph, link live bindings, evaluate in post-order (dependencies first). Static imports are hoisted and run before the module body; the graph is known up front.",
+      "example": "import main, { add } from './math.mjs'; export function add() {}"
     },
     {
       "id": "dynamic-import",
       "front": "import() vs static import?",
-      "meaning": "Dynamic import() returns a Promise, allows conditional/async loading; static import stays hoisted and analyzable. ESM's escape hatch for lazy loading. Specifier can be computed in many environments, but static import remains the analyzable default.",
+      "meaning": "Dynamic import() returns a Promise and allows conditional/async loading; static import stays hoisted and analyzable. Specifier can be computed in many environments, but static import remains the default for tree-shaking and splitting.",
       "example": "const mod = await import('./lazy.mjs');"
     },
     {
-      "id": "top-level-this",
-      "front": "Top-level this: CJS vs ESM?",
-      "meaning": "Node CJS wrapper: often exports object (same starting object as module.exports before reassignment). ESM: undefined, always strict. Don't rely on CJS this in new code."
-    },
-    {
-      "id": "top-level-await",
-      "front": "Top-level await: ESM vs CJS?",
-      "meaning": "ESM can use top-level await in supporting runtimes/bundlers. CJS cannot at the top level without wrapping in async IIFEs. Often appears when comparing Nest/Node module targets."
-    },
-    {
-      "id": "cjs-vs-esm-table",
-      "front": "CJS vs ESM — syntax, timing, shaking, values, async, this, cycles?",
-      "meaning": "CJS: require/module.exports, runtime sync/dynamic, hard to tree-shake, require returns the exports object (primitive field once is a snapshot), no native import(), top-level this is exports, cycles may return partial exports. ESM: import/export, parse/link static graph, shakeable, live bindings, import()→Promise, this undefined, unfinished exports can be in TDZ."
-    },
-    {
       "id": "live-bindings",
-      "front": "ESM: increment() then read imported count?",
-      "meaning": "Importer sees updated count — imported names are live bindings to exporter's variables (read-only on import side). Not a frozen snapshot of a primitive at import time.",
-      "example": "export let count; increment(); import { count } — second log is 1."
+      "front": "ESM: increment() then read imported count — can you reassign count?",
+      "meaning": "Importer sees the updated count — imported names are live bindings to the exporter's variables, not a snapshot of a primitive at import time. Reassigning an imported binding is a TypeError; importers get live read-only views.",
+      "example": "increment(); import { count } — second log is 1.  count = 5; // TypeError"
     },
     {
-      "id": "import-readonly",
-      "front": "Can you reassign an imported binding?",
-      "meaning": "No — TypeError. Importers get live read-only views; mutate exported object properties if shared mutable state is intentional.",
-      "example": "import { count } from './counter.mjs'; // count = 5; TypeError"
+      "id": "cjs-destructure-primitive",
+      "front": "const { count, increment } = require(...); increment(); count?",
+      "meaning": "count is still the initial value — destructuring copied the primitive at require time. CJS gives you the cached module.exports object; read counter.count or put a getter on exports for live reads. If increment does not also assign exports.count, readers of the copied field stay stale.",
+      "example": "const { count, increment } = require('./counter.cjs'); increment(); count; // still 0"
     },
     {
       "id": "mutate-exported-object",
@@ -108,138 +58,44 @@
       "example": "export const state = { n: 0 }; state.n++;"
     },
     {
-      "id": "cjs-destructure-primitive",
-      "front": "const { count, increment } = require(...); increment(); count?",
-      "meaning": "count still initial value — destructuring copied the primitive at require time. Need the exports object (counter.count) or getter on exports for live reads unless you mutate shared object properties."
-    },
-    {
-      "id": "cjs-exports-object-rule",
-      "front": "CJS live-vs-copy causal rule?",
-      "meaning": "CJS gives you the cached module.exports object. Destructuring a primitive property copies the current value. ESM imported names are bindings to the exporter's variables (let/const/function exports), so updates show up. Object exports / getters can still look live in CJS."
-    },
-    {
-      "id": "cjs-getter-or-reassign",
-      "front": "How can CJS exports look live for a number?",
-      "meaning": "A getter on the exports object stays live via the object. If you assigned a primitive (exports.count2 = count2), increment must also update the exported property (exports.count2 = count2) or readers still see the old copy.",
-      "example": "const counter = require('./counter.cjs'); counter.increment(); // counter.count still 0 unless increment updates module.exports.count"
-    },
-    {
       "id": "esm-named-vs-default",
-      "front": "ESM named vs default export?",
-      "meaning": "Named: export const a = 1. Default: one per module (export default function f() {}). Import with import f, { a } from './m.mjs' or import { default as f2, a as a2 }."
-    },
-    {
-      "id": "named-tree-shake",
-      "front": "Why do named exports tree-shake more cleanly?",
-      "meaning": "Named exports map cleanly to tree-shaking (“was a used?”). Default exports are convenient but easier to rename inconsistently across files (import React vs import react)."
-    },
-    {
-      "id": "cjs-no-default",
-      "front": "Does CJS have a first-class default export?",
-      "meaning": "No. People fake it with module.exports = function f() {} and maybe module.exports.a = 1, or exports.a = 1. There is one module.exports value, not a separate default slot."
+      "front": "ESM named vs default — and does CJS have a default export?",
+      "meaning": "Named: export const a = 1. Default: one per module. Import with import f, { a } from './m.mjs'. Named exports map cleanly to tree-shaking. CJS has no first-class default — one module.exports value (module.exports = fn is a fake default). Prefer named exports in new shared libraries unless the ecosystem already uses default (React).",
+      "example": "export default function f() {}\nmodule.exports = function f() {}"
     },
     {
       "id": "esmoduleinterop",
-      "front": "Why default import from CJS is painful?",
-      "meaning": "CJS has one module.exports value, not a first-class default export; interop may wrap with .default depending on tsconfig/helpers. Named vs default mismatch drives esModuleInterop / synthetic defaults.",
-      "notes": "Without esModuleInterop / allowSyntheticDefaultImports, import fs from 'fs' may fail types or runtime; import * as fs or require differ. import pkg from 'cjs-pkg' might need pkg.default in some compile targets."
-    },
-    {
-      "id": "interop-interview-framing",
-      "front": "Interview framing for CJS/ESM default mismatch?",
-      "meaning": "Default/named mismatch plus CJS's single module.exports value is why interop flags and default wrappers exist. It's not that one system is “wrong”; they encode public API differently."
-    },
-    {
-      "id": "prefer-named-exports",
-      "front": "Named vs default for new shared libraries?",
-      "meaning": "Prefer named exports in new shared libraries when you care about clearest ESM ergonomics and shaking; follow each ecosystem's idioms (React default export is fixed by history)."
-    },
-    {
-      "id": "circular-cjs",
-      "front": "Circular require in CJS?",
-      "meaning": "Partial exports object may be returned mid-init — order of assignment matters; you can read unfinished state.",
-      "example": "b.js: module.exports = { aLoaded: a.loaded }; // may see false — a not finished"
-    },
-    {
-      "id": "circular-esm",
-      "front": "Circular ESM?",
-      "meaning": "Bindings linked first; reading an export before its module finishes initializing can throw TDZ-like errors. Prefer deferring reads to after init or calling functions later."
-    },
-    {
-      "id": "circular-esm-example",
-      "front": "export const b = 'b' + a while a.mjs imports b?",
-      "meaning": "May throw if a is not initialized yet — ESM linked the binding, but the exporting module has not finished evaluating. Cycles can work if you only call functions after both modules initialized, or avoid reading unfinished bindings at top level."
+      "front": "Why is default import from CJS painful?",
+      "meaning": "CJS has one module.exports value, not a default slot; interop may wrap with .default depending on tsconfig/helpers. Named vs default mismatch drives esModuleInterop / allowSyntheticDefaultImports. Without them, import fs from 'fs' may fail types or runtime; import pkg from 'cjs-pkg' might need pkg.default on some targets.",
+      "notes": "Interview line: the systems encode public API differently — not that one is “wrong.”"
     },
     {
       "id": "circular-interview-line",
-      "front": "CJS vs ESM cycles — one interview line?",
-      "meaning": "CJS cycles often give a partial exports object. ESM cycles give live bindings but reading too early can throw (TDZ-like). Both are reasons to avoid deep circular top-level coupling."
+      "front": "CJS vs ESM circular deps — one interview line?",
+      "meaning": "CJS cycles often return a partial exports object mid-init — assignment order matters; you can read unfinished state. ESM links bindings first; reading an export before its module finishes initializing can throw TDZ-like errors. Both are reasons to avoid deep circular top-level coupling.",
+      "example": "CJS: b sees a.loaded === false. ESM: export const b = 'b' + a may throw if a is not initialized."
     },
     {
       "id": "node-type-module",
-      "front": "Node: .mjs, .cjs, \"type\": \"module\"?",
-      "meaning": ".mjs always ESM; .cjs always CJS; package.json \"type\":\"module\" makes .js ESM; omitted/default often CJS for .js. Source import syntax ≠ runtime if tsc emits require."
-    },
-    {
-      "id": "type-commonjs-or-omitted",
-      "front": "\"type\": \"commonjs\" or omitted — what is .js?",
-      "meaning": "Treated as CJS (Node default when type is omitted or set to commonjs). \"type\": \"module\" in the nearest package.json makes .js ESM."
-    },
-    {
-      "id": "source-vs-output",
-      "front": "Source ESM syntax but Node still CJS until compile?",
-      "meaning": "Bundlers may parse ESM syntax in files that Node would still treat as CJS until compile time — your source can be ESM while output is CJS. Source syntax ≠ runtime system."
+      "front": "Node: .mjs, .cjs, \"type\": \"module\" — what is .js?",
+      "meaning": ".mjs always ESM; .cjs always CJS; package.json \"type\":\"module\" makes .js ESM; omitted or \"type\":\"commonjs\" treats .js as CJS. Don't assume .js is ESM (or CJS) without checking the nearest package.json. Source import syntax ≠ runtime if tsc emits require.",
+      "example": "\"type\": \"module\" → .js is ESM; omitted → .js is CJS"
     },
     {
       "id": "tree-shaking-why",
       "front": "Why is CJS harder to tree-shake than ESM?",
-      "meaning": "require is a runtime call — conditional, dynamic paths, try/catch — bundler can't always know used modules without executing code. Static import/export give a build-time usage graph to drop unused exports.",
-      "notes": "Static analyzability also makes import() a reliable code-split point."
-    },
-    {
-      "id": "cjs-shake-heuristic",
-      "front": "Can bundlers tree-shake “simple” CJS at all?",
-      "meaning": "Some bundlers partially shake simple CJS, but it's heuristic and fragile. ESM is the model designed for it."
-    },
-    {
-      "id": "lodash-es-pattern",
-      "front": "import _ from 'lodash' vs import { get } from 'lodash-es'?",
-      "meaning": "The practical React/Metro/Vite version of tree-shaking: named ESM exports give the graph something precise to drop. Prefer packages that ship ESM named exports when bundle size matters."
+      "meaning": "require is a runtime call — conditional, dynamic paths, try/catch — a bundler cannot always know used modules without executing code. Static import/export give a build-time usage graph to drop unused exports. Some bundlers heuristically shake simple CJS, but ESM is the model designed for it (lodash-es named imports vs import _ from 'lodash')."
     },
     {
       "id": "nest-ts-emit",
-      "front": "Nest/TS: wrote import — still ESM at runtime?",
-      "meaning": "Not necessarily — many Nest apps emit commonjs (require) while source uses import. Affects __dirname, top-level await, default import interop; check tsconfig module and package.json type."
+      "front": "Nest/TS: you wrote import — still ESM at runtime? __dirname?",
+      "meaning": "Not necessarily — many Nest apps emit commonjs (require) while source uses import. That affects __dirname, top-level await, and default-import interop; check tsconfig module and package.json type. __dirname / __filename are easy in CJS; in native ESM use import.meta.url.",
+      "notes": "Stack connection: source syntax ≠ runtime system."
     },
     {
-      "id": "dirname-esm",
-      "front": "__dirname in CJS vs native ESM?",
-      "meaning": "__dirname / __filename are easy in CJS; in ESM use import.meta.url. Using __dirname in native ESM without that conversion is a common mistake."
-    },
-    {
-      "id": "react-author-esm",
-      "front": "React / RN / Vite / Metro — what do you author?",
-      "meaning": "You author ESM. The bundler builds the static graph, tree-shakes, and code-splits on import(). Prefer packages that ship ESM named exports when bundle size matters (lodash-es pattern)."
-    },
-    {
-      "id": "reassign-exports",
-      "front": "What is wrong with exports = ... in CJS?",
-      "meaning": "It breaks the alias to module.exports. Use module.exports = ... to replace the export object. exports.foo = 1 is only safe while exports still points at module.exports."
-    },
-    {
-      "id": "mixing-js-type",
-      "front": "Mixing .js ESM/CJS expectations without checking type?",
-      "meaning": "Wrong. Node decides CJS vs ESM from \"type\", .mjs, and .cjs. Don't assume .js is ESM (or CJS) without checking the nearest package.json and extensions."
-    },
-    {
-      "id": "modules-package-scope",
-      "front": "How do modules relate to scope?",
-      "meaning": "Modules are how scope is packaged across files: module scope, no accidental script globals, explicit export surface. Live bindings are a cross-file cousin of “same binding, many readers.”"
-    },
-    {
-      "id": "circular-rhyme-tdz",
-      "front": "Circular evaluation vs TDZ — connection?",
-      "meaning": "Circular evaluation issues rhyme with TDZ: the name exists in the graph before initialization finished. CJS partial exports vs ESM TDZ on unfinished bindings are the same family of “used before ready” bugs as hoisting/TDZ."
+      "id": "top-level-this",
+      "front": "Top-level this and top-level await: CJS vs ESM?",
+      "meaning": "Node CJS wrapper: this is often the exports object (same starting object as module.exports before reassignment). ESM: this is undefined, always strict. ESM can use top-level await in supporting runtimes; CJS cannot at the top level without wrapping in an async IIFE."
     }
   ]
 }

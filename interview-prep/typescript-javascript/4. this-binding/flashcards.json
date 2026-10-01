@@ -6,71 +6,26 @@
   "modeReverse": "Meaning → prompt",
   "cards": [
     {
-      "id": "this-not-scope-chain",
-      "front": "Is this looked up like a normal variable?",
-      "meaning": "No — except for arrow functions, which have no this binding of their own. For ordinary functions, this is decided mostly by how the function is called (the call site), plus hard overrides: new, bind, and arrows."
-    },
-    {
       "id": "lexical-vs-this",
       "front": "Variables vs this — one sentence each?",
-      "meaning": "Variable lookup is lexical (where code was written). For ordinary functions, this is decided mostly by how the function is called (call site), plus new, bind, and arrows (lexical this)."
-    },
-    {
-      "id": "call-site-checklist",
-      "front": "Call-site checklist for this (ordinary vs arrow)?",
-      "meaning": "Ask: (1) called with new? (2) call/apply, or a function from bind? (3) something.fn(...)? (4) otherwise bare call → default binding. (5) If the function is an arrow, skip 1–4 for this: use the enclosing scope’s this. That ordering is the precedence list."
+      "meaning": "Variable lookup is lexical (where code was written). For ordinary functions, this is decided mostly by how the function is called (call site), plus new, bind, and arrows (lexical this). Ordinary this is not a variable on the scope chain."
     },
     {
       "id": "four-rules-precedence",
       "front": "this precedence for ordinary functions?",
-      "meaning": "Highest to lowest: new binding, explicit (call/apply/bind), implicit (obj.method()), default (bare fn()). Arrows ignore this ladder — use enclosing lexical this."
-    },
-    {
-      "id": "table-bare-fn",
-      "front": "fn() — this inside the function?",
-      "meaning": "undefined in strict mode; the global object in sloppy mode."
-    },
-    {
-      "id": "table-obj-fn",
-      "front": "obj.fn() — this inside the function?",
-      "meaning": "obj. Implicit binding: the object left of the final property access is the receiver."
-    },
-    {
-      "id": "table-call-apply",
-      "front": "fn.call(x) / fn.apply(x) — this?",
-      "meaning": "x. Explicit binding sets this (and optionally arguments) yourself."
-    },
-    {
-      "id": "table-bind",
-      "front": "const bound = fn.bind(x); bound() — this?",
-      "meaning": "x, permanently for that bound function."
-    },
-    {
-      "id": "table-new",
-      "front": "new Fn() — this?",
-      "meaning": "The newly created instance (unless the constructor returns another object)."
-    },
-    {
-      "id": "table-arrow",
-      "front": "Arrow function — this?",
-      "meaning": "Whatever this was in the enclosing lexical scope. Call-site rules 1–4 do not apply."
+      "meaning": "Highest to lowest: new (the instance), explicit (call/apply/bind), implicit (obj.method()), default (bare fn() → undefined in strict, global in sloppy). Arrows ignore this ladder — use enclosing lexical this."
     },
     {
       "id": "default-binding-strict",
       "front": "Bare fn() — this in strict vs sloppy?",
-      "meaning": "Strict (modules, class bodies, 'use strict'): undefined. Sloppy: global object (globalThis). Modern React/TS/ESM → expect undefined on detached calls.",
+      "meaning": "Strict (modules, class bodies, 'use strict'): undefined. Sloppy: global object (globalThis). Modern React/TS/ESM → expect undefined on detached calls, not window.",
       "example": "'use strict'; function f() { return this; } f(); // undefined"
     },
     {
       "id": "detached-method",
       "front": "const detached = obj.read; detached()?",
-      "meaning": "Default binding — not obj.read(). Implicit binding needs call shape receiver.method(); a bare function reference loses the receiver.",
+      "meaning": "Default binding — not obj. Implicit binding needs receiver.method(). Same family: setTimeout(obj.method, 0), const { greet } = obj; greet(). In strict, reading this.x throws. Fix: obj.read.bind(obj), or an arrow that captures lexical this.",
       "notes": "strict: TypeError reading property of undefined."
-    },
-    {
-      "id": "settimeout-method-ref",
-      "front": "setTimeout(obj.method, 0) — this inside method?",
-      "meaning": "Default binding. The timer later does a bare call, not obj.method(), so implicit binding never applies. Same family as passing this.handleClick as a callback."
     },
     {
       "id": "implicit-receiver",
@@ -79,37 +34,15 @@
       "example": "a.b.greet(); // 'b' — receiver is a.b"
     },
     {
-      "id": "why-implicit-exists",
-      "front": "Why does implicit binding exist?",
-      "meaning": "Methods need a convenient reference to “the object I was invoked on” without passing that object as an argument every time."
-    },
-    {
-      "id": "losing-implicit-forms",
-      "front": "What loses implicit binding?",
-      "meaning": "Anything that separates the function from the call’s receiver: const greet = a.b.greet; greet(); setTimeout(a.b.greet, 0); const { greet: g } = a.b; g(); All become default binding."
-    },
-    {
       "id": "foreach-thisarg",
       "front": "[1].forEach(user.print) vs forEach(user.print, user)?",
-      "meaning": "Without thisArg, this is not user (forEach may set its own thisArg; without it, default / undefined in strict). With thisArg user, explicit thisArg is OK. Wrapping [1].forEach(() => user.print()) keeps the call shape user.print().",
+      "meaning": "Without thisArg, this is not user. With thisArg user, explicit thisArg is OK. Wrapping [1].forEach(() => user.print()) keeps the call shape user.print().",
       "example": "[1].forEach(user.print); // not user\n[1].forEach(user.print, user); // OK\n[1].forEach(() => user.print());"
     },
     {
       "id": "call-apply-bind-roles",
       "front": "call vs apply vs bind?",
-      "meaning": "call: invoke immediately with listed args. apply: invoke immediately with args as an array (or array-like). bind: return a new function permanently tied to thisArg (and optional partial args)."
-    },
-    {
-      "id": "intro-call-apply-bind",
-      "front": "intro.call(person,'Hi') vs apply vs bound('Hey')?",
-      "meaning": "call → 'Hi, Nika'. apply(person, ['Hi']) → 'Hi, Nika'. bind(person) then bound('Hey') → 'Hey, Nika'.",
-      "example": "function intro(greeting) { return `${greeting}, ${this.name}`; }"
-    },
-    {
-      "id": "bind-purpose",
-      "front": "Why fn.bind(thisArg)?",
-      "meaning": "Returns a new function permanently tied to thisArg for later bare calls (e.g. setTimeout). bind does not mutate the original function. Bound this sticks — later call/apply won't rebind as beginners expect.",
-      "example": "const stable = obj.read.bind(obj); setTimeout(stable, 0); // this === obj"
+      "meaning": "call: invoke immediately with listed args. apply: invoke immediately with args as an array (or array-like). bind: return a new function permanently tied to thisArg (and optional partial args); it does not mutate the original. add.bind(null, 10)(5) is 15."
     },
     {
       "id": "bind-call-apply-stick",
@@ -122,12 +55,6 @@
       "meaning": "Strict mode: this is actually that value (null or undefined). Sloppy mode: they coerce to the global object."
     },
     {
-      "id": "bind-partial-add10",
-      "front": "add.bind(null, 10) then add10(5)?",
-      "meaning": "15. bind creates a new exotic function; useful for partial application as well as this.",
-      "example": "function add(a, b) { return a + b; } const add10 = add.bind(null, 10); add10(5); // 15"
-    },
-    {
       "id": "new-four-steps",
       "front": "What does new Fn(...args) roughly do?",
       "meaning": "(1) Create a new ordinary object. (2) Set that object’s prototype link from Fn.prototype. (3) Call Fn with this bound to the new object. (4) If the constructor returns an object, that object is the result; otherwise use the new object.",
@@ -136,7 +63,7 @@
     {
       "id": "new-vs-bind",
       "front": "new Bound() when F was bound to obj?",
-      "meaning": "new wins over bind's thisArg for construction — this is the new instance, not obj. new has highest precedence among ordinary call-site rules.",
+      "meaning": "new wins over bind’s thisArg for construction — this is the new instance, not obj. new has highest precedence among ordinary call-site rules.",
       "example": "const Bound = F.bind(obj); const x = new Bound(); x.tag; // 'instance'"
     },
     {
@@ -147,30 +74,25 @@
     {
       "id": "arrow-no-own-this",
       "front": "Do arrow functions get this from the four call-site rules?",
-      "meaning": "No. They have no own this binding. Evaluating this inside an arrow resolves like a variable in the enclosing lexical scope (the this that the outer non-arrow context would see — or the outer arrow’s inherited this, and so on)."
+      "meaning": "No. They have no own this binding. Evaluating this inside an arrow resolves like a variable in the enclosing lexical scope. They also have no own arguments; new arrow → TypeError; no own super the way methods do."
     },
     {
       "id": "arrow-object-literal",
       "front": "arrow: () => ... as object property — this?",
-      "meaning": "Not the object. Object literals don't create a this binding for the arrow; it captures lexical this from outside (often undefined in modules), not implicit obj.",
+      "meaning": "Not the object. Object literals don’t create a this binding for the arrow; it captures lexical this from outside (often undefined in modules), not implicit obj. Do not use arrows as prototype methods that need per-call receivers.",
       "example": "obj.regular(); // this=obj. obj.arrow(); // lexical, typically undefined name."
-    },
-    {
-      "id": "detached-regular-from-obj",
-      "front": "const detached = obj.regular; detached()?",
-      "meaning": "Default binding — undefined in strict / TypeError on property access. regular used implicit binding only when called as obj.regular().",
-      "example": "obj.regular(); // 'nika'\nconst detached = obj.regular; detached(); // default"
     },
     {
       "id": "arrow-settimeout",
       "front": "Why arrow in setTimeout inside start() fixes this.ms?",
-      "meaning": "Arrow has no own this; it uses this from enclosing start() where implicit binding made this the timer object. Regular function callback gets default binding, not timer2.",
+      "meaning": "Arrow has no own this; it uses this from enclosing start() where implicit binding made this the timer object. A regular function callback gets default binding, not the timer.",
       "example": "timer.start(); // arrow logs this.ms from timer\nsetTimeout(function () { console.log(this.ms); } // default, not timer2"
     },
     {
-      "id": "arrows-lack-arguments-new-super",
-      "front": "What else do arrows lack besides own this?",
-      "meaning": "No own arguments; cannot be used as constructors (new arrow → TypeError); no own super binding in the same way methods do. For this interviews, the headline is: lexical this, call site ignored."
+      "id": "nested-arrow-implicit",
+      "front": "obj.f() returns arrow; arrow() — this?",
+      "meaning": "obj if f was called as obj.f() — the arrow captured this from f’s implicit binding at the call that created it.",
+      "example": "const obj = { f() { return () => this; } }; const arrow = obj.f(); arrow(); // obj"
     },
     {
       "id": "new-arrow-typeerror",
@@ -178,78 +100,10 @@
       "meaning": "TypeError. Arrow functions cannot be used as constructors."
     },
     {
-      "id": "class-field-arrow",
-      "front": "Class field arrow handleClick = () => {} — this?",
-      "meaning": "Created per instance where this is the instance, so the arrow lexically captures that instance — stable this when passed as detached handler (React class pattern)."
-    },
-    {
-      "id": "precedence-obj-f-and-call",
-      "front": "obj.f() vs f.call(obj) — this === obj?",
-      "meaning": "Both true for a non-arrow f. obj.f() is implicit; f.call(obj) is explicit.",
-      "example": "const obj = { f }; obj.f() === obj; // true\nf.call(obj) === obj; // true"
-    },
-    {
-      "id": "nested-arrow-implicit",
-      "front": "obj.f() returns arrow; arrow() — this?",
-      "meaning": "obj if f was called as obj.f() — the arrow captured this from f's implicit binding at the call that created it.",
-      "example": "const obj = { f() { return () => this; } }; const arrow = obj.f(); arrow(); // obj"
-    },
-    {
       "id": "react-class-onclick",
       "front": "onClick={this.handleClick} breaks because?",
-      "meaning": "React invokes a bare function reference, not component.handleClick(), so implicit binding never applies; class bodies are strict → this is undefined → this.props throws.",
-      "notes": "Fix: constructor bind, class field arrow, or inline () => this.handleClick()."
-    },
-    {
-      "id": "react-handler-why-steps",
-      "front": "React class handler bug — five mechanism steps?",
-      "meaning": "(1) this.handleClick evaluates to a function reference. (2) React stores and later invokes it as a bare callback. (3) Implicit binding requires receiver.method(). (4) Class bodies are strict → default this is undefined. (5) Reading this.props throws."
-    },
-    {
-      "id": "react-three-fixes",
-      "front": "Three fixes for the React class this.handleClick bug?",
-      "meaning": "(1) Constructor bind: this.handleClick = this.handleClick.bind(this). (2) Class field arrow: handleClick = () => { ... } (lexical this). (3) Inline arrow in render: onClick={() => this.handleClick()} — call shape restores implicit binding (new function each render; sometimes relevant for memoization/perf). Function components sidestep this because there's no this.",
+      "meaning": "React invokes a bare function reference, not component.handleClick(), so implicit binding never applies; class bodies are strict → this is undefined → this.props throws. Fixes: constructor bind; class field arrow handleClick = () => {} (lexical instance this); inline onClick={() => this.handleClick()}. Function components sidestep this because there is no this.",
       "notes": "Modern codebases often avoid the issue with function components."
-    },
-    {
-      "id": "react-handler-spoken",
-      "front": "React onClick={this.handleClick} — spoken answer?",
-      "meaning": "this.handleClick is passed as a bare reference to onClick — React calls it as a plain function, not as this.handleClick(), so the implicit binding rule never applies and this falls back to undefined in strict mode (all ES modules and class bodies are strict by default). Three fixes: bind in the constructor; use a class field arrow which lexically captures this; or pass an inline arrow at the call site. Function components sidestep this because there's no this to bind."
-    },
-    {
-      "id": "destructure-loses-this",
-      "front": "const { greet } = a.b; greet()?",
-      "meaning": "Default binding — destructuring extracts the function without the receiver; call is greet(), not a.b.greet()."
-    },
-    {
-      "id": "this-not-enclosing-object",
-      "front": "Does this mean the function’s enclosing object in the source?",
-      "meaning": "For ordinary functions, no — look at the call. Object-literal arrows do not get that object as this either; they bind lexically to the enclosing scope’s this, which may be undefined in modules."
-    },
-    {
-      "id": "arrows-not-object-they-are-on",
-      "front": "Do arrows bind this to the object they are defined on?",
-      "meaning": "No. They bind lexically to the enclosing scope’s this, which may be undefined in modules — not “the object they are defined on.”"
-    },
-    {
-      "id": "closures-vs-this-slot",
-      "front": "Closures vs this — which slot?",
-      "meaning": "Closures capture variables lexically. Ordinary this is not a variable lookup (arrows make this behave like lexical capture). Closures answer which variable binding; this answers which receiver object for non-arrows. Mixing the two explanations is a common interview failure."
-    },
-    {
-      "id": "bind-does-not-mutate",
-      "front": "Does bind mutate the original function?",
-      "meaning": "No. It returns a new function."
-    },
-    {
-      "id": "arrows-wrong-for-dynamic-this",
-      "front": "Use arrows as prototype methods that need dynamic this?",
-      "meaning": "Avoid that. If you need per-call receivers (e.g. borrowing methods), use regular functions."
-    },
-    {
-      "id": "strict-modern-not-window",
-      "front": "Bare calls in modern React/TS/ESM — this is window?",
-      "meaning": "No. Forgetful sloppy-mode thinking. Bare calls in modern React/TS/ESM are undefined, not window. Class bodies and modules are strict."
     }
   ]
 }

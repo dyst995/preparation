@@ -8,17 +8,12 @@
     {
       "id": "structural-and-erased-pair",
       "front": "Two facts that define TS's type system?",
-      "meaning": "It is structural (compatibility by shape, not by name) and erased (types exist at compile time only; runtime is plain JavaScript). That pair explains unnamed objects satisfying interfaces, why instanceof SomeInterface is impossible, why Nest/zod validation is the runtime half of safety, and how tsc relates to Babel/SWC."
+      "meaning": "It is structural (compatibility by shape, not by name) and erased (types exist at compile time only; runtime is plain JavaScript). That pair explains unnamed objects satisfying interfaces, why instanceof SomeInterface is impossible, and why Nest/zod validation is the runtime half of safety."
     },
     {
       "id": "structural-typing",
       "front": "Structural typing in TS?",
-      "meaning": "Two types are compatible when their members match — the needed shape is present — not because they share a declared name or inheritance relationship. Unrelated types with the same fields are often assignable."
-    },
-    {
-      "id": "duck-typing-high-level",
-      "front": "Is structural typing “duck typing”?",
-      "meaning": "At a high level yes: if it has the properties you need, it fits. That is a teaching label for shape compatibility, not a second type system."
+      "meaning": "Two types are compatible when their members match — the needed shape is present — not because they share a declared name. Unrelated types with the same fields are often assignable (accidental structural match). High-level “duck typing”: if it has the properties you need, it fits."
     },
     {
       "id": "extra-z-variable",
@@ -27,67 +22,32 @@
       "example": "const obj = { x: 1, y: 2, z: 3 }; logPoint(obj); // OK"
     },
     {
-      "id": "why-structural-mirrors-js",
-      "front": "Why is TypeScript structural?",
-      "meaning": "JavaScript is already structural in practice: APIs care about properties and methods, not class pedigrees. TypeScript mirrors that so typing feels natural for JS, including plain objects and JSON-shaped data."
-    },
-    {
-      "id": "named-types-no-runtime-brands",
-      "front": "Do named TS types create runtime brands?",
-      "meaning": "No. Interfaces and type names are compile-time. They do not invent runtime brands you can instanceof."
-    },
-    {
-      "id": "accidental-structural-match",
-      "front": "Unrelated types with the same fields?",
-      "meaning": "Often assignable under structural typing. Accidental structural matches are a real consequence — two unrelated types with the same members can pass where a nominal language would refuse."
-    },
-    {
-      "id": "structural-vs-nominal",
-      "front": "Structural vs nominal (Java/C#)?",
-      "meaning": "Structural (TS): compatibility when the shape matches. Nominal (typical Java/C#): you need an explicit type relationship — extends, implements, or the same declared type. Unrelated same-shape types are often assignable in TS and not assignable nominally without casts/adapters."
-    },
-    {
-      "id": "nominal-interfaces-runtime",
-      "front": "Interfaces at runtime — TS vs typical Java/C#?",
-      "meaning": "In TS, interfaces are erased. In typical nominal OO, types are often reflective / present at runtime."
-    },
-    {
-      "id": "approximate-nominal",
-      "front": "Can TS approximate nominal typing?",
-      "meaning": "Yes, with private fields or branded/unique-symbol patterns when you need intentional distinction. Advanced topic — default answer is TS is structural by default."
-    },
-    {
       "id": "excess-property-literal",
       "front": "logPoint({ x:1, y:2, z:3 }) error?",
-      "meaning": "Excess property checks on a fresh object literal — a special soundness aid on top of structural typing. z is excess when the literal is passed directly where Point is expected.",
+      "meaning": "Excess property checks on a fresh object literal — a soundness aid on top of structural typing, not a switch to nominal typing. z is excess when the literal is passed directly where Point is expected.",
       "example": "logPoint({ x: 1, y: 2, z: 3 }); // Error: z is excess on a fresh literal"
     },
     {
       "id": "why-literal-vs-variable-asymmetry",
       "front": "Why is extra z OK on obj but an error on a fresh literal?",
       "meaning": "Variable obj already exists with its own inferred type; assigning it to Point only asks whether it has x and y. A fresh literal is checked more strictly for typos and unintended fields.",
-      "notes": "Mental model for this unit: structural typing plus a literal-specific guard. Full excess-property rules are the next curriculum section."
+      "notes": "Structural typing plus a literal-specific guard."
     },
     {
-      "id": "excess-not-nominal",
-      "front": "Do excess property errors mean TS is nominal?",
-      "meaning": "No. They are a special check on fresh literals within a structural system, not a switch to name-based compatibility."
+      "id": "structural-vs-nominal",
+      "front": "Structural vs nominal (Java/C#)?",
+      "meaning": "Structural (TS): compatible when the shape matches. Nominal (typical Java/C#): you need an explicit type relationship — extends, implements, or the same declared type. Same-shape unrelated types often assign in TS and not in Java/C#. TS interfaces are erased; typical nominal OO types are often reflective at runtime."
+    },
+    {
+      "id": "approximate-nominal",
+      "front": "Can TS approximate nominal typing?",
+      "meaning": "Yes, with private fields or branded/unique-symbol patterns when you need intentional distinction. Default answer: TS is structural."
     },
     {
       "id": "type-erasure",
       "front": "What is type erasure?",
-      "meaning": "Type annotations, interfaces, type aliases, generic parameters as types, and most type-only constructs are removed during emit. The output is JavaScript with no type metadata — unless you use experimental/decorator emit, which still does not make interfaces runtime values."
-    },
-    {
-      "id": "erasure-emit-id-generic",
-      "front": "What does function id<T>(x: T): T emit as?",
-      "meaning": "Approximately function id(x) { return x; } — the generic and annotations are gone. Runtime is plain JS.",
+      "meaning": "Annotations, interfaces, type aliases, generic type parameters, and most type-only constructs are removed during emit. Output is JavaScript with no type metadata. Types guide the compiler; they do not execute.",
       "example": "function id<T>(x: T): T { return x; }\n// emit: function id(x) { return x; }"
-    },
-    {
-      "id": "why-erasure-typed-layer",
-      "front": "Why does TypeScript erase types?",
-      "meaning": "TypeScript is a typed layer on JavaScript, not a separate VM. Runtime remains the JS engine you already run (Node, Hermes, browsers). Types guide the compiler and editor; they do not execute."
     },
     {
       "id": "instanceof-interface",
@@ -96,15 +56,9 @@
       "example": "interface User { id: string; }\n// value instanceof User // Error — User is not a value"
     },
     {
-      "id": "generic-json-parse",
-      "front": "parse<T>(raw) { return JSON.parse(raw) }?",
-      "meaning": "No runtime checks against generic T. It lies to the type system; runtime is just JSON.parse. Generics do not enforce element types after JSON.parse or network I/O.",
-      "example": "function parse<T>(raw: string): T { return JSON.parse(raw); }"
-    },
-    {
       "id": "class-instanceof",
       "front": "When does instanceof work in TS/JS?",
-      "meaning": "Classes do leave runtime values — the constructor function — so instanceof checks the prototype chain vs that constructor. Type aliases and interfaces emit nothing.",
+      "meaning": "Classes leave a runtime constructor, so instanceof checks the prototype chain. Type aliases and interfaces emit nothing.",
       "example": "class User { constructor(public id: string) {} }\nnew User('1') instanceof User; // true at runtime"
     },
     {
@@ -113,110 +67,31 @@
       "meaning": "Not always. Enums may emit runtime objects depending on const enum / preserve settings. Do not lump “all TS syntax vanishes equally.”"
     },
     {
-      "id": "typeof-two-worlds",
-      "front": "JS typeof vs TS typeof in type position?",
-      "meaning": "JS typeof checks runtime values (typeof x === 'string'). TypeScript's type-level typeof in type positions is a compile-time query of a value's type. Same keyword, different worlds."
+      "id": "generic-json-parse",
+      "front": "parse<T>(raw) { return JSON.parse(raw) }?",
+      "meaning": "No runtime checks against generic T. It lies to the type system; runtime is just JSON.parse. Generics do not enforce shapes after JSON.parse or network I/O.",
+      "example": "function parse<T>(raw: string): T { return JSON.parse(raw); }"
     },
     {
       "id": "runtime-validation-options",
       "front": "Runtime “is this a User?” check?",
-      "meaning": "Interfaces are compile-time only and fully erased — nothing to instanceof. Use classes for prototype checks, or a type predicate / zod / io-ts / Nest class-validator + DTOs for real shape checks (and optionally derive static types from the same schema).",
+      "meaning": "A type annotation checks nothing at runtime — it is erased. Use JS checks the compiler can follow (typeof, instanceof on classes, 'prop' in obj, Array.isArray), a type predicate (x is User), or a schema library (zod / io-ts / Nest class-validator + DTOs). Validators are the runtime half of safety, not extra typing.",
       "notes": "Preserved interview framing."
-    },
-    {
-      "id": "type-predicate-is-user",
-      "front": "What is a custom type predicate for User?",
-      "meaning": "A function like function isUser(x: unknown): x is User { ... } that runs real JS checks and tells the checker to narrow. It is runtime logic plus a type-level claim, not a surviving interface."
-    },
-    {
-      "id": "runtime-check-typeof",
-      "front": "What does value-level typeof actually check?",
-      "meaning": "JS typeof tags. It exists because of the language runtime, not because of TS annotations."
-    },
-    {
-      "id": "runtime-check-instanceof",
-      "front": "What does instanceof actually check?",
-      "meaning": "Prototype chain versus a constructor. It exists because classes/functions are values. That is why instanceof works for classes and not for interfaces."
-    },
-    {
-      "id": "runtime-check-in",
-      "front": "What does 'prop' in obj actually check?",
-      "meaning": "Property presence on objects. TypeScript may narrow when it sees the check; the check itself is JS."
-    },
-    {
-      "id": "runtime-check-array-isarray",
-      "front": "What does Array.isArray actually check?",
-      "meaning": "The runtime array brand. It is a JS check, not a TS type surviving emit."
-    },
-    {
-      "id": "runtime-check-zod-class-validator",
-      "front": "What do zod / class-validator actually check?",
-      "meaning": "Schema rules you wrote — your code or libraries. They are the runtime half of safety, not extra typing on top of interfaces."
-    },
-    {
-      "id": "runtime-check-annotation-nothing",
-      "front": "What does a TS type annotation check at runtime?",
-      "meaning": "Nothing. It is erased. Nest/zod validation is not optional extra typing — it is the runtime half of safety."
-    },
-    {
-      "id": "control-flow-narrowing",
-      "front": "typeof / in / instanceof — who narrows?",
-      "meaning": "TypeScript may narrow types when it sees these checks in control flow. That is the checker following your runtime logic, not types existing at runtime."
     },
     {
       "id": "tsc-vs-babel",
       "front": "tsc vs Babel/SWC on TS?",
-      "meaning": "tsc type-checks the program and/or emits JS (configurable). Babel/SWC transform/strip TS syntax for speed and often do not type-check. Strip is not check — a green Babel/SWC build can ship unsound assumptions if nobody ran tsc."
-    },
-    {
-      "id": "ide-language-service",
-      "front": "What does the IDE language service do for TS?",
-      "meaning": "It uses TypeScript for squiggles as you type. That is editor checking, not proof that the production emit pipeline ran tsc."
-    },
-    {
-      "id": "common-ts-pipelines",
-      "front": "Three common tsc / bundler pipelines?",
-      "meaning": "1) tsc alone — check and emit. 2) tsc --noEmit plus a bundler (SWC/esbuild/Babel) — CI/typecheck separate from fast emit. 3) Babel/SWC only — fast builds; types can be wrong until something runs tsc --noEmit."
-    },
-    {
-      "id": "we-use-ts-not-equal-checked",
-      "front": "“We use TypeScript” — does every build type-check?",
-      "meaning": "Not unless CI (or the emit path) runs the checker. Erasure means a green Babel build can still ship unsound assumptions if nobody ran tsc --noEmit."
+      "meaning": "tsc type-checks and/or emits JS. Babel/SWC often only strip TS syntax — strip is not check. Common pipelines: tsc alone; tsc --noEmit plus a bundler; bundler-only (types can be wrong until CI runs tsc). “We use TypeScript” does not mean every build type-checks."
     },
     {
       "id": "emit-decorator-metadata",
       "front": "Nest DI metadata — do interfaces survive erasure?",
-      "meaning": "No. emitDecoratorMetadata / reflect-metadata is extra emit, usually around classes — constructor param types as runtime hints for the container. It is not interfaces surviving as runtime values."
+      "meaning": "No. emitDecoratorMetadata / reflect-metadata is extra emit around classes — constructor param types as runtime hints for the container. It is not interfaces surviving as runtime values."
     },
     {
-      "id": "structural-not-no-safety",
-      "front": "Does structural typing mean no type safety?",
-      "meaning": "No. The program is still checked at compile time. The rule is shape compatibility, not “unchecked,” and not the same rule as nominal typing."
-    },
-    {
-      "id": "types-not-at-runtime-trap",
-      "front": "Do TypeScript types exist at runtime?",
-      "meaning": "No, with limited enum/class exceptions for values (constructors, some enum objects). Interfaces and annotations do not."
-    },
-    {
-      "id": "connection-js-shapes-to-structural",
-      "front": "How does JS runtime shape-care connect to TS?",
-      "meaning": "JS cares about shapes at runtime; TS structural typing mirrors that at compile time. Types are then erased on emit, so runtime safety still needs JS checks or validators."
-    },
-    {
-      "id": "connection-ci-must-typecheck",
-      "front": "tsc checks vs Babel/SWC strip — CI implication?",
-      "meaning": "tsc checks; Babel/SWC may only strip. CI must still type-check if the bundler is the emit path."
-    },
-    {
-      "id": "next-section-foundation",
-      "front": "What does type vs interface sit on?",
-      "meaning": "This foundation: same structural rules, different declaration tools. Excess property details continue in the next curriculum section; here you only need the seed of why people get surprised."
-    },
-    {
-      "id": "interview-one-liner",
-      "front": "Strong one-liner for structural + erased?",
-      "meaning": "TypeScript checks shapes at compile time and deletes those checks from the output; anything you need at runtime you must validate with real JavaScript (or a library that generates both)."
+      "id": "typeof-two-worlds",
+      "front": "JS typeof vs TS typeof in type position?",
+      "meaning": "JS typeof checks runtime values (typeof x === 'string'). TypeScript's type-level typeof in type positions is a compile-time query of a value's type. Same keyword, different worlds."
     }
   ]
 }

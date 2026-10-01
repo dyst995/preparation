@@ -8,41 +8,19 @@
     {
       "id": "basic-syntax",
       "front": "How do you read T extends U ? X : Y?",
-      "meaning": "At the type level, extends means is assignable to, not class inheritance. The conditional picks X if T is assignable to U, otherwise Y.",
+      "meaning": "At the type level, extends means is assignable to, not class inheritance. The conditional picks X if T is assignable to U, otherwise Y. IsString<'hello'> is true; IsString<42> is false.",
       "example": "type IsString<T> = T extends string ? true : false;"
-    },
-    {
-      "id": "is-string-outputs",
-      "front": "What are IsString<'hello'> and IsString<42>?",
-      "meaning": "true and false. 'hello' is assignable to string; 42 is not. That is the basic type-level branch.",
-      "example": "type A = IsString<'hello'>; // true\ntype B = IsString<42>; // false"
-    },
-    {
-      "id": "why-conditionals-exist",
-      "front": "What do conditionals add that generics alone do not?",
-      "meaning": "Generics parameterize; conditionals branch on relationships between types. That lets you filter unions, unwrap wrappers, and pick APIs based on input shape."
-    },
-    {
-      "id": "powers-builtins",
-      "front": "Which built-ins are powered by conditional types?",
-      "meaning": "Exclude, Extract, NonNullable, ReturnType, Parameters, Awaited, plus custom unwrap / branch-on-shape helpers. Utility types are consumers of this machinery."
-    },
-    {
-      "id": "id-of-shape",
-      "front": "What does T extends { id: infer Id } ? Id : never capture?",
-      "meaning": "If T has an id property, infer binds Id to that property's type and the true branch returns it; otherwise never. Pattern for 'property type if present'.",
-      "example": "type IdOf<T> = T extends { id: infer Id } ? Id : never;"
     },
     {
       "id": "distributive-conditional",
       "front": "What is ToArray<string | number> when ToArray is T extends any ? T[] : never?",
-      "meaning": "When T is a naked type parameter and a union, the conditional distributes once per member: string[] | number[], not (string | number)[]. Evaluation is ToArray<string> | ToArray<number>. This is how Exclude and Extract filter unions.",
+      "meaning": "When T is a naked type parameter and a union, the conditional distributes once per member: string[] | number[], not (string | number)[]. Evaluation is ToArray<string> | ToArray<number>. This is how Exclude and Extract filter unions. Expecting a single array of the union is the usual trap.",
       "example": "type Result = ToArray<string | number>; // string[] | number[]"
     },
     {
       "id": "naked-type-parameter",
       "front": "When does a conditional distribute over a union?",
-      "meaning": "Only when the checked type is a naked type parameter — just T, not wrapped in a tuple, array, or similar — and T is a union. Distribution runs the conditional once per member, then unions the results. Distribution is only for naked type params in the checked position."
+      "meaning": "Only when the checked type is a naked type parameter — just T, not wrapped in a tuple, array, or similar — and T is a union. Distribution runs the conditional once per member, then unions the results."
     },
     {
       "id": "disable-distribution",
@@ -53,7 +31,7 @@
     {
       "id": "exclude-sketch",
       "front": "How is Exclude implemented?",
-      "meaning": "MyExclude<T, U> = T extends U ? never : T. Each union member is tested; matches become never and disappear from the union. That is the filter trick behind Exclude. Do not reinvent it for ordinary union filtering.",
+      "meaning": "MyExclude<T, U> = T extends U ? never : T. Each union member is tested; matches become never and disappear from the union — never members vanish. Do not reinvent it for ordinary union filtering.",
       "example": "type WithoutB = MyExclude<'a' | 'b' | 'c', 'b'>; // 'a' | 'c'"
     },
     {
@@ -63,26 +41,16 @@
       "example": "type OnlyB = MyExtract<'a' | 'b' | 'c', 'b'>; // 'b'"
     },
     {
-      "id": "never-vanishes",
-      "front": "Why does never disappear from union results?",
-      "meaning": "never members vanish from unions. Rejected conditional branches use never so filtered members disappear — the mechanism Exclude and Extract rely on."
-    },
-    {
       "id": "infer-capture",
       "front": "What does infer do?",
-      "meaning": "Inside an extends clause, infer Name introduces a new type variable bound to whatever matched that position, usable in the true branch. You cannot use infer outside an extends clause.",
+      "meaning": "Inside an extends clause, infer Name introduces a new type variable bound to whatever matched that position, usable in the true branch. You cannot use infer outside an extends clause. If the pattern does not match, the false branch runs (often never).",
       "notes": "Using infer outside extends is a listed misconception."
     },
     {
       "id": "element-type-array",
       "front": "What is ElementType<string[]> vs ElementType<string>?",
-      "meaning": "string, and never. ElementType<T> = T extends (infer U)[] ? U : never infers the array element when T matches an array; otherwise the false branch is never.",
+      "meaning": "string, and never. ElementType<T> = T extends (infer U)[] ? U : never infers the array element when T matches an array; otherwise the false branch is never. Flatten one level without never by using T on the false branch: T extends (infer U)[] ? U : T.",
       "example": "type A = ElementType<string[]>; // string\ntype C = ElementType<string>; // never"
-    },
-    {
-      "id": "flatten-one-level",
-      "front": "How do you flatten one level of an array type without turning non-arrays into never?",
-      "meaning": "T extends (infer U)[] ? U : T — unwrap the element if T is an array, otherwise keep T. That differs from ElementType, which uses never on the false branch."
     },
     {
       "id": "return-type-sketch",
@@ -103,30 +71,10 @@
       "example": "type A = MyAwaited<Promise<Promise<string>>>; // string"
     },
     {
-      "id": "infer-interview-answer",
-      "front": "Interview one-liner: what is infer, and how does ReturnType use it?",
-      "meaning": "infer captures a matched piece of a type in a conditional and reuses it in the result. ReturnType is roughly F extends (...args: any[]) => infer R ? R : never. Practically: type UserDto = Awaited<ReturnType<typeof userService.findById>> so DTOs do not drift from the service."
-    },
-    {
-      "id": "multiple-infers",
-      "front": "Can a conditional use more than one infer?",
-      "meaning": "Yes. FirstArg binds the first parameter: F extends (first: infer A, ...rest: any[]) => any ? A : never. If the pattern does not match, the false branch runs — never in many helpers.",
-      "example": "type FirstArg<F> = F extends (first: infer A, ...rest: any[]) => any ? A : never;"
-    },
-    {
-      "id": "infer-no-match",
-      "front": "What happens when an infer pattern does not match?",
-      "meaning": "The false branch runs. Helpers often use never there, so a non-matching input becomes never rather than a captured piece."
-    },
-    {
-      "id": "practical-filter-unwrap",
-      "front": "Which built-ins should you use to filter a union or unwrap a Promise?",
-      "meaning": "Filter a union with Exclude or Extract — do not reinvent. Unwrap Promise with Awaited. Function I/O types with ReturnType and Parameters."
-    },
-    {
-      "id": "property-if-present",
-      "front": "How do you take a property type only if it is present?",
-      "meaning": "T extends { x: infer X } ? X : never. Same idea as IdOf: match a shape, infer the field, otherwise never."
+      "id": "id-of-shape",
+      "front": "What does T extends { id: infer Id } ? Id : never capture?",
+      "meaning": "If T has an id property, infer binds Id to that property's type and the true branch returns it; otherwise never. Pattern for 'property type if present'.",
+      "example": "type IdOf<T> = T extends { id: infer Id } ? Id : never;"
     },
     {
       "id": "service-dto-derive",
@@ -136,63 +84,18 @@
     {
       "id": "when-custom-overkill",
       "front": "When should you write a custom conditional type?",
-      "meaning": "Day-to-day app code rarely needs hand-rolled conditionals; most value is using built-ins. Write a custom one when deriving from an existing function or API shape would otherwise drift, or when building a shared library util type — not for one-off DTOs. Deep recursive conditionals for one-off app DTOs are overkill and can slow the checker."
-    },
-    {
-      "id": "prefer-builtins-first",
-      "front": "Should you reimplement ReturnType in app code?",
-      "meaning": "No. Prefer built-ins first; custom conditionals when derivation removes real duplication. Reimplementing ReturnType poorly instead of using the built-in is a listed mistake. Explaining how Exclude and ReturnType work still proves interview depth beyond memorizing names."
+      "meaning": "Day-to-day app code rarely needs hand-rolled conditionals; use Exclude, Extract, Awaited, ReturnType, Parameters. Write a custom one when deriving from an existing function or API shape would otherwise drift, or when building a shared library util — not for one-off DTOs. Deep recursive conditionals for one-off app DTOs are overkill and can slow the checker."
     },
     {
       "id": "never-distributes",
       "front": "What happens with never extends X ? A : B?",
-      "meaning": "never distributes, which can surprise you because never is an empty union — distribution over no members yields never. Empty-union distribution is the edge case to name.",
+      "meaning": "never distributes, which can surprise you because never is an empty union — distribution over no members yields never. Empty-union distribution is the edge case to name, not a simple 'never is assignable to everything' shortcut.",
       "notes": "never extends X is not a simple 'never is assignable to everything' interview shortcut once distribution applies."
     },
     {
       "id": "extends-check-order",
       "front": "Does the order of extends checks matter?",
       "meaning": "Yes, for overlapping patterns. Put more specific patterns first, like overload order. A later, broader match can steal cases the specific branch should have taken."
-    },
-    {
-      "id": "any-in-conditional",
-      "front": "Why avoid any in conditional checks?",
-      "meaning": "any extends X can behave oddly and take both branches in edge cases. Avoid baking any into conditional logic."
-    },
-    {
-      "id": "extends-not-inheritance",
-      "front": "Is type-level extends the same as class inheritance?",
-      "meaning": "No. Read extends as assignability. Reading it as inheritance-only is a listed misconception and will mis-explain conditionals."
-    },
-    {
-      "id": "distribution-expectation-trap",
-      "front": "Why do people expect ToArray<string | number> to be (string | number)[]?",
-      "meaning": "They forget distribution. A naked T distributes, so you get string[] | number[] unless you wrap T to disable it. That expectation without disabling distribution is a listed trap."
-    },
-    {
-      "id": "connections-type-level-if",
-      "front": "How do conditionals connect to Exclude and Extract?",
-      "meaning": "T extends U ? is a type-level if. Naked T distributes over unions, and that distribution is how Exclude and Extract filter members."
-    },
-    {
-      "id": "connections-infer-builtins",
-      "front": "How does infer connect to ReturnType, Parameters, and ElementType?",
-      "meaning": "infer R binds a matched piece; ReturnType, Parameters, and ElementType are that pattern on function returns, argument tuples, and array elements."
-    },
-    {
-      "id": "connections-awaited",
-      "front": "How does Promise<infer U> connect to Awaited?",
-      "meaning": "Matching Promise and inferring U, then recursing, is the Awaited unwrap. Nested Promise<Promise<string>> becomes string."
-    },
-    {
-      "id": "connections-mapped-next",
-      "front": "How do conditionals relate to mapped types?",
-      "meaning": "Mapped types transform keys and properties; they are often combined with conditionals to filter keys or branch value types. Utility types consume both."
-    },
-    {
-      "id": "interview-read-assignability",
-      "front": "What must you be able to say first about T extends U ? X : Y?",
-      "meaning": "Read it as assignability branching, not inheritance. Then explain distribution with string[] | number[] vs (string | number)[], define infer, sketch ReturnType and recursive Awaited, and say when to stop at built-ins."
     }
   ]
 }

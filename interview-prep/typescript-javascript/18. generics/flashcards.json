@@ -13,7 +13,7 @@
     {
       "id": "why-generics",
       "front": "Generics vs any vs overloads — why generics exist?",
-      "meaning": "Without generics you either use any and lose safety downstream, or copy-paste/overload per type, which does not scale. Generics keep one implementation and preserve the relationship (element type in ⇒ same type out) per call."
+      "meaning": "Without generics you either use any and lose safety downstream, or copy-paste/overload per type, which does not scale. Generics keep one implementation and preserve the relationship (element type in ⇒ same type out) per call. Using any “to make it compile” drops the call-site relationship generics exist to preserve."
     },
     {
       "id": "inference-first-element",
@@ -23,8 +23,8 @@
     },
     {
       "id": "identity-inference",
-      "front": "How is T usually inferred on identity<T>(x: T): T?",
-      "meaning": "Inference usually comes from arguments. identity(1) infers T as 1 or number depending on context; identity<string>('a') passes T explicitly. Return type is often inferred too; annotate when it clarifies.",
+      "front": "How is T inferred, and when do you pass fn<User>(…)?",
+      "meaning": "Inference usually comes from arguments. identity(1) infers T; identity<string>('a') passes T explicitly. Pass explicit type arguments when inference fails: no arguments to infer from, conflicting inferences, or too-wide contextual types. Do not force <T> everywhere.",
       "example": "identity(1); identity<string>('a');"
     },
     {
@@ -34,31 +34,15 @@
       "example": "function mapPair<A, B>(a: A, b: B): [A, B] { return [a, b]; }"
     },
     {
-      "id": "inference-fails",
-      "front": "When do you pass explicit type arguments like fn<User>(…)?",
-      "meaning": "When inference fails: no arguments to infer from (identity() needs <T> or a default), conflicting inferences from multiple args, or too-wide contextual types. Then pass explicit type arguments."
-    },
-    {
       "id": "generic-interface",
       "front": "What is ApiResponse<T> — a factory or a value?",
-      "meaning": "A generic type alias is a factory for concrete types. Instantiating ApiResponse<User> fixes data: User and status: number. Generic types are not runtime values.",
+      "meaning": "A generic type alias is a factory for concrete types, not a runtime value. Instantiating ApiResponse<User> fixes data: User and status: number. Same idea for classes: class Box<T> { constructor(public value: T) {} } — each instance carries a concrete T.",
       "example": "type UserResponse = ApiResponse<User>;"
-    },
-    {
-      "id": "generic-repository-shape",
-      "front": "What does interface Repository<T, ID> parameterize?",
-      "meaning": "The entity type T and the id type ID: findById(id: ID): Promise<T | null> and save(entity: T): Promise<T>. Instantiating Repository<User, string> fixes both parameters."
-    },
-    {
-      "id": "box-generic-class",
-      "front": "Can classes be generic?",
-      "meaning": "Yes. class Box<T> { constructor(public value: T) {} } is a generic class; each instance carries a concrete T for value.",
-      "example": "class Box<T> { constructor(public value: T) {} }"
     },
     {
       "id": "constraint-extends",
       "front": "What does T extends { name: string } do?",
-      "meaning": "It limits what T may be so you can use known properties. x.name is allowed because the constraint guarantees name: string. Without that extends, x.name is an error.",
+      "meaning": "It limits what T may be so you can use known properties. x.name is allowed because the constraint guarantees name: string. Without that extends, x.name is an error. Prefer the minimal constraint that unlocks those properties — over-constraining breaks inference; T extends any is pointless.",
       "example": "function label<T extends { name: string }>(x: T): string { return x.name; }"
     },
     {
@@ -70,35 +54,19 @@
     {
       "id": "getprop-keyof",
       "front": "What does getProp<T, K extends keyof T>(obj, key: K): T[K] buy you?",
-      "meaning": "Keys are checked and the return type is exact — typos and misuse fail at compile time, unlike (obj: any, key: string): any.",
+      "meaning": "keyof T is the union of property names; K extends keyof T allows only those names; T[K] is the type of that property. Keys are checked and the return type is exact — typos fail at compile time, unlike (obj: any, key: string): any.",
       "example": "getProp(user, 'name'); // string — getProp(user, 'nope'); // Error"
-    },
-    {
-      "id": "keyof-indexed-access-chain",
-      "front": "keyof T, then K extends keyof T, then T[K] — causal chain?",
-      "meaning": "keyof T is the union of property names. K extends keyof T allows only those names. T[K] is indexed access: the type of that property. Together they type a safe key accessor."
     },
     {
       "id": "default-type-param",
       "front": "What does type Page<T = unknown> mean when you write Page?",
-      "meaning": "Default type parameters supply a type when callers omit the argument. Page alone is Page<unknown>; Page<User> is UserPage. Defaults help when a parameter is often a common choice (useState-style APIs, optional config types).",
+      "meaning": "Default type parameters supply a type when callers omit the argument. Page alone is Page<unknown>; Page<User> is UserPage. Needed when there is nothing to infer from (e.g. createSet<T = string>(): Set<T>).",
       "example": "type AnyPage = Page; // Page<unknown>"
-    },
-    {
-      "id": "create-set-default",
-      "front": "Why give createSet a default T = string?",
-      "meaning": "With no arguments there is nothing to infer from. T = string lets createSet() return Set<string> without an explicit type argument, while callers can still pass T.",
-      "example": "function createSet<T = string>(): Set<T> { return new Set(); }"
     },
     {
       "id": "generics-erased",
       "front": "Can you instanceof T, new T(), or inspect T at runtime?",
-      "meaning": "No. Generics are erased — T is not a value. You cannot new T(), instanceof T, or inspect T at runtime. That is the same erasure story as other TypeScript types."
-    },
-    {
-      "id": "as-t-smell",
-      "front": "Why is return {} as T in make<T>(): T a smell?",
-      "meaning": "There is no runtime T to construct or check. The assertion pretends an empty object is T. Factories that need instances must take a runtime constructor value instead."
+      "meaning": "No. Generics are erased — T is not a value. You cannot new T(), instanceof T, or inspect T at runtime. return {} as T in make<T>(): T is a smell: there is no runtime T to construct or check."
     },
     {
       "id": "constructor-factory",
@@ -108,25 +76,15 @@
     },
     {
       "id": "useasync-generic",
-      "front": "Why is useAsync generic?",
-      "meaning": "Success state carries data: T inferred from () => Promise<T>, so on success state.data is User after fetchUser. One hook, correct data type per fetch — a common whiteboard exercise combining generics, discriminated unions, and closures."
-    },
-    {
-      "id": "useasync-discriminated-state",
-      "front": "How is useAsync state modeled?",
-      "meaning": "A discriminated union: idle | loading | { status: 'success'; data: T } | { status: 'error'; error: unknown }. T only exists on success; error is unknown until narrowed.",
-      "example": "useState<{ status: 'idle' } | { status: 'loading' } | { status: 'success'; data: T } | { status: 'error'; error: unknown }>({ status: 'idle' })"
+      "front": "Why is useAsync generic, and how is state modeled?",
+      "meaning": "Success state carries data: T inferred from () => Promise<T>, so on success state.data is User after fetchUser. State is a discriminated union: idle | loading | { status: 'success'; data: T } | { status: 'error'; error: unknown }. T only exists on success; error is unknown until narrowed.",
+      "example": "useAsync(() => fetchUser(id)); // T inferred from Promise<User>"
     },
     {
       "id": "list-component",
       "front": "How does inference work on List<T> with renderItem?",
-      "meaning": "T flows from items: T[] to renderItem: (item: T) => React.ReactNode. Inference links the array element type to the callback parameter without any on renderItem.",
+      "meaning": "T flows from items: T[] to renderItem: (item: T) => React.ReactNode. Write function List<T>(props: ListProps<T>) — React.FC<Props<T>> is awkward for generic components.",
       "example": "function List<T>({ items, renderItem }: ListProps<T>) { return <>{items.map(renderItem)}</>; }"
-    },
-    {
-      "id": "react-fc-generic",
-      "front": "Why avoid React.FC<Props<T>> for a generic component?",
-      "meaning": "Writing a generic React component as React.FC<Props<T>> is awkward. Prefer function Comp<T>(props: Props<T>)."
     },
     {
       "id": "repository-nest",
@@ -136,47 +94,7 @@
     {
       "id": "nest-di-generics",
       "front": "Can Nest inject an open generic T?",
-      "meaning": "No. Runtime DI still needs concrete classes or tokens. Generics do not exist at runtime for Nest to inject “T”. Thinking Nest can inject an open generic without a concrete class is a common mistake."
-    },
-    {
-      "id": "identity-pair-pattern",
-      "front": "What is the identity / pair generic pattern?",
-      "meaning": "The interview-toolkit sketch <T>(x: T): T — and pair as mapPair<A, B>. One implementation that returns the same type(s) it received."
-    },
-    {
-      "id": "container-pattern",
-      "front": "What is the container generic pattern?",
-      "meaning": "Wrap a payload in a named shape: ApiResponse<T>, Box<T>. The container fields stay fixed; T is the varying inner type."
-    },
-    {
-      "id": "constrained-field-pattern",
-      "front": "What is the constrained-field generic pattern?",
-      "meaning": "<T extends { id: string }>(x: T) — require a known field so the body can use it, while still returning or preserving the richer T."
-    },
-    {
-      "id": "awaited-utility-awareness",
-      "front": "Where does Awaited<T> sit relative to generics?",
-      "meaning": "Promise unwrap is a utility type (advanced chapter). It is part of the generics interview toolkit as “unwrap a Promise,” not something this unit implements from scratch."
-    },
-    {
-      "id": "any-instead-of-t",
-      "front": "Why is using any instead of T a mistake?",
-      "meaning": "It “makes it compile” but drops the call-site relationship generics exist to preserve. You lose downstream safety — the problem generics were meant to solve."
-    },
-    {
-      "id": "over-constrain",
-      "front": "What goes wrong if you over- or under-constrain T?",
-      "meaning": "Over-constraining breaks inference; under-constraining means you cannot use the properties you need. Prefer the minimal constraint that unlocks those properties."
-    },
-    {
-      "id": "t-extends-any",
-      "front": "Is T extends any a useful constraint?",
-      "meaning": "No. It is a pointless constraint. It does not add property knowledge and does not improve inference."
-    },
-    {
-      "id": "force-explicit-type-args",
-      "front": "Should you force explicit type arguments everywhere?",
-      "meaning": "No. Inference from arguments usually works. Force <T> when inference fails (no args, conflicts, too-wide context), not as a default style."
+      "meaning": "No. Runtime DI still needs concrete classes or tokens. Generics do not exist at runtime for Nest to inject “T”."
     }
   ]
 }

@@ -8,50 +8,25 @@
     {
       "id": "narrowing-definition",
       "front": "What is narrowing?",
-      "meaning": "TypeScript refining a wide type (often a union) to a smaller type by analyzing control flow: if, switch, early return, throw, and similar. Checks eliminate impossible union members so the remaining type is used inside that branch."
+      "meaning": "TypeScript refining a wide type (often a union) to a smaller type by analyzing control flow: if, switch, early return, throw. It is compile-time reasoning about runtime checks — the JS still runs the if/typeof/instanceof. Wrong or lying guards produce unsound static types."
     },
     {
       "id": "type-guard-definition",
       "front": "What is a type guard?",
-      "meaning": "A check that causes narrowing. Built-ins include typeof, instanceof, in, equality, and truthiness. Custom guards are type predicates (value is T) and assertion functions (asserts …)."
-    },
-    {
-      "id": "guards-are-runtime-js",
-      "front": "Are type guards erased like interfaces?",
-      "meaning": "No. Guards are real runtime JavaScript; TypeScript’s types follow those checks. Discriminated-union tag checks are one narrowing tool; erasure is why interfaces cannot use instanceof."
-    },
-    {
-      "id": "cfa-four-steps",
-      "front": "How does control-flow analysis walk a function?",
-      "meaning": "Like a human reader: at each check, eliminate impossible union constituents; inside a branch, use the narrowed type; after a branch that returns or throws, treat that case as handled for the rest of the function; assignments can reset narrowing if you reassign to a wider value."
-    },
-    {
-      "id": "compile-time-about-runtime",
-      "front": "Is narrowing a runtime type conversion?",
-      "meaning": "No. Narrowing is compile-time reasoning about runtime checks. The JS still runs the if/typeof/instanceof. Wrong or lying guards produce unsound static types."
-    },
-    {
-      "id": "typeof-tags",
-      "front": "Which JS typeof tags does TypeScript discriminate?",
-      "meaning": "The primitive typeof strings: 'string' | 'number' | 'boolean' | 'undefined' | 'object' | 'function' | 'symbol' | 'bigint'. typeof does not distinguish most class instances — those are usually 'object'."
+      "meaning": "A check that causes narrowing. Built-ins: typeof, instanceof, in, equality, truthiness. Custom: type predicates (value is T) and assertion functions (asserts …). Guards are real runtime JavaScript; TypeScript’s types follow those checks. Interfaces cannot use instanceof because they are erased."
     },
     {
       "id": "typeof-primitives",
-      "front": "How does typeof narrow string | number?",
-      "meaning": "typeof x === 'string' narrows to string so you can use length; the remaining branch is number so you can use toFixed. typeof discriminates those primitive tags, not most class instances.",
+      "front": "How does typeof narrow, and what does it not distinguish?",
+      "meaning": "It discriminates JS typeof tags: 'string' | 'number' | 'boolean' | 'undefined' | 'object' | 'function' | 'symbol' | 'bigint'. Class instances are usually 'object' — use instanceof, a discriminant, or a predicate, not typeof.",
       "example": "function len(x: string | number) { if (typeof x === 'string') return x.length; return x.toFixed(2); }"
     },
     {
       "id": "typeof-null-object",
       "front": "Why is typeof null === 'object' an interview trap?",
-      "meaning": "A long-standing JS quirk that cannot be fixed without breaking the web. typeof value === 'object' is also true for null, so treating “object” as safe to read properties throws on null.",
-      "notes": "Always pair object typeof chains with an explicit null (or nullish) check."
-    },
-    {
-      "id": "null-check-before-object",
-      "front": "How do you safely narrow object | null?",
-      "meaning": "Check value === null (or value == null for nullish) before or alongside object typeof chains. After an explicit null check, TypeScript excludes null from later branches so property access is typed as object.",
-      "example": "function keys(value: object | null) { if (value === null) return []; return Object.keys(value); }"
+      "meaning": "A long-standing JS quirk that cannot be fixed without breaking the web. typeof value === 'object' is also true for null, so treating “object” as safe to read properties throws. Always pair object typeof chains with an explicit null (or nullish) check.",
+      "example": "function keys(value: object | null) { if (value === null) return []; return Object.keys(value); }",
+      "notes": "After value === null, TypeScript excludes null so later property access is typed as object."
     },
     {
       "id": "array-isarray",
@@ -60,117 +35,56 @@
       "example": "if (Array.isArray(x)) return x.join(','); return x.toUpperCase();"
     },
     {
-      "id": "instanceof-runtime-ctors",
-      "front": "What does instanceof narrow?",
-      "meaning": "Runtime constructor values: classes and some built-ins like Date. If d instanceof Date, you get Date methods; otherwise you treat the remaining union member (e.g. string).",
-      "example": "if (d instanceof Date) return d.toISOString(); return new Date(d).toISOString();"
-    },
-    {
       "id": "instanceof-limits",
-      "front": "Can you use instanceof on an interface type?",
-      "meaning": "No. Interfaces and type aliases are erased — there is no runtime constructor. instanceof works with classes and some built-ins, not with interface-shaped values. Those need predicates or a discriminant."
-    },
-    {
-      "id": "instanceof-cross-realm",
-      "front": "Why can instanceof Date fail for a Date-like value?",
-      "meaning": "Cross-realm issues: an iframe’s Date is a different constructor, so instanceof Date can be false for a value that “looks like Date.” Rare but real in browsers."
+      "front": "What does instanceof narrow, and where does it fail?",
+      "meaning": "Runtime constructor values: classes and some built-ins like Date. It cannot be used on interfaces or type aliases — those are erased, so there is no constructor. Cross-realm: an iframe’s Date is a different constructor, so instanceof Date can be false for a Date-like value.",
+      "example": "if (d instanceof Date) return d.toISOString(); return new Date(d).toISOString();"
     },
     {
       "id": "in-operator",
       "front": "How does the in operator narrow a union?",
-      "meaning": "It checks property existence and narrows when one union side has that key. 'permissions' in user makes user Admin if only Admin has permissions.",
+      "meaning": "It checks property existence and narrows when one union side has that key. 'permissions' in user makes user Admin if only Admin has permissions. Caveats: in is true for inherited prototype keys, and optional properties can surprise you. Prefer a discriminant tag when you design the type yourself.",
       "example": "if ('permissions' in user) { console.log(user.permissions); }"
-    },
-    {
-      "id": "in-prototype-optional",
-      "front": "What surprises people about in narrowing?",
-      "meaning": "in is true for inherited prototype-chain keys, and optional properties can also surprise you. For “own property only,” combine with careful checks or different modeling."
-    },
-    {
-      "id": "prefer-discriminant-over-in",
-      "front": "When should you prefer a discriminant over in?",
-      "meaning": "When you design the type yourself. A shared tag with distinct literals is clearer and safer than probing for extra keys with in."
     },
     {
       "id": "truthiness-trap",
       "front": "if (x) on string | null | undefined — what is the gotcha?",
-      "meaning": "Truthiness treats '', 0, NaN, and false as falsy, so they are removed along with nullish. Empty string is excluded from the true branch even though it is a valid string.",
+      "meaning": "Truthiness treats '', 0, NaN, and false as falsy, so they are removed along with nullish. Empty string never enters the true branch even though it is a valid string. To drop only nullish, use x != null (or x !== undefined && x !== null).",
       "example": "if (x) { x.toUpperCase(); } // x is string here, but '' never enters"
-    },
-    {
-      "id": "prefer-neq-null",
-      "front": "How do you exclude only nullish, not empty string or zero?",
-      "meaning": "Use x != null, or x !== undefined && x !== null. That drops null and undefined without wiping valid '' or 0."
     },
     {
       "id": "equality-narrowing",
       "front": "What does equality narrowing cover?",
-      "meaning": "x === null, x === 'foo' (literal narrowing), and state.status === 'success' (discriminant from the unions unit). Equality checks eliminate other constituents of the union."
-    },
-    {
-      "id": "switch-equality-scale",
-      "front": "What is switch on a discriminant, in narrowing terms?",
-      "meaning": "Equality narrowing at scale. Each case eliminates other tag literals so the remaining variant’s fields are available in that case."
-    },
-    {
-      "id": "loose-eq-nullish",
-      "front": "What does == null catch that === null does not?",
-      "meaning": "Both null and undefined (loose equality). Use it as an intentional nullish check, not as a general == habit."
+      "meaning": "x === null, x === 'foo' (literal narrowing), and state.status === 'success' (discriminant). switch on a discriminant is equality narrowing at scale. == null is an intentional nullish check — both null and undefined — not a general == habit."
     },
     {
       "id": "type-predicate",
       "front": "What does animal is Cat mean as a return type?",
-      "meaning": "A custom type predicate: if the function returns true, the argument is treated as Cat in the caller’s control flow. The body must be honest; always returning true unsounds the program because TypeScript trusts you.",
+      "meaning": "A custom type predicate: if the function returns true, the argument is treated as Cat in the caller’s control flow. Needed when built-ins are not enough (JSON shapes, nested discriminants, branded types). The body must actually test the shape — always returning true unsounds the program because TypeScript trusts you.",
       "example": "function isCat(animal: Cat | Dog): animal is Cat { return 'meow' in animal; }"
-    },
-    {
-      "id": "predicates-when-builtins-fail",
-      "front": "When are custom type predicates needed?",
-      "meaning": "When built-ins are not enough: API JSON shape validation, nested discriminants, branded types, and library-specific structures."
     },
     {
       "id": "unknown-predicate",
       "front": "Why pair isUser(v: unknown): v is User with unknown?",
-      "meaning": "Unknown at boundaries plus an honest runtime check (typeof object, not null, 'id' in v, id is string) is how you prove structure after JSON or external APIs before entering typed code.",
+      "meaning": "Unknown at boundaries plus an honest runtime check is how you prove structure after JSON or external APIs before entering typed code.",
       "example": "typeof v === 'object' && v !== null && 'id' in v && typeof (v as { id: unknown }).id === 'string'"
-    },
-    {
-      "id": "lying-predicates",
-      "front": "What happens if a type predicate always returns true?",
-      "meaning": "The program becomes unsound. TypeScript trusts the return type, so callers narrow as if the check were real. The body must actually test the shape."
     },
     {
       "id": "assertion-functions",
       "front": "What is an assertion function (asserts)?",
-      "meaning": "A function that throws if a condition fails and tells TypeScript that after a successful call, that condition holds. Use it for “must be true or abort” (invariant checks, Nest-guards-ish style in plain TS).",
+      "meaning": "A function that throws if a condition fails and tells TypeScript that after a successful call, that condition holds. asserts x is string means after the call, x is string. asserts cond means after the call, cond is truthy. Both return void. Use for “must be true or abort.”",
       "example": "function assertIsString(x: unknown): asserts x is string { if (typeof x !== 'string') throw new Error('not a string'); }"
     },
     {
-      "id": "asserts-cond",
-      "front": "What does asserts cond mean vs asserts x is string?",
-      "meaning": "asserts cond means after the call, cond is truthy (generic assert). asserts x is string means after the call, x is string. Both return void and throw on failure.",
-      "example": "function assert(cond: unknown, msg?: string): asserts cond { if (!cond) throw new Error(msg ?? 'Assertion failed'); }"
-    },
-    {
       "id": "asserts-vs-predicate",
-      "front": "Type predicate vs assertion function — table?",
-      "meaning": "Predicate is T returns boolean; caller writes if (isX(v)). Assertion asserts x is T returns void and throws; caller writes assertIsX(v) then uses v. Failure is a false branch vs an exception."
-    },
-    {
-      "id": "as-cast-no-runtime",
-      "front": "How is x as T different from predicates and asserts?",
-      "meaning": "A type assertion (x as T) forces a type with no runtime check. Predicates and assertion functions are runtime checks that TypeScript’s control-flow analysis follows. Do not confuse as with asserts."
+      "front": "Type predicate vs assertion function vs x as T?",
+      "meaning": "Predicate is T returns boolean; caller writes if (isX(v)). Assertion asserts x is T returns void and throws; caller writes assertIsX(v) then uses v. x as T forces a type with no runtime check. Do not confuse as with asserts."
     },
     {
       "id": "early-return-cfa",
       "front": "After if (typeof x === 'string') return …, what is x?",
-      "meaning": "The remaining union member — often number if the input was string | number. TypeScript treats returned or thrown paths as eliminating those cases from later code, the same idea as exhaustiveness in switches.",
+      "meaning": "The remaining union member — often number if the input was string | number. TypeScript walks like a human reader: checks eliminate constituents; returned or thrown paths drop those cases from later code; assignments can reset narrowing.",
       "example": "function handle(x: string | number) { if (typeof x === 'string') return x.toUpperCase(); return x.toFixed(2); }"
-    },
-    {
-      "id": "property-narrow-simple",
-      "front": "Does typeof obj.a === 'string' narrow obj.a?",
-      "meaning": "In simple cases, yes: inside that branch obj.a is string. Destructuring or storing the property in a new variable can interact with narrowing differently than direct property access."
     },
     {
       "id": "reassignment-widens",
@@ -180,23 +94,8 @@
     },
     {
       "id": "mutable-prop-narrow",
-      "front": "Why copy a narrowed property to a local const?",
-      "meaning": "For mutable objects, narrowing a property is not a lifetime guarantee if something else mutates it. Prefer a local const copy after the check when you need the narrowed type to stay stable."
-    },
-    {
-      "id": "typeof-class-instances",
-      "front": "Does typeof distinguish class instances?",
-      "meaning": "Usually no — class instances are typically 'object'. Use instanceof (or a discriminant / predicate), not typeof, to tell Date vs plain object vs other classes."
-    },
-    {
-      "id": "never-after-narrowing",
-      "front": "How do never and exhaustiveness connect to narrowing?",
-      "meaning": "After you have narrowed away every union case, what remains is never. That leftover is the exhaustiveness check used in default/assertNever branches."
-    },
-    {
-      "id": "built-in-narrowing-tools",
-      "front": "List the built-in narrowing tools and when each applies?",
-      "meaning": "typeof for primitives (and the null/'object' trap); instanceof for classes/constructors; in for property presence on unions; equality (===, switch on discriminants, == null for nullish); truthiness (avoid when ''/0 are valid). Custom: value is T and asserts."
+      "front": "Why copy a narrowed property to a local const? (aliasing pitfall)",
+      "meaning": "Narrowing a property is not a lifetime guarantee if the object is mutable — something else can mutate it. Destructuring or storing in a new variable can also interact differently than direct property access. Prefer a local const copy after the check when you need the narrowed type to stay stable."
     }
   ]
 }
