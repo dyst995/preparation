@@ -4,7 +4,7 @@ Study materials based on **Nika Beroshvili's** CV stack.
 
 **Start here for the learning sequence:** [order.md](./order.md)
 
-**62 markdown files / ~24,000+ lines** across 8 technology tracks.
+**62 markdown files / ~24,000+ lines** across 8 technology tracks plus an English speaking track.
 
 Each chapter includes: learning objectives, topic checklists, deep explanations, tables, interview Q&A with model answers, hands-on drills, green/red flags, CV tie-backs, and mastery checklists.
 
@@ -31,6 +31,7 @@ Each chapter includes: learning objectives, topic checklists, deep explanations,
 | [sql-databases/](./sql-databases/INDEX.md) | 5 chapters + index | PostgreSQL, MySQL, SQL, TypeORM | **Medium-High** |
 | [devops-cloud/](./devops-cloud/INDEX.md) | 5 chapters + index | Docker, AWS S3/SNS, Nginx, Git, SSL/VPS, CI | **Medium** |
 | [native-developement/](./native-developement/INDEX.md) | 6 chapters + index | Android Gradle/Manifest/Activity; iOS Xcode/plist/signing; storage/backup; host debugging | **High** with RN (platform literacy) |
+| [english/](./english/INDEX.md) | Phrases + unit lessons (same numbered folders as TS/JS) | Spoken interview English | **Ongoing** (10–15 min/day) |
 
 Working-knowledge languages (Kotlin, Swift, Java, Objective-C) are **not** separate language tracks. Read them inside [react-native/07-native-modules.md](./react-native/07-native-modules.md) and the [native-developement](./native-developement/INDEX.md) host-OS track (Gradle, Xcode, lifecycle, permissions).
 
@@ -61,6 +62,9 @@ Working-knowledge languages (Kotlin, Swift, Java, Objective-C) are **not** separ
 
 ### Native development (Android + iOS)
 `01` Android | `02` iOS | `03` Android vs iOS tables | `04` Spoken Q&A | `05` Storage/background/security | `06` Debug playbook — [track index](./native-developement/INDEX.md)
+
+### English
+`1` Phrases — add more as `2. topic-name/` — [track index](./english/INDEX.md)
 
 ---
 
@@ -106,6 +110,7 @@ Timed coding + system design for: **EasyPay**, **Clean House**, **VetApp**, **On
 - [ ] Next.js
 - [ ] DevOps / Cloud
 - [ ] Native development (Android + iOS)
+- [ ] English ([english/](./english/INDEX.md))
 - [ ] DSA ([interview-dsa/](../interview-dsa/))
 
 ---

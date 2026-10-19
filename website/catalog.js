@@ -29,6 +29,11 @@ const TRACKS = [
     name: "Native development",
   },
   {
+    id: "english",
+    root: "interview-prep/english",
+    name: "English",
+  },
+  {
     id: "devops-cloud",
     root: "interview-prep/devops-cloud",
     name: "DevOps / Cloud",

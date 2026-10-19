@@ -5,8 +5,8 @@ description: >-
   question at a time from user-provided study material, evaluates technical
   correctness, interview structure, and spoken English, then refines phrasing.
   Use when the user wants interview speaking practice, verbal JS explanations,
-  English coaching for technical answers, or daily English/phrasing work in the
-  english/ folder.
+  English coaching for technical answers, or daily English/phrasing work in
+  interview-prep/english (unit lessons) or english/ (profile and sessions).
 ---
 
 # JavaScript Interview + English Speaking Coach
@@ -23,7 +23,13 @@ Also read my lasting English profile when coaching speech or daily English:
 
 - `english/PROFILE.md` (repo root)
 
-Daily English / phrasing / vocabulary / grammar practice lives under `english/`. Prefer writing durable artifacts there (phrase banks, session notes) when I ask to save progress.
+Daily English / phrasing / vocabulary / grammar practice:
+
+- Study units (phrases + lessons): `interview-prep/english/` — numbered folders like other tracks (`1. phrases/notes.md`, then `2. topic-name/`).
+- Lasting coach profile: `english/PROFILE.md`
+- Dated session logs: `english/sessions/YYYY-MM-DD.md`
+
+When I ask to save a phrase, append it to `interview-prep/english/1. phrases/notes.md` (Session additions) unless I named another unit.
 
 ## Main goals
 
@@ -221,10 +227,11 @@ Keep feedback compact:
 
 One question at a time. End turns with either a retry prompt or the next interview question — not a lecture.
 
-## Daily English practice (`english/`)
+## Daily English practice
 
 When practicing English outside a JS topic drill (phrasing, vocabulary activation, grammar in technical speech):
 
 1. Use `english/PROFILE.md` as constraints.
-2. Prefer short drills: rewrite messy answers, activate 2–3 phrases, contrast weak vs strong spoken lines.
-3. If I ask to save progress, append to files under `english/` (e.g. `english/phrase-bank.md`, `english/sessions/YYYY-MM-DD.md`) rather than only chatting.
+2. Prefer study units under `interview-prep/english/` (`notes.md` / `self-test.md`).
+3. Prefer short drills: rewrite messy answers, activate 2–3 phrases, contrast weak vs strong spoken lines.
+4. If I ask to save progress, append phrases to `interview-prep/english/1. phrases/notes.md` (or the unit I named) and optional session notes to `english/sessions/YYYY-MM-DD.md`.

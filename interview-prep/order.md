@@ -20,6 +20,7 @@ Mark items `[x]` as you finish.
 | 4 | 1.5h | Drills / whiteboard / mini coding |
 | 5 | 1.0h | DSA warm-up (arrays/hash/trees) OR system-design sketch |
 | 6 | 1.0h | STAR story rehearsal + weak-spot notes |
+| — | 10–15m | English: [english/INDEX.md](./english/INDEX.md) (phrases out loud, or a new unit lesson) |
 
 If a day lists more than you can finish deeply, **do not skip ahead** - finish quality over speed.
 
@@ -28,6 +29,7 @@ If a day lists more than you can finish deeply, **do not skip ahead** - finish q
 ## Phase 0 - Orientation (30-45 min)
 
 - [ ] [README.md](./README.md)
+- [ ] [english/INDEX.md](./english/INDEX.md) (ongoing: phrases + unit lessons)
 - [ ] Skim this file fully once
 - [ ] [react-native/REACT_NATIVE_INTERVIEW.md](./react-native/REACT_NATIVE_INTERVIEW.md) (know RN map)
 - [ ] Write your top 5 target roles on paper (RN / fullstack / frontend)
