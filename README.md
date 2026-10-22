@@ -8,7 +8,7 @@ Study notes for fullstack / React Native interviews (theory, self-test, DSA).
 cd website && npm install && npm run dev
 ```
 
-- [interview-prep/](./interview-prep/) — tracks (RN, React, TS/JS, Nest, Next, SQL, native, English)
+- [interview-prep/](./interview-prep/) — tracks (RN, React, TS/JS, Nest, Next, SQL, native, design patterns, English)
 - [interview-dsa/](./interview-dsa/) — algorithms by pattern
 - [website/](./website/) — notes reader (theory + optional flashcards)
 

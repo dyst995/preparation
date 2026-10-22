@@ -1,0 +1,157 @@
+# Design patterns in NestJS / backend — Answers
+
+## Core recall
+
+1. **DIP** (depend on abstractions, not concretions) applied via **DI** (the container supplies constructor dependencies). DIP is the principle; DI is the wiring technique. Nest’s IoC container is DI, not a different name for DIP.
+2. The class **lists collaborators as constructor parameters**. The container **instantiates** them (from `providers` / imported `exports`) and **passes** them in at construction. The class does not `new` its dependencies.
+3. Interfaces are **erased** at compile time — there is no runtime type for Nest to read from `design:paramtypes`. A **token** (`Symbol`, string, or class used as token) plus `@Inject()` identifies the binding. A class type survives as a constructor function, so Nest can use it as the token by default.
+4. **`DEFAULT` (singleton):** one instance for the process lifetime. **`REQUEST`:** one instance per incoming HTTP request, then eligible for GC. **`TRANSIENT`:** a new instance **every time** the provider is injected.
+5. **`DEFAULT` / singleton.** Not an omission — the intended default for stateless services.
+6. Concurrent requests **share one object**. `this.user = req.user` on request B **overwrites** request A’s user. Later reads on A see B’s identity (wrong name, wrong role, authorization bug).
+7. The consumer becomes **request-scoped too** (scope **bubbles** to the narrower lifetime). Instantiation cost applies to that whole subtree, not only the original provider.
+8. **`REQUEST`:** one instance shared for that request (both injections see the same object). **`TRANSIENT`:** two instances (each injection site gets its own).
+9. The **Repository** pattern. Persistence API lives on `repo`, not as statics on `User`. You already have it; a wrapper class is optional.
+10. **Justified:** a real domain query (conflicts, “active vets at clinic,” non-trivial QueryBuilder) that should not be copy-pasted. **Not:** a class whose methods only delegate `find`/`save`/`delete` to `this.repo`.
+11. **Active Record:** the entity **is** the persistence API (`user.save()`, `User.find()`), typically via TypeORM `BaseEntity`. **Repository:** `this.repo.save(user)` on an injected `Repository<T>`. AR is a static/global-ish call; repository is a **DI collaborator** you can mock in `TestingModule`.
+12. **`providers`:** owned by this module, injectable **inside** it. **`exports`:** the subset (or re-exported modules) that **importers** may inject. Unexported providers are the private subsystem behind the facade.
+13. **Middleware → guards → interceptors (before) → pipes → controller/handler → interceptors (after) → exception filters** (filters only if something threw).
+14. **Chain of Responsibility.** Middleware: HTTP-adapter concerns (CORS, raw body, request id). Guards: allow/deny (auth/RBAC). Interceptors: wrap the handler (timing, transform in/out). Pipes: validate/transform input. Filters: shape errors after a throw.
+15. **Adapter** (plus DIP: bind `PaymentGateway` to `BogPaymentGateway` / `FlittPaymentGateway`).
+16. **HTTP DTO** (untrusted JSON), **domain/application types** (your rules and units), **vendor SDK payload** (BoG/Flitt field names).
+17. A use-case / port / mapper / repo-impl stack that only **delegates** to `repository.save` with **no extra invariant** — empty “clean architecture” for CRUD.
+
+## Explain why
+
+1. Constructor injection **declares** the graph. Tests replace a provider in `createTestingModule`. Service Locator **hides** lookups inside methods (`moduleRef.get`) so you must fake the locator or boot extra container machinery. A module singleton import is a **fixed shared instance**; tests need `jest.mock` and concurrent tests share mutable state. Readable constructors beat scavenger hunts.
+2. Node handles many requests on one process. A singleton is **one object**. Two in-flight requests writing `this.user` are a race: the field is not per-request. You leak identity and can authorize the wrong role. Style is irrelevant; **shared mutable request state** is the defect.
+3. A singleton is created **once at bootstrap**, when there is **no request**. It cannot honestly hold a per-request collaborator. Nest therefore **narrows the consumer** to `REQUEST` (or you resolve via `ModuleRef` in request context — Service Locator). Bubbling is the consistent lifetime rule.
+4. Arguments keep `UsersService` a **singleton**: cheap, stateless, easy to test. `Scope.REQUEST` on a fat service **recreates it (and dependents) every request**. Use REQUEST when threading the argument through a deep stack is worse than that cost — not as a default.
+5. `User.find()` is Active Record / static access: **not injected**, painful to swap in `TestingModule`, and it bypasses the module graph. `Repository<User>` is a provider: DIP-friendly, mockable, and persistence stays off the entity.
+6. A second module can **write appointments** without going through `AppointmentsService` (conflict checks, status machine, events). The module’s public contract was supposed to be the service. Compiling is not encapsulating.
+7. Guards are the **allow/deny** hop **before** pipes and the handler. JWT/RBAC is “may this request proceed?” Interceptors **wrap** work you already decided to run (timing, mapping). Filters run **after a throw** — they format failures, they do not authenticate. Wrong hop = auth that runs too late or error mapping used as a permission system.
+8. Vendor names and units (**tetri**, `order_id`) are **their** model. If they leak, every controller and test depends on BoG. An adapter converts to `{ amountCents, providerRef }`. Swapping Flitt or a fake is a `useClass` / `useValue` change, not a rewrite of `PaymentsService`.
+9. Nest already supplied module + DI + controller + service + `Repository<T>` + pipes. Extra files that only forward calls add **navigation cost and fake seams**. Senior means **a seam where a shape or invariant actually changes**, not a folder named `use-cases`.
+
+## Compare and contrast
+
+1. **DIP:** high-level policy depends on an abstraction. **DI:** the mechanism that **passes** the implementation in (Nest constructor + module `provide`). You can violate DIP while still using DI (`new BogSdk()` inside the service). You can talk DIP and still Service-Locate.
+2. **Constructor:** deps listed, container fills them, tests override providers. **Service Locator:** code **asks** the container at runtime; deps are implicit. **Module singleton:** `export const x = new X()` — one instance, no container, hard to replace, hidden coupling.
+3. **Singleton:** one per process; default; must be stateless w.r.t. requests. **REQUEST:** one per HTTP request; shared among injections in that request; bubbles; allocation cost. **TRANSIENT:** new object **per injection**, even twice in one constructor; rare.
+4. **Argument:** explicit, singleton-safe, test-obvious (`create(dto, user)`). **REQUEST service:** implicit context, useful deep in the stack, costs scope bubbling. **Singleton field:** concurrent overwrite — incorrect for request data.
+5. **`Repository<T>`:** Nest/TypeORM default; CRUD is enough. **Custom repo class:** domain queries live in one injectable. **Active Record:** persistence methods on the entity/statics; fights DI and module boundaries.
+6. **`providers`:** internal inventory. **`exports`:** public facade other modules may import. Same class can be in both; if it is only in `providers`, importers must not see it.
+7. **Middleware:** adapter-level, before Nest route binding / weak DI. **Guard:** canActivate, authz. **Interceptor:** before/after around `next.handle()` (Observable). **Pipe:** transform/validate arguments. **Filter:** exception → HTTP error body.
+8. **DTO:** runtime-validated HTTP input (class + class-validator). **Domain:** your rules and units. **SDK:** vendor JSON/RPC. One TypeScript type for all three leaks validation, secrets, or tetri into the wrong layer.
+9. **Adapter:** converts a **foreign interface** (SDK, raw HTTP JSON) into yours. **Facade:** **hides a subsystem** behind a small API — Nest `exports`. A payment adapter is a class at the vendor edge; a module facade is which providers leave the module. You often want both.
+10. **Enough Nest:** controller, service, module, DTO, inject `Repository<T>`, maybe a guard. **Ceremony:** ports, use-cases, mappers, repo impls with no extra behavior. The first is how VetApp-style CRUD should look; the second is résumé architecture.
+
+## Predict the output
+
+1. **Request A can see `{ id: 2, role: 'admin' }`.** One singleton, one `user` field. B’s `setUser` overwrites A’s during A’s `await`. A’s `getUser()` is not request-local. (If B finished and a third request ran, you could see that user instead — any interleaving of writes.)
+
+2. **`AppointmentsService` becomes request-scoped.** Every HTTP request constructs a new `AppointmentsService` (and anything else in that chain). Cost: extra allocations, slower throughput, surprise request-scoping of code that looked like a singleton. “I only scoped AuthService” is false once something injects it.
+
+3. **Nest fails at bootstrap** with a missing-provider / cannot-resolve `SlotPolicy` error for `BillingModule`. Unexported providers are **not** visible to importers. Fix: export a **service method** you intend to share, or keep slot rules behind `AppointmentsService` — do not export internals just to silence DI.
+
+4. **No.** The chain **stops** at the guard. Pipes (including `ValidationPipe`) and the controller do not run. That short-circuit is Chain of Responsibility: a hop handled the request by denying it.
+
+5. **`[1, 1]`.** `TRANSIENT` means `a` and `b` are **different** `Counter` instances, each starting at `n = 0`. First `inc()` on each returns `1`. (`ReportsService` being singleton only means you reuse the **same pair** of counters across requests — still two counters, not one.) If `Counter` were `REQUEST` or default singleton, both parameters would typically be the **same** instance and `pair()` would return `[1, 2]`.
+
+## Debugging
+
+1. **Diagnosis:** default-scoped `CurrentUserService` plus middleware assigning `service.user` is the classic **shared request field** bug. Intermittent because it depends on overlap. **Fix:** drop the field. Middleware/guard sets `req.user`; controller uses `@CurrentUser() user` and **passes `user` into the service**. Only if the call stack cannot thread it, `Scope.REQUEST` on a tiny context provider — never a singleton field. Do not “fix” with TRANSIENT while a singleton still stores `user`.
+
+2. **Broken facade / module boundary:** notifications **own writes** to appointments by injecting the repository, skipping `AppointmentsService.create` invariants. **Fix:** `AppointmentsModule` **exports `AppointmentsService`** (or a dedicated query method like `findDueForReminder()`). Notifications **import the module and call the service**. Do not export `Repository<Appointment>` across features.
+
+3. **Missing Adapter (+ DIP token).** Controller is talking to the vendor. Introduce `PaymentGateway` and `BogPaymentAdapter`; bind with `useClass`. Controller → `PaymentsService` → port. Tests `{ provide: PAYMENT_GATEWAY, useValue: { charge: jest.fn() } }`. SDK stays inside the adapter file.
+
+4. **Review:** these files are an anemic stack — they do not add an invariant, a query, or a vendor seam. Nest’s service + `Repository<T>` already is the design. Keep controller/service/module/DTO. **Later justification:** a real conflict query (custom repo), a second payment provider (port + adapters), or mapping that must strip secrets on the way out (response adapter / serializer) — not folders for their own sake.
+
+## Application
+
+1.
+```ts
+const moduleRef = await Test.createTestingModule({
+  providers: [
+    PaymentsService,
+    {
+      provide: PAYMENT_GATEWAY,
+      useValue: { charge: jest.fn().mockResolvedValue({ providerRef: 'test' }) },
+    },
+  ],
+}).compile();
+const service = moduleRef.get(PaymentsService);
+```
+The mock is a **provider replacement** (constructor DI), not `moduleRef.get(PAYMENT_GATEWAY)` inside `PaymentsService`.
+
+2.
+```ts
+export const PAYMENT_GATEWAY = Symbol('PAYMENT_GATEWAY');
+
+export interface PaymentGateway {
+  charge(input: { amountCents: number }): Promise<{ providerRef: string }>;
+}
+
+@Injectable()
+export class BogPaymentAdapter implements PaymentGateway {
+  constructor(private readonly sdk: BogSdk) {}
+  async charge(input: { amountCents: number }) {
+    const raw = await this.sdk.createPayment({ amountTetri: input.amountCents });
+    return { providerRef: raw.order_id };
+  }
+}
+```
+`PaymentsService` injects `PaymentGateway` and calls `charge({ amountCents })` only.
+
+3.
+```ts
+@Module({
+  imports: [TypeOrmModule.forFeature([Appointment])],
+  controllers: [AppointmentsController],
+  providers: [AppointmentsService, SlotPolicy],
+  exports: [AppointmentsService],
+})
+export class AppointmentsModule {}
+```
+`SlotPolicy` is injectable only inside this module. Importers see `AppointmentsService`.
+
+4.
+```ts
+@Injectable()
+export class AppointmentsService {
+  constructor(@InjectRepository(Appointment) private readonly repo: Repository<Appointment>) {}
+
+  create(dto: CreateAppointmentDto, user: AuthUser) {
+    return this.repo.save({ ...dto, createdBy: user.id });
+  }
+}
+
+// controller
+@Post()
+create(@Body() dto: CreateAppointmentDto, @CurrentUser() user: AuthUser) {
+  return this.appointments.create(dto, user);
+}
+```
+No `currentUser` field. Guard still runs first in the chain so `user` is present.
+
+## Interview questions
+
+1. **Spoken:** “The ones Nest is built on: dependency injection for DIP — constructor injection, tokens for gateways, mocks in `TestingModule`. Modules as facades: export the service, not the TypeORM repo. Repository as `Repository<T>`, plus a custom repo only for real domain queries. The HTTP pipeline as Chain of Responsibility — guards for JWT/RBAC, pipes for DTOs. Adapters at the edges: HTTP DTOs in, payment SDKs out. I don’t sprinkle Strategy or extra use-case classes on CRUD.”  
+   **Follow-ups:** DI ≠ DIP (technique vs principle). Custom repo is **not** per entity. Skip a pattern when Nest already provided the seam and the extra class would only delegate.
+
+2. **Spoken:** “It’s Chain of Responsibility. Middleware at the Express/Fastify edge, then a guard that can stop the request — that’s auth and roles. Interceptors wrap the handler. Pipes validate and transform the body. The controller delegates to a service. Interceptors can map the response. Filters run only if something threw.”  
+   **Follow-ups:** JWT/RBAC → **guards**. DTO validation → **pipes** (`ValidationPipe`). Failed guard → chain stops; pipes/controller **do not run**.
+
+3. **Spoken:** “In Nest I use TypeORM’s repository API: inject `Repository<User>`. That’s already the pattern — persistence is a collaborator, not `user.save()`. Active Record fights testing and module boundaries. I add a class named `AppointmentsRepository` when the query is domain language, not when I want a file per table.”  
+   **Follow-ups:** `@InjectRepository(User)` is enough for CRUD. Write `AppointmentsRepository` for conflicts/slots/QueryBuilder you refuse to duplicate.
+
+4. **Spoken:** “VetApp was a PHP backend rewritten in Nest against the existing MySQL schema. I used feature modules as facades so we could migrate a domain at a time. Auth was JWT plus RBAC for admin, vet, and receptionist — guards on the pipeline, not checks buried in payments. Persistence was injected repositories on entities that mapped the legacy tables. Bank of Georgia sat behind a payment adapter so the service spoke our types. I did not add a ports-and-use-cases folder on every CRUD resource.”  
+   **Follow-ups:** Deliberately skipped anemic clean architecture. Flitt vs BoG is another **adapter** on the same `PaymentGateway` token (`useClass`), not a second `PaymentsService`.
+
+## Connections
+
+1. `PaymentsService` depends on the **port** (`PaymentGateway`). DIP forbids depending on `BogSdk`. Each adapter implements the port; the module **binds** the token. BoG, Flitt, or `{ charge: jest.fn() }` are `useClass` / `useValue` — callers unchanged.
+2. Importers depend on **exported** `AppointmentsService`, not on `Repository<Appointment>` or `SlotPolicy`. Writes go through the service that owns conflict checks. The facade makes the DI graph **enforce** that boundary: you cannot inject what was not exported.
+3. Role checks are a **guard hop** (allow/deny) before the handler. The payment adapter only translates money and ids. Mixing RBAC into BoG mapping couples vendor code to clinic roles and runs at the wrong time (too late, or on paths that are not HTTP). CoR = put the concern on the hop whose job it is.
+4. **Same pattern:** convert a foreign shape to the one the inner layer speaks. **Different edge / layer:** HTTP DTO adapts **untrusted JSON → validated input** (pipes). `BogPaymentAdapter` adapts **domain charge → vendor SDK**. You still need both; collapsing them puts tetri in the DTO or class-validator on `order_id`.
+5. Default singleton is **correct** when methods are stateless: many requests share one `AppointmentsService` that only uses arguments + injected repo. The bug is **request-shaped mutable fields** on that shared instance. Same lifetime, wrong state model — not “singletons are banned in Nest.”

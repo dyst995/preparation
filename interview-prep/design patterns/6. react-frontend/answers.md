@@ -1,0 +1,179 @@
+# Applying design patterns in React / React Native UI — Answers
+
+## Core recall
+
+1. **`children`.** The parent typically passes **React elements** (or other `ReactNode`) into that slot so the child is a shell, not a subclass.
+2. **`class PrimaryButton extends Button`** (class inheritance of components). Interviewers treat it as a red flag.
+3. **Component state** — `useState` / `useReducer` (this component is the observer). **Context** — `useContext` under a Provider. **Zustand / Redux** — `useStore(selector)` (or equivalent). React Query is Observer of **server** cache, not a fourth UI store.
+4. The observer callback still runs, but it closed over **props/state from the render that subscribed**, not the latest render.
+5. A **strategy / variant map** (`buttonClass[variant]`, `methodUi[method]`), not a growing `switch` in JSX.
+6. **HOC** (`withAuth(Page)`, `memo`, `connect`) ≈ GoF Decorator (wrap, same interface, extra behavior). **Custom hooks** compose behavior *into* the component — not a wrap.
+7. At the **API boundary** (`queryFn` / `select` / `model/mappers.ts`). Screens must not read wire names like `amt_cents` / `st`.
+8. A **Context provider** (shared widget state) plus a **family of related children** (`Tabs` + `Tabs.Tab`).
+9. The **container is usually a custom hook** (subscribe + map); the **presentational** function component receives view-model props and renders. A dedicated `*Container` component is optional.
+10. **GoF Bridge** splits abstraction from implementors (structural pattern). **RN Bridge** is the legacy JS↔native **message transport**. Same word, unrelated ideas.
+
+## Explain why
+
+1. You inherit **implementation** (markup, internal state, lifecycle), not a UI contract. Single inheritance cannot mix `Touchable` + `Themed`. Changing the base `render` breaks subclasses (fragile base class). Hooks are for function components — a class hierarchy freezes you out of the modern API.
+2. Render-prop libraries for *behavior* (`<Mouse>{pos => …}</Mouse>`) nested into wrapper hell. Hooks compose that logic **into** the caller with no extra tree nodes. `renderItem` is still a **slot**: the child owns iteration, the parent owns the row — composition of UI, not a subscription library.
+3. Context subscribers re-render whenever the Provider **`value` identity** changes (`Object.is`). There is no built-in selector. Zustand notifies only when the **selected slice** changes, so unrelated fields do not wake that observer.
+4. The effect subscribed **once**. The interval callback closed over **`n === 0`**. Every tick does `setN(0 + 1)`. Observer (the timer) fired; the **closure** was bound to the first render. UI sticks at `1`.
+5. Each method is a **strategy object** (a component). Adding a method is a new component + one map entry, not another branch in a 120-line screen. `Pay` stays a stable caller. Discriminated unions keep the data side in sync.
+6. Decorator **wraps** an object and keeps its interface. `useAuth()` runs **inside** `Home` — no wrapper component, no extra node, no ref-forwarding. That is **composition of behavior**, same family as composition-over-inheritance.
+7. The view is speaking the **foreign JSON interface**. Three screens will invent three interpretations. A backend rename or string-minor-units change becomes a **wrong amount**, not a one-line mapper fix. Adapter’s job is to convert DTO → view model **once** at the boundary.
+8. Cooperating children need shared `active` without turning every `Tab` prop into a drill. Private context is an **implementation detail of the widget**. App-wide Auth/Theme context is a **global subject** with a large fan-out — different scope, same Observer mechanism.
+9. The **split of data wiring vs view** is still useful (Storybook, reuse, tests). Hooks collapsed the extra **container component**, but interviewers still use the 2015 name. Map it: hook = container logic; presentational = markup.
+
+## Compare and contrast
+
+1. **Wrap:** `PrimaryButton` *uses* `Button` and passes `variant`. Function composition; both stay function components. **Subclass:** inherits implementation, fragile base, no hooks-friendly API. Interviewers want the wrap.
+2. **`children`:** compose **elements** (parent places a tree in a slot). **Render prop:** compose a **function** the child calls with data (list row). **Custom hook:** compose **stateful logic** into the caller; does not wrap JSX and does not share a store.
+3. **`setState`:** one observer (the owner), plus children re-rendered as a consequence. **Context:** fan-out, no selector — any `value` identity change wakes all consumers. **Zustand:** external subject; selector filters which observers run.
+4. **`withAuth(Home)`:** Decorator — wrapper component, same outward props, extra gate. **`useAuth()`:** composition inside `Home`; no wrapper hell / ref tax. Prefer the hook for new code.
+5. **Decorator:** wrap, preserve interface, add responsibility (HOC). **Composition:** contain (`children`) or inline behavior (hooks) without a wrapping type. React’s default is composition; HOCs are the remaining wraps.
+6. **Boundary mapper:** one function, one interpretation, screens typed to `PaymentView`. **JSX rename:** wire names leak; API change touches every screen; fintech amounts/status drift.
+7. **Compound context:** private, small family, throw if missing provider, not a product-wide store. **App-wide context:** theme/auth/session for the whole tree; coarse Observer; not how you implement `Select.Item`.
+8. **2015:** `connect` / container component fetches and injects props; presentational is dumb. **Today:** `useUserCard` (Observer + Adapter) + `UserCard` presentational. Same split, fewer wrapper files. Still split two files when the view is reused or snapshot-tested.
+9. **GoF Bridge:** two hierarchies (abstraction vs implementor) that vary independently — structural unit. **RN Bridge:** serialize/batch messages JS↔native — transport unit. Never swap the answers.
+
+## Predict the output
+
+1. **Sticks at `1`.** The interval fires (Observer worked). The callback closed over the first render’s `n === 0`, so every tick is `setN(0 + 1)`. Empty deps never resubscribe.
+2. **Type error; does not compile.** `ButtonVariant` is `'primary' | 'ghost'`. `"danger"` is not a key of `buttonClass`. The strategy map *is* the type.
+3. **Runtime: `View` is `undefined`, then crash on `<View />`.** `methodUi` has no `google`. Types may already error if `methodUi[method]` is indexed with `'google'`. Missing strategy entry, not a React mystery.
+4. **Throws `Tab must be used in Tabs`.** No Provider above; `useContext` is `null`. Compound children require the parent. Fail-fast is intentional.
+5. **Adapter is missing.** The row speaks the DTO. Renaming `amt_cents` breaks this component (and every other leak). A mapper would isolate the rename; `WalletRow` would still take `amountMinor`.
+6. **Two compositions: HOC wrap + hook inside.** Redundant Observer/gate. Pick one — usually `useAuth` in `Home` (or a layout) and drop `withAuth`, unless `withAuth` is a legacy boundary you have not unwrapped yet. Double-wrapping is wrapper hell, not extra safety.
+
+## Debugging
+
+1. **Fragile base class / inheritance of implementation.** Subclasses depended on `Button`’s internal layout. Fix: stop extending; `function PrimaryButton(props) { return <Button {...props} variant="primary" /> }` (or a variant map). Put `loading` on the shared `Button` API once.
+2. **Observer + stale closure.** The store notified the listener; the listener closed over `count` from the subscribe-time render (`0`). Fixes: log `store.getState()` inside the listener (read the subject now); or a ref updated each render (`countRef.current = count`) that the listener reads; do not expect `count` from `[]` to stay fresh. Tearing down Zustand is unrelated.
+3. **Strategy smell.** Extract `CardForm` / `ApplePayButton` / `GooglePayButton` / `NewMethod` and `const methodUi: Record<Method, Component> = { … }`. `PayScreen` does `const View = methodUi[method]; return <View … />`. New method = new component + one key.
+4. **DTO leaked into the tree; Adapter never ran.** Three interpretations of money. Live: `paymentFromDto` (parse + map) next to the fetch; screens take `PaymentView` / `amountMinor`. Not three slightly different `/ 100`s. Optional zod at the boundary so string minor units fail loudly.
+5. **Missing compound provider.** `Select.Item` consumed null context. Storybook wrapped `Root`; the screen did not. Fix: always render the family under `Select.Root` (or the equivalent provider). Throw in the child hook if missing — that crash *is* the diagnosis.
+6. **Drop what hooks already compose.** `useAuth` replaces `withAuth`. Spinner/loading is often a hook or a presentational prop, not `withSpinner`. **Maybe leave** `withAnalytics` if the library is HOC-only and you are not wrapping three more. `React.memo` can stay a wrap. Do not add new `withX` for behavior you can hook.
+
+## Application
+
+1.
+```tsx
+function PrimaryButton(props: Omit<ButtonProps, 'variant'>) {
+  return <Button {...props} variant="primary" />;
+}
+```
+**Composition:** it *uses* `Button` (contain/delegate), it does not *become* `Button` via a prototype chain.
+
+2.
+```tsx
+const buttonClass = {
+  primary: 'btn-primary',
+  ghost: 'btn-ghost',
+  danger: 'btn-danger',
+  link: 'btn-link',
+} as const;
+
+type ButtonVariant = keyof typeof buttonClass;
+
+function Button({ variant, label }: { variant: ButtonVariant; label: string }) {
+  return <button className={buttonClass[variant]}>{label}</button>;
+}
+```
+`link` is a new key. No `switch` to edit. Typos fail at compile time.
+
+3.
+```tsx
+type PaymentDto = { amt_cents: number; st: string };
+type PaymentView = { amountMinor: number; status: 'pending' | 'completed' | 'failed' };
+
+function paymentFromDto(dto: PaymentDto): PaymentView {
+  return { amountMinor: dto.amt_cents, status: statusFromWire(dto.st) };
+}
+
+function WalletRow({ payment }: { payment: PaymentView }) {
+  return <span>{formatMinor(payment.amountMinor)}</span>;
+}
+```
+`WalletRow` never sees `amt_cents` / `st`. Mapper is the Adapter.
+
+4.
+```tsx
+const TabsCtx = createContext<{ active: string; setActive: (id: string) => void } | null>(null);
+
+function Tabs({ defaultId, children }: { defaultId: string; children: React.ReactNode }) {
+  const [active, setActive] = useState(defaultId);
+  return <TabsCtx.Provider value={{ active, setActive }}>{children}</TabsCtx.Provider>;
+}
+
+function Tab({ id, children }: { id: string; children: React.ReactNode }) {
+  const ctx = useContext(TabsCtx);
+  if (!ctx) throw new Error('Tab must be used in Tabs');
+  return (
+    <button onClick={() => ctx.setActive(id)} data-active={ctx.active === id}>
+      {children}
+    </button>
+  );
+}
+Tabs.Tab = Tab;
+
+<Tabs defaultId="wallet">
+  <Tabs.Tab id="wallet">Wallet</Tabs.Tab>
+</Tabs>
+```
+
+5.
+```tsx
+function UserCard({ name, avatarUrl }: { name: string; avatarUrl: string }) {
+  return (
+    <article>
+      <img src={avatarUrl} alt="" />
+      <h2>{name}</h2>
+    </article>
+  );
+}
+
+function useUserCard(id: string) {
+  const { data } = useUser(id);
+  return data ? { name: data.displayName, avatarUrl: data.avatarUrl } : null;
+}
+
+function UserCardScreen({ id }: { id: string }) {
+  const vm = useUserCard(id);
+  if (!vm) return null;
+  return <UserCard {...vm} />;
+}
+```
+Hook = container (Observer + a bit of Adapter). `UserCard` = presentational. Storybook can mount `UserCard` with props.
+
+## Interview questions
+
+1. **Spoken:** The tree is composition, not class inheritance — `children`, maybe a render prop for a slot, hooks for behavior. UI state is Observer (`setState`, Context, Zustand selector). Variants and payment methods are a Strategy map. HOCs are the old Decorator wrap; I write hooks unless I need `memo` / legacy `connect`. JSON is Adapted to a view model at the boundary. Tabs/Select are compound components (provider + family). Container/presentational maps to a hook plus a presentational view.
+   **Follow-ups:** Inherit → fragile base class, single inheritance, hooks are functions. Strategy → `buttonClass[variant]`, `methodUi[method]`. Adapter → mapper next to fetch, never `amt_cents` in JSX.
+
+2. **Spoken:** Closest yes — an HOC wraps a component, keeps the props interface, adds behavior. I don’t use them for everything because hooks compose the same behavior *into* the component without wrapper hell, ref forwarding, or prop collisions.
+   **Follow-ups:** `memo` is still a wrap (performance Decorator). `connect` is Observer + Decorator, legacy. Error boundaries must be classes, so you wrap a tree.
+
+3. **Spoken:** A long-lived subscription (interval, store listener) is Observer: it still fires. The callback is a function from a specific render, so it closes over that render’s state. Empty deps mean we never recreate it — we keep seeing `n === 0`. Observer worked; the closure was stale.
+   **Follow-ups:** `setN(x => x + 1)` does not read `n`. A ref holds latest. Deps resubscribe (churny if frequent).
+
+4. **Spoken:** Adapter at the boundary: DTO in, view model out (`paymentFromDto`). Screens take `PaymentView`. Outbound: view model → request DTO before POST. I do **not** map every feature in a global Axios interceptor — that becomes a god adapter.
+   **Follow-ups:** interceptor = shared HTTP only; feature mapper stays in the feature. Zod/parse before map so bad wire fails loudly.
+
+5. **Spoken:** A small family that only makes sense together — parent provides state, children consume it, usually via private Context. Overkill for a Button or a one-level parent that can pass props. Radix/Headless `Select.Item` is the good case.
+   **Follow-ups:** It *uses* Context; it is not “I put the app in Context.” Auth context is a global subject; Tabs context is a widget channel. Missing provider should throw.
+
+6. **Spoken:** The 2015 split is data wiring vs view. Today the container is usually a hook; the presentational component still takes props and is easy to snapshot. I don’t make `FooContainer.tsx` for every widget.
+   **Follow-ups:** Split two files when the view is reused, Storybooked, or the wiring is thick. Adapter often lives in the hook (`data` DTO → view-model props).
+
+7. **Spoken first:** “Do you mean the **React Native Bridge** — the JS↔native transport — or the **GoF Bridge** pattern?” RN interview: assume transport, one sentence, then offer the pattern if they want it. UI-patterns round: GoF Bridge is the structural unit; I would not volunteer it as a React UI pattern.
+
+## Connections
+
+1. Observer gives you a **long-lived callback**. Closures bind that callback to the **subscribe-time** lexical environment. If you don’t resubscribe / use a functional updater / ref, the subject notifies you and you still read yesterday’s `n`.
+2. Adapter’s **target interface** is what presentational components should take (`PaymentView`, `name` + `avatarUrl`). The old container (now a hook) is where mapping + subscription live so the view stays dumb.
+3. HOC **wraps** like Decorator. A hook **inlines** behavior into the caller — same instinct as “compose, don’t extend `Button`.” Both fight inheritance; only the HOC is a wrap.
+4. The parent **composes** children in JSX (`<Tabs><Tabs.Tab /></Tabs>`). Those children **observe** shared state through context. Compound = composition of structure + Observer for the implicit channel.
+5. The strategy **map keys** should be the same union as the domain (`Method`, `ButtonVariant`). Discriminated unions on data (`{ type: 'card'; pan } | { type: 'apple' }`) pick the strategy and keep invalid combinations out of JSX.
+6. `usePayment(id)`: **Observer** of server cache (`useQuery`) or a store; **Adapter** `paymentFromDto` in `queryFn`/`select`; sometimes **Strategy** if it returns which method UI to mount. It is not itself a Decorator.
+7. RN Bridge is **transport physics** (serialize, batch, JS↔native). A React UI patterns answer is composition, Observer, Strategy, Adapter, compound, hooks vs HOC. Mixing them sounds like you memorized the word “bridge.” Disambiguate; point at the structural unit for GoF Bridge.

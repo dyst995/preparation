@@ -30,6 +30,7 @@ If a day lists more than you can finish deeply, **do not skip ahead** - finish q
 
 - [ ] [README.md](./README.md)
 - [ ] [english/INDEX.md](./english/INDEX.md) (ongoing: phrases + unit lessons)
+- [ ] [design patterns/INDEX.md](./design%20patterns/INDEX.md) (after Nest + React: name the patterns you already use)
 - [ ] Skim this file fully once
 - [ ] [react-native/REACT_NATIVE_INTERVIEW.md](./react-native/REACT_NATIVE_INTERVIEW.md) (know RN map)
 - [ ] Write your top 5 target roles on paper (RN / fullstack / frontend)
@@ -325,6 +326,14 @@ Use this if you prefer one flat list with no day splits.
 39. [ ] `sql-databases/04-postgres-vs-mysql.md`
 40. [ ] `sql-databases/05-interview-questions.md`
 
+### Design patterns (after Nest + React)
+- [ ] `design patterns/1. intro/notes.md`
+- [ ] `design patterns/2. creational/notes.md`
+- [ ] `design patterns/3. structural/notes.md`
+- [ ] `design patterns/4. behavioral/notes.md`
+- [ ] `design patterns/5. nest-backend/notes.md`
+- [ ] `design patterns/6. react-frontend/notes.md`
+
 ### Next.js + DevOps
 41. [ ] `nextjs/01-routing-rendering.md`
 42. [ ] `nextjs/02-data-fetching-caching.md`
@@ -381,6 +390,7 @@ Emergency order (one day):
 - [ ] Day 4 done
 - [ ] Day 5 done (Bridge / Native / Turbo)
 - [ ] Native platform literacy done (Android + iOS host)
+- [ ] Design patterns done (intro → Nest/React application)
 - [ ] Day 6 done
 - [ ] Day 7 done
 - [ ] Day 8 done

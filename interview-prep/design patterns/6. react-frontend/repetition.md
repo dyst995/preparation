@@ -1,0 +1,44 @@
+# Applying design patterns in React / React Native UI — Next-day repetition
+
+## How to use
+
+1. Do **not** open `notes.md` first. The full question bank is `self-test.md`; this file is the next-day subset.
+2. Answer every question out loud or in writing, notes closed.
+3. Check `answers.md` only after you finish (or after an item if stuck more than ~2 minutes).
+4. Mark `[x]` only if you retrieved it without looking.
+5. If more than about a third are misses, restudy those sections in `notes.md`, then retry only the misses.
+
+Target time: **15–25 minutes**.
+
+## Must retrieve
+
+- [ ] What inheritance pattern is the red flag in React / RN UI? Why is `class PrimaryButton extends Button` a trap even if the UI looks right? Contrast with `function PrimaryButton(props) { return <Button {...props} variant="primary" /> }`.
+- [ ] Name three Observer subjects in a typical React/RN UI and how a component subscribes to each. In one sentence, what is a stale closure in an Observer callback?
+- [ ] What replaces a growing `switch` / ternary in JSX for button variants or payment-method UI? Why put payment methods in a component map instead of `switch (method)` inside `Pay`?
+- [ ] Which React API is closest to GoF Decorator? Which API is composition of behavior instead? Why is `useAuth()` not a Decorator even though it “adds” auth behavior to `Home`?
+- [ ] Where should API DTO → view-model mapping happen? What must screens not read? Why is `<Text>{item.amt_cents / 100}</Text>` on three screens an Adapter failure?
+- [ ] What two pieces make a practical compound component? How do you map “container / presentational” onto today’s React?
+- [ ] One sentence: Gang of Four Bridge vs the React Native Bridge.
+
+## Predict / debug
+
+- [ ] `Tick` with `setInterval(() => setN(n + 1), 1000)` and `[]` deps. What does the UI show after several seconds? State the result **and explain why** (Observer + closure).
+```tsx
+function Tick() {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setN(n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span>{n}</span>;
+}
+```
+- [ ] `buttonClass = { primary, ghost } as const`; `<Button variant="danger" />`. Compile or run? Why?
+- [ ] `Tab` uses `useContext(TabsCtx)` (default `null`) and throws if missing; render `<Tab id="wallet" />` with no `Tabs` parent. What happens on render, and why?
+- [ ] Wallet, Confirm, and Receipt each do `(item.amt_cents / 100).toFixed(2)` with slightly different null checks. One screen shows the wrong amount after a backend string-minor-units change. Diagnose. Where does the Adapter live?
+
+## Say it out loud
+
+- [ ] Explain applying design patterns in React / RN UI in 30–60 seconds as if an interviewer asked.
+- [ ] What design patterns do you use in React / React Native UI? Follow-ups: Why not inherit components? Where does Strategy show up? Where does Adapter live?
+- [ ] Someone in an RN interview says “tell me about the Bridge pattern.” What do you disambiguate first?
