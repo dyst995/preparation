@@ -33,6 +33,7 @@ Each chapter includes: learning objectives, topic checklists, deep explanations,
 | [native-developement/](./native-developement/INDEX.md) | 6 chapters + index | Android Gradle/Manifest/Activity; iOS Xcode/plist/signing; storage/backup; host debugging | **High** with RN (platform literacy) |
 | [english/](./english/INDEX.md) | Phrases + unit lessons (same numbered folders as TS/JS) | Spoken interview English | **Ongoing** (10–15 min/day) |
 | [design patterns/](./design%20patterns/INDEX.md) | 6 study units — GoF map + Nest/React application | Named solutions you already use (DI, Repository, Adapter, Observer) | **Medium** (after Nest + React) |
+| [interview-questions/](./interview-questions/PROGRESS.md) | Senior Q&A handbook (React, Nest, Node, databases) | Long-form interview answers; see progress file for how many are written | **Ongoing** |
 
 Working-knowledge languages (Kotlin, Swift, Java, Objective-C) are **not** separate language tracks. Read them inside [react-native/07-native-modules.md](./react-native/07-native-modules.md) and the [native-developement](./native-developement/INDEX.md) host-OS track (Gradle, Xcode, lifecycle, permissions).
 
