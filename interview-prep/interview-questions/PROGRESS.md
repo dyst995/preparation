@@ -6,19 +6,19 @@ Updated when question files change. Recount with:
 node interview-prep/interview-questions/count-questions.mjs
 ```
 
-**Status:** in progress. Not complete. Sections 01 and 02 of each track are a full 50. Sections 03–10 are not started. Counts below were checked with `count-questions.mjs` (heading IDs and required answer sections). They were not line-audited against current docs for every claim.
+**Status:** in progress. Sections 01–03 of each track are a full 50. Sections 04–10 are not started. Counts checked with `count-questions.mjs`.
 
-**Continuation point:** `react/03-performance.md` (`REACT-101`–`REACT-150`), then Nest `03-dependency-injection.md` (`NEST-101`–`NEST-150`), Node `03-concurrency.md` (`NODE-101`–`NODE-150`), and databases `03-indexing.md` (`DB-101`–`DB-150`). Do not skip ahead to later sections of a track.
+**Continuation point:** `react/04-architecture.md` (`REACT-151`–`REACT-200`), then Nest `04-auth.md` (`NEST-151`–`NEST-200`), Node `04-streams.md` (`NODE-151`–`NODE-200`), and databases `04-transactions.md` (`DB-151`–`DB-200`). Do not skip ahead to later sections of a track.
 
 ## Totals
 
 | Track | Written | Target | Remaining |
 |---|---:|---:|---:|
-| React | 100 | 500 | 400 |
-| NestJS | 100 | 500 | 400 |
-| Node.js | 100 | 500 | 400 |
-| Databases | 100 | 500 | 400 |
-| **Total** | **400** | **2000** | **1600** |
+| React | 150 | 500 | 350 |
+| NestJS | 150 | 500 | 350 |
+| Node.js | 150 | 500 | 350 |
+| Databases | 150 | 500 | 350 |
+| **Total** | **600** | **2000** | **1400** |
 
 ## Sections
 
@@ -30,7 +30,7 @@ Each row is 50 questions. `0` means the file is not written yet.
 |---|---|---:|
 | `react/01-fundamentals.md` | REACT-001–050 | 50 |
 | `react/02-hooks-state.md` | REACT-051–100 | 50 |
-| `react/03-performance.md` | REACT-101–150 | 0 |
+| `react/03-performance.md` | REACT-101–150 | 50 |
 | `react/04-architecture.md` | REACT-151–200 | 0 |
 | `react/05-async-data.md` | REACT-201–250 | 0 |
 | `react/06-forms-accessibility.md` | REACT-251–300 | 0 |
@@ -45,7 +45,7 @@ Each row is 50 questions. `0` means the file is not written yet.
 |---|---|---:|
 | `nestjs/01-fundamentals.md` | NEST-001–050 | 50 |
 | `nestjs/02-request-lifecycle.md` | NEST-051–100 | 50 |
-| `nestjs/03-dependency-injection.md` | NEST-101–150 | 0 |
+| `nestjs/03-dependency-injection.md` | NEST-101–150 | 50 |
 | `nestjs/04-auth.md` | NEST-151–200 | 0 |
 | `nestjs/05-database.md` | NEST-201–250 | 0 |
 | `nestjs/06-validation-api.md` | NEST-251–300 | 0 |
@@ -60,7 +60,7 @@ Each row is 50 questions. `0` means the file is not written yet.
 |---|---|---:|
 | `nodejs/01-runtime-foundations.md` | NODE-001–050 | 50 |
 | `nodejs/02-event-loop.md` | NODE-051–100 | 50 |
-| `nodejs/03-concurrency.md` | NODE-101–150 | 0 |
+| `nodejs/03-concurrency.md` | NODE-101–150 | 50 |
 | `nodejs/04-streams.md` | NODE-151–200 | 0 |
 | `nodejs/05-http.md` | NODE-201–250 | 0 |
 | `nodejs/06-errors-reliability.md` | NODE-251–300 | 0 |
@@ -75,7 +75,7 @@ Each row is 50 questions. `0` means the file is not written yet.
 |---|---|---:|
 | `databases/01-sql-foundations.md` | DB-001–050 | 50 |
 | `databases/02-postgres-internals.md` | DB-051–100 | 50 |
-| `databases/03-indexing.md` | DB-101–150 | 0 |
+| `databases/03-indexing.md` | DB-101–150 | 50 |
 | `databases/04-transactions.md` | DB-151–200 | 0 |
 | `databases/05-data-modeling.md` | DB-201–250 | 0 |
 | `databases/06-scaling-ha.md` | DB-251–300 | 0 |
