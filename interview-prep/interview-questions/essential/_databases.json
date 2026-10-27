@@ -1,0 +1,812 @@
+[
+  {
+    "id": "DB-151",
+    "tier": "must",
+    "rank": 1,
+    "title": "What does ACID mean, and how does PostgreSQL deliver each property?",
+    "file": "04-transactions.md",
+    "score": 4.9,
+    "why": "ACID is the interview entry point for every transaction and concurrency follow-up."
+  },
+  {
+    "id": "DB-156",
+    "tier": "must",
+    "rank": 2,
+    "title": "Which isolation levels does PostgreSQL implement?",
+    "file": "04-transactions.md",
+    "score": 4.85,
+    "why": "You must name what Postgres actually implements before debating anomalies."
+  },
+  {
+    "id": "DB-157",
+    "tier": "must",
+    "rank": 3,
+    "title": "How does Read Committed behave?",
+    "file": "04-transactions.md",
+    "score": 4.8,
+    "why": "Default isolation; most production bugs and race questions start here."
+  },
+  {
+    "id": "DB-159",
+    "tier": "must",
+    "rank": 4,
+    "title": "How does Repeatable Read work in PostgreSQL?",
+    "file": "04-transactions.md",
+    "score": 4.75,
+    "why": "Snapshot isolation and serialization failures are core senior concurrency talk."
+  },
+  {
+    "id": "DB-164",
+    "tier": "must",
+    "rank": 5,
+    "title": "What is a lost update, and how do you prevent it?",
+    "file": "04-transactions.md",
+    "score": 4.72,
+    "why": "Lost updates are the concurrency failure interviewers expect you to prevent."
+  },
+  {
+    "id": "DB-169",
+    "tier": "must",
+    "rank": 6,
+    "title": "What does `SELECT \u2026 FOR UPDATE` do?",
+    "file": "04-transactions.md",
+    "score": 4.7,
+    "why": "Pessimistic locking is the practical tool for safe read-modify-write."
+  },
+  {
+    "id": "DB-101",
+    "tier": "must",
+    "rank": 7,
+    "title": "What a B-tree index stores",
+    "file": "03-indexing.md",
+    "score": 4.68,
+    "why": "B-tree leaf/TID model is the base for every index and EXPLAIN discussion."
+  },
+  {
+    "id": "DB-102",
+    "tier": "must",
+    "rank": 8,
+    "title": "Why the planner sometimes prefers a sequential scan",
+    "file": "03-indexing.md",
+    "score": 4.65,
+    "why": "Explains why 'add an index' is often the wrong first answer."
+  },
+  {
+    "id": "DB-103",
+    "tier": "must",
+    "rank": 9,
+    "title": "Leftmost prefix of a multicolumn index",
+    "file": "03-indexing.md",
+    "score": 4.62,
+    "why": "Multicolumn leftmost-prefix rules show up constantly in query tuning."
+  },
+  {
+    "id": "DB-117",
+    "tier": "must",
+    "rank": 10,
+    "title": "Reading Index Scan vs Index Only vs Bitmap",
+    "file": "03-indexing.md",
+    "score": 4.6,
+    "why": "Reading Index / Index Only / Bitmap plans is day-one EXPLAIN fluency."
+  },
+  {
+    "id": "DB-148",
+    "tier": "must",
+    "rank": 11,
+    "title": "Explaining \u201cFilter\u201d vs \u201cIndex Cond\u201d",
+    "file": "03-indexing.md",
+    "score": 4.55,
+    "why": "Filter vs Index Cond separates usable indexes from fake wins."
+  },
+  {
+    "id": "DB-007",
+    "tier": "must",
+    "rank": 12,
+    "title": "An inner join keeps only matched rows",
+    "file": "01-sql-foundations.md",
+    "score": 4.52,
+    "why": "Inner join semantics and unmatched-row loss are baseline SQL."
+  },
+  {
+    "id": "DB-008",
+    "tier": "must",
+    "rank": 13,
+    "title": "A left join keeps every left row",
+    "file": "01-sql-foundations.md",
+    "score": 4.5,
+    "why": "Left join preservation is required for correct reporting queries."
+  },
+  {
+    "id": "DB-011",
+    "tier": "must",
+    "rank": 14,
+    "title": "A WHERE on the outer side discards the preserved row",
+    "file": "01-sql-foundations.md",
+    "score": 4.48,
+    "why": "Classic ON vs WHERE trap that silently turns outer joins into inner."
+  },
+  {
+    "id": "DB-015",
+    "tier": "must",
+    "rank": 15,
+    "title": "A join changes the grain before COUNT runs",
+    "file": "01-sql-foundations.md",
+    "score": 4.48,
+    "why": "Join-grain mistakes before COUNT are a top production SQL bug."
+  },
+  {
+    "id": "DB-004",
+    "tier": "must",
+    "rank": 16,
+    "title": "Comparisons with NULL yield unknown",
+    "file": "01-sql-foundations.md",
+    "score": 4.45,
+    "why": "Three-valued NULL logic breaks WHERE/CHECK reasoning without exception."
+  },
+  {
+    "id": "DB-013",
+    "tier": "must",
+    "rank": 17,
+    "title": "WHERE filters rows; HAVING filters groups",
+    "file": "01-sql-foundations.md",
+    "score": 4.42,
+    "why": "WHERE vs HAVING is the grouping filter distinction interviewers probe."
+  },
+  {
+    "id": "DB-058",
+    "tier": "must",
+    "rank": 18,
+    "title": "An update adds a tuple version and leaves the old one",
+    "file": "02-postgres-internals.md",
+    "score": 4.4,
+    "why": "MVCC update-as-new-version explains locking, vacuum, and bloat."
+  },
+  {
+    "id": "DB-059",
+    "tier": "must",
+    "rank": 19,
+    "title": "A snapshot is the set of transaction ids a statement may see",
+    "file": "02-postgres-internals.md",
+    "score": 4.38,
+    "why": "Snapshots are how Postgres isolation is actually delivered."
+  },
+  {
+    "id": "DB-060",
+    "tier": "must",
+    "rank": 20,
+    "title": "A plain read does not lock the row a writer needs",
+    "file": "02-postgres-internals.md",
+    "score": 4.35,
+    "why": "Readers not blocking writers is the key Postgres concurrency claim."
+  },
+  {
+    "id": "DB-176",
+    "tier": "must",
+    "rank": 21,
+    "title": "Do readers block writers in Postgres?",
+    "file": "04-transactions.md",
+    "score": 4.32,
+    "why": "Direct answer to 'do readers block writers?' with table-lock nuance."
+  },
+  {
+    "id": "DB-055",
+    "tier": "must",
+    "rank": 22,
+    "title": "A commit waits for WAL, and the heap page can stay dirty",
+    "file": "02-postgres-internals.md",
+    "score": 4.3,
+    "why": "WAL-before-commit is the durability mechanism behind ACID D."
+  },
+  {
+    "id": "DB-177",
+    "tier": "must",
+    "rank": 23,
+    "title": "How are deadlocks detected and resolved?",
+    "file": "04-transactions.md",
+    "score": 4.28,
+    "why": "Deadlock detection/resolution is expected senior production knowledge."
+  },
+  {
+    "id": "DB-182",
+    "tier": "must",
+    "rank": 24,
+    "title": "What are the hazards of long-running transactions?",
+    "file": "04-transactions.md",
+    "score": 4.25,
+    "why": "Long transactions cause vacuum, lock, and replica pain in real systems."
+  },
+  {
+    "id": "DB-202",
+    "tier": "must",
+    "rank": 25,
+    "title": "Explain 2NF and 3NF with a concrete example.",
+    "file": "05-data-modeling.md",
+    "score": 4.22,
+    "why": "2NF/3NF with an example is the core design interview ask."
+  },
+  {
+    "id": "DB-204",
+    "tier": "must",
+    "rank": 26,
+    "title": "How far should you normalize in a real OLTP application?",
+    "file": "05-data-modeling.md",
+    "score": 4.2,
+    "why": "Practical normalize-vs-stop judgment for OLTP schemas."
+  },
+  {
+    "id": "DB-205",
+    "tier": "must",
+    "rank": 27,
+    "title": "When is denormalization justified?",
+    "file": "05-data-modeling.md",
+    "score": 4.18,
+    "why": "When denormalization is justified\u2014and how to stay honest about cost."
+  },
+  {
+    "id": "DB-212",
+    "tier": "must",
+    "rank": 28,
+    "title": "What does a foreign key guarantee, and what does it not?",
+    "file": "05-data-modeling.md",
+    "score": 4.15,
+    "why": "FK guarantees and non-guarantees frame integrity vs application rules."
+  },
+  {
+    "id": "DB-149",
+    "tier": "must",
+    "rank": 29,
+    "title": "Choosing indexes from slow-query evidence",
+    "file": "03-indexing.md",
+    "score": 4.12,
+    "why": "Evidence-first indexing process beats checklist indexes."
+  },
+  {
+    "id": "DB-252",
+    "tier": "must",
+    "rank": 30,
+    "title": "Why are many direct connections a problem in PostgreSQL?",
+    "file": "06-scaling-ha.md",
+    "score": 4.1,
+    "why": "Connection explosion is the first scaling failure mode for Postgres."
+  },
+  {
+    "id": "DB-253",
+    "tier": "must",
+    "rank": 31,
+    "title": "Explain PgBouncer session, transaction, and statement pooling.",
+    "file": "06-scaling-ha.md",
+    "score": 4.08,
+    "why": "PgBouncer modes are required knowledge for app-to-DB scaling."
+  },
+  {
+    "id": "DB-306",
+    "tier": "must",
+    "rank": 32,
+    "title": "Walk through cache-aside for a Postgres read.",
+    "file": "07-redis-caching.md",
+    "score": 4.05,
+    "why": "Cache-aside is the default Redis+Postgres pattern in interviews."
+  },
+  {
+    "id": "DB-309",
+    "tier": "must",
+    "rank": 33,
+    "title": "What is a cache stampede, and how do you stop it?",
+    "file": "07-redis-caching.md",
+    "score": 4.02,
+    "why": "Stampede control is the production failure mode of naive caching."
+  },
+  {
+    "id": "DB-196",
+    "tier": "must",
+    "rank": 34,
+    "title": "What is the transactional outbox pattern?",
+    "file": "04-transactions.md",
+    "score": 4.0,
+    "why": "Transactional outbox is the standard dual-write fix."
+  },
+  {
+    "id": "DB-197",
+    "tier": "must",
+    "rank": 35,
+    "title": "Why is dual-write (DB + message broker) unsafe?",
+    "file": "04-transactions.md",
+    "score": 3.98,
+    "why": "Why DB+broker dual writes fail\u2014and what 'eventually consistent' really costs."
+  },
+  {
+    "id": "DB-200",
+    "tier": "must",
+    "rank": 36,
+    "title": "Optimistic vs pessimistic concurrency: how do you choose?",
+    "file": "04-transactions.md",
+    "score": 3.95,
+    "why": "Optimistic vs pessimistic choice ties locks, versions, and retries together."
+  },
+  {
+    "id": "DB-073",
+    "tier": "must",
+    "rank": 37,
+    "title": "ANALYZE writes the statistics the planner reads",
+    "file": "02-postgres-internals.md",
+    "score": 3.92,
+    "why": "ANALYZE/stats are why plans go wrong after data-shape changes."
+  },
+  {
+    "id": "DB-065",
+    "tier": "must",
+    "rank": 38,
+    "title": "VACUUM reclaims space inside the file",
+    "file": "02-postgres-internals.md",
+    "score": 3.9,
+    "why": "VACUUM reclaim is the operational half of MVCC."
+  },
+  {
+    "id": "DB-251",
+    "tier": "must",
+    "rank": 39,
+    "title": "Compare vertical and horizontal scaling for PostgreSQL. What do you try first?",
+    "file": "06-scaling-ha.md",
+    "score": 3.88,
+    "why": "Scale-up vs scale-out order of attack for Postgres systems."
+  },
+  {
+    "id": "DB-411",
+    "tier": "must",
+    "rank": 40,
+    "title": "SQL injection is untrusted text parsed as SQL",
+    "file": "09-security-reliability.md",
+    "score": 3.85,
+    "why": "SQL injection remains a hard security floor for any DB interview."
+  },
+  {
+    "id": "DB-016",
+    "tier": "important",
+    "rank": 1,
+    "title": "Semi-joins and anti-joins ask about existence",
+    "file": "01-sql-foundations.md",
+    "score": 3.8,
+    "why": "EXISTS/NOT EXISTS semi- and anti-joins beat fragile NOT IN patterns."
+  },
+  {
+    "id": "DB-005",
+    "tier": "important",
+    "rank": 2,
+    "title": "NOT IN drops the whole result when the subquery yields NULL",
+    "file": "01-sql-foundations.md",
+    "score": 3.75,
+    "why": "NOT IN + NULL is a high-frequency SQL footgun."
+  },
+  {
+    "id": "DB-104",
+    "tier": "important",
+    "rank": 3,
+    "title": "Index-only scans need the visibility map",
+    "file": "03-indexing.md",
+    "score": 3.72,
+    "why": "Index-only scans need the visibility map\u2014ties indexing to MVCC."
+  },
+  {
+    "id": "DB-105",
+    "tier": "important",
+    "rank": 4,
+    "title": "Partial indexes match a subset",
+    "file": "03-indexing.md",
+    "score": 3.7,
+    "why": "Partial indexes are the selective-status/soft-delete win pattern."
+  },
+  {
+    "id": "DB-106",
+    "tier": "important",
+    "rank": 5,
+    "title": "Expression indexes need matching expressions",
+    "file": "03-indexing.md",
+    "score": 3.68,
+    "why": "Expression indexes require matching predicates\u2014common tuning miss."
+  },
+  {
+    "id": "DB-108",
+    "tier": "important",
+    "rank": 6,
+    "title": "CREATE INDEX CONCURRENTLY",
+    "file": "03-indexing.md",
+    "score": 3.65,
+    "why": "CONCURRENTLY is how you add indexes without locking production."
+  },
+  {
+    "id": "DB-114",
+    "tier": "important",
+    "rank": 7,
+    "title": "Foreign keys and missing indexes",
+    "file": "03-indexing.md",
+    "score": 3.62,
+    "why": "Missing FK indexes cause delete/update storms under load."
+  },
+  {
+    "id": "DB-120",
+    "tier": "important",
+    "rank": 8,
+    "title": "Too many indexes hurt writes",
+    "file": "03-indexing.md",
+    "score": 3.6,
+    "why": "Write amplification from too many indexes is a senior trade-off."
+  },
+  {
+    "id": "DB-158",
+    "tier": "important",
+    "rank": 9,
+    "title": "In Read Committed, what happens when an `UPDATE` hits a row concurrently updated by another transaction?",
+    "file": "04-transactions.md",
+    "score": 3.58,
+    "why": "Read Committed re-read-on-conflict behavior on concurrent UPDATE."
+  },
+  {
+    "id": "DB-172",
+    "tier": "important",
+    "rank": 10,
+    "title": "What is `SKIP LOCKED`, and when is it appropriate?",
+    "file": "04-transactions.md",
+    "score": 3.55,
+    "why": "SKIP LOCKED is the worker-queue pattern on Postgres."
+  },
+  {
+    "id": "DB-175",
+    "tier": "important",
+    "rank": 11,
+    "title": "Why can a quick `ALTER TABLE` cause an outage?",
+    "file": "04-transactions.md",
+    "score": 3.52,
+    "why": "Quick ALTER TABLE can still outage via lock queues."
+  },
+  {
+    "id": "DB-183",
+    "tier": "important",
+    "rank": 12,
+    "title": "What is \"idle in transaction\" and why is it harmful?",
+    "file": "04-transactions.md",
+    "score": 3.5,
+    "why": "Idle-in-transaction is the #1 ops smell behind bloat and locks."
+  },
+  {
+    "id": "DB-190",
+    "tier": "important",
+    "rank": 13,
+    "title": "What is SQLSTATE `40001` and how should an application react?",
+    "file": "04-transactions.md",
+    "score": 3.48,
+    "why": "40001 serialization failure handling is required with SSI/RR."
+  },
+  {
+    "id": "DB-195",
+    "tier": "important",
+    "rank": 14,
+    "title": "How does connection pooling interact with transactions?",
+    "file": "04-transactions.md",
+    "score": 3.45,
+    "why": "Pooling \u00d7 transaction boundaries cause subtle production bugs."
+  },
+  {
+    "id": "DB-207",
+    "tier": "important",
+    "rank": 15,
+    "title": "UUID vs identity bigint as primary key: how do you choose?",
+    "file": "05-data-modeling.md",
+    "score": 3.42,
+    "why": "UUID vs identity bigint is a recurring PK design debate."
+  },
+  {
+    "id": "DB-218",
+    "tier": "important",
+    "rank": 16,
+    "title": "How do you model a many-to-many relationship?",
+    "file": "05-data-modeling.md",
+    "score": 3.38,
+    "why": "Many-to-many junction modeling is baseline relational design."
+  },
+  {
+    "id": "DB-244",
+    "tier": "important",
+    "rank": 17,
+    "title": "Why use `timestamptz` instead of `timestamp`?",
+    "file": "05-data-modeling.md",
+    "score": 3.35,
+    "why": "timestamptz vs timestamp is a classic modeling correctness ask."
+  },
+  {
+    "id": "DB-247",
+    "tier": "important",
+    "rank": 18,
+    "title": "What are the main strategies for schema migrations without downtime?",
+    "file": "05-data-modeling.md",
+    "score": 3.32,
+    "why": "Zero-downtime migration strategies every senior ships."
+  },
+  {
+    "id": "DB-067",
+    "tier": "important",
+    "rank": 19,
+    "title": "Autovacuum schedules itself from dead tuples, inserts, and age",
+    "file": "02-postgres-internals.md",
+    "score": 3.28,
+    "why": "Autovacuum triggers and tuning for hot tables."
+  },
+  {
+    "id": "DB-254",
+    "tier": "important",
+    "rank": 20,
+    "title": "What breaks under PgBouncer transaction pooling?",
+    "file": "06-scaling-ha.md",
+    "score": 3.25,
+    "why": "What breaks under transaction pooling\u2014session-state landmines."
+  },
+  {
+    "id": "DB-256",
+    "tier": "important",
+    "rank": 21,
+    "title": "What are read replicas good for, and what are their limits?",
+    "file": "06-scaling-ha.md",
+    "score": 3.22,
+    "why": "Read replica uses and hard limits (not write scaling)."
+  },
+  {
+    "id": "DB-257",
+    "tier": "important",
+    "rank": 22,
+    "title": "What causes replication lag and how do you measure it?",
+    "file": "06-scaling-ha.md",
+    "score": 3.2,
+    "why": "Lag causes and measurement for replica-backed reads."
+  },
+  {
+    "id": "DB-275",
+    "tier": "important",
+    "rank": 23,
+    "title": "When should you partition a table, and what do you gain?",
+    "file": "06-scaling-ha.md",
+    "score": 3.18,
+    "why": "When partitioning helps\u2014and what it does not buy you."
+  },
+  {
+    "id": "DB-292",
+    "tier": "important",
+    "rank": 24,
+    "title": "How does point-in-time recovery work?",
+    "file": "06-scaling-ha.md",
+    "score": 3.15,
+    "why": "PITR is the durability/ops counterpart to WAL knowledge."
+  },
+  {
+    "id": "DB-304",
+    "tier": "important",
+    "rank": 25,
+    "title": "How do TTLs and eviction interact when Redis is near `maxmemory`?",
+    "file": "07-redis-caching.md",
+    "score": 3.12,
+    "why": "TTL and eviction interaction near maxmemory."
+  },
+  {
+    "id": "DB-312",
+    "tier": "important",
+    "rank": 26,
+    "title": "How do you invalidate Redis when a Postgres transaction commits?",
+    "file": "07-redis-caching.md",
+    "score": 3.1,
+    "why": "Invalidate Redis only after Postgres commit\u2014consistency boundary."
+  },
+  {
+    "id": "DB-375",
+    "tier": "important",
+    "rank": 27,
+    "title": "Eventual consistency, stated precisely",
+    "file": "08-nosql-distributed.md",
+    "score": 3.08,
+    "why": "Precise eventual consistency language for distributed answers."
+  },
+  {
+    "id": "DB-406",
+    "tier": "important",
+    "rank": 28,
+    "title": "Row-level security adds a hidden filter",
+    "file": "09-security-reliability.md",
+    "score": 3.05,
+    "why": "RLS as the DB-side multi-tenant filter mechanism."
+  },
+  {
+    "id": "DB-477",
+    "tier": "important",
+    "rank": 29,
+    "title": "Expand/contract migrations",
+    "file": "10-real-world-architecture.md",
+    "score": 3.02,
+    "why": "Expand/contract migrations are the safe schema-change pattern."
+  },
+  {
+    "id": "DB-021",
+    "tier": "important",
+    "rank": 30,
+    "title": "UNIQUE allows many nulls unless NULLS NOT DISTINCT",
+    "file": "01-sql-foundations.md",
+    "score": 3.0,
+    "why": "UNIQUE + NULL semantics and NULLS NOT DISTINCT in PG15+."
+  },
+  {
+    "id": "DB-160",
+    "tier": "advanced",
+    "rank": 1,
+    "title": "What is Serializable in PostgreSQL (SSI)?",
+    "file": "04-transactions.md",
+    "score": 2.95,
+    "why": "SSI Serializable\u2014when and how Postgres prevents write skew."
+  },
+  {
+    "id": "DB-165",
+    "tier": "advanced",
+    "rank": 2,
+    "title": "What is write skew? Show an example.",
+    "file": "04-transactions.md",
+    "score": 2.92,
+    "why": "Write skew example separates snapshot isolation from true serializability."
+  },
+  {
+    "id": "DB-170",
+    "tier": "advanced",
+    "rank": 3,
+    "title": "What are the four row-lock strengths?",
+    "file": "04-transactions.md",
+    "score": 2.88,
+    "why": "Four row-lock strengths matter for FOR SHARE / KEY SHARE designs."
+  },
+  {
+    "id": "DB-063",
+    "tier": "advanced",
+    "rank": 4,
+    "title": "A HOT update does not add an index entry",
+    "file": "02-postgres-internals.md",
+    "score": 2.85,
+    "why": "HOT updates explain why some UPDATEs stay cheap."
+  },
+  {
+    "id": "DB-064",
+    "tier": "advanced",
+    "rank": 5,
+    "title": "The visibility map is what lets an index-only scan skip the heap",
+    "file": "02-postgres-internals.md",
+    "score": 2.82,
+    "why": "Visibility map is the mechanism behind index-only scans."
+  },
+  {
+    "id": "DB-070",
+    "tier": "advanced",
+    "rank": 6,
+    "title": "Wraparound is the server refusing new transaction ids",
+    "file": "02-postgres-internals.md",
+    "score": 2.8,
+    "why": "XID wraparound is the existential vacuum failure mode."
+  },
+  {
+    "id": "DB-035",
+    "tier": "advanced",
+    "rank": 7,
+    "title": "DEFERRABLE moves the check to statement end or commit",
+    "file": "01-sql-foundations.md",
+    "score": 2.75,
+    "why": "DEFERRABLE constraints enable multi-row invariant updates safely."
+  },
+  {
+    "id": "DB-198",
+    "tier": "advanced",
+    "rank": 8,
+    "title": "How do you build the outbox relay on PostgreSQL?",
+    "file": "04-transactions.md",
+    "score": 2.72,
+    "why": "Building the outbox relay on Postgres (SKIP LOCKED / polling)."
+  },
+  {
+    "id": "DB-246",
+    "tier": "advanced",
+    "rank": 9,
+    "title": "Multi-tenancy: database-per-tenant vs schema-per-tenant vs shared tables with `tenant_id`?",
+    "file": "05-data-modeling.md",
+    "score": 2.68,
+    "why": "Database/schema/shared-table tenancy trade-offs at staff depth."
+  },
+  {
+    "id": "DB-248",
+    "tier": "advanced",
+    "rank": 10,
+    "title": "Which DDL operations are risky on large tables in PG16, and how do you mitigate them?",
+    "file": "05-data-modeling.md",
+    "score": 2.65,
+    "why": "Risky DDL on large PG16 tables and online mitigations."
+  },
+  {
+    "id": "DB-280",
+    "tier": "advanced",
+    "rank": 11,
+    "title": "What are the common problems with partitioned tables?",
+    "file": "06-scaling-ha.md",
+    "score": 2.62,
+    "why": "Partitioning footguns: pruning, unique keys, and planning traps."
+  },
+  {
+    "id": "DB-311",
+    "tier": "advanced",
+    "rank": 12,
+    "title": "What does singleflight mean, and where do you put it?",
+    "file": "07-redis-caching.md",
+    "score": 2.58,
+    "why": "Singleflight placement for stampede control at scale."
+  },
+  {
+    "id": "DB-332",
+    "tier": "advanced",
+    "rank": 13,
+    "title": "How do you lose read-your-writes with cache-aside, and how do you close the hole?",
+    "file": "07-redis-caching.md",
+    "score": 2.55,
+    "why": "Cache-aside read-your-writes holes and how to close them."
+  },
+  {
+    "id": "DB-342",
+    "tier": "advanced",
+    "rank": 14,
+    "title": "Redis accepts the new value and Postgres then rolls back. What should the user observe?",
+    "file": "07-redis-caching.md",
+    "score": 2.52,
+    "why": "Redis write then Postgres rollback\u2014correct user-visible behavior."
+  },
+  {
+    "id": "DB-354",
+    "tier": "advanced",
+    "rank": 15,
+    "title": "When to keep Postgres as the source of truth",
+    "file": "08-nosql-distributed.md",
+    "score": 2.48,
+    "why": "When Postgres must remain source of truth in polyglot designs."
+  },
+  {
+    "id": "DB-373",
+    "tier": "advanced",
+    "rank": 16,
+    "title": "CAP during a partition",
+    "file": "08-nosql-distributed.md",
+    "score": 2.45,
+    "why": "CAP during partition\u2014precise language for store-choice interviews."
+  },
+  {
+    "id": "DB-400",
+    "tier": "advanced",
+    "rank": 17,
+    "title": "Choosing a store in a system-design interview",
+    "file": "08-nosql-distributed.md",
+    "score": 2.42,
+    "why": "Choosing a store in system design without cargo-cult NoSQL."
+  },
+  {
+    "id": "DB-463",
+    "tier": "advanced",
+    "rank": 18,
+    "title": "Saga vs 2PC",
+    "file": "10-real-world-architecture.md",
+    "score": 2.38,
+    "why": "Saga vs 2PC for cross-service workflows."
+  },
+  {
+    "id": "DB-484",
+    "tier": "advanced",
+    "rank": 19,
+    "title": "Consistency for checkout vs feed",
+    "file": "10-real-world-architecture.md",
+    "score": 2.35,
+    "why": "Consistency budget: checkout strictness vs feed freshness."
+  },
+  {
+    "id": "DB-485",
+    "tier": "advanced",
+    "rank": 20,
+    "title": "Idempotent order pipeline",
+    "file": "10-real-world-architecture.md",
+    "score": 2.32,
+    "why": "Idempotent order pipeline across retries and consumers."
+  }
+]

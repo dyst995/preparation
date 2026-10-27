@@ -1,0 +1,902 @@
+[
+  {
+    "id": "TS-010",
+    "tier": "must",
+    "rank": 1,
+    "title": "unknown vs any",
+    "file": "01-foundations.md",
+    "score": 100,
+    "why": "Classic senior probe; shows boundary discipline and refusal of any-spreading."
+  },
+  {
+    "id": "TS-001",
+    "tier": "must",
+    "rank": 2,
+    "title": "Structural typing vs nominal typing",
+    "file": "01-foundations.md",
+    "score": 99,
+    "why": "Core mental model; explains assignability surprises from Java/C# backgrounds."
+  },
+  {
+    "id": "TS-030",
+    "tier": "must",
+    "rank": 3,
+    "title": "Compile time vs runtime",
+    "file": "01-foundations.md",
+    "score": 98,
+    "why": "Separates types from validation; filters candidates who treat interfaces as runtime."
+  },
+  {
+    "id": "TS-007",
+    "tier": "must",
+    "rank": 4,
+    "title": "Discriminated unions",
+    "file": "01-foundations.md",
+    "score": 97,
+    "why": "Highest-leverage modeling tool for UI state and API results."
+  },
+  {
+    "id": "TS-003",
+    "tier": "must",
+    "rank": 5,
+    "title": "Interfaces vs type aliases",
+    "file": "01-foundations.md",
+    "score": 96,
+    "why": "Everyday design choice; merging vs unions comes up constantly."
+  },
+  {
+    "id": "TS-005",
+    "tier": "must",
+    "rank": 6,
+    "title": "Union types in practice",
+    "file": "01-foundations.md",
+    "score": 95,
+    "why": "Foundation for narrowing; unsafe casting is a common failure mode."
+  },
+  {
+    "id": "TS-020",
+    "tier": "must",
+    "rank": 7,
+    "title": "Generics introduction",
+    "file": "01-foundations.md",
+    "score": 94,
+    "why": "Baseline for reusable React/Node helpers without losing types."
+  },
+  {
+    "id": "TS-002",
+    "tier": "must",
+    "rank": 8,
+    "title": "Type inference basics",
+    "file": "01-foundations.md",
+    "score": 93,
+    "why": "Shows judgment about when annotations help public APIs."
+  },
+  {
+    "id": "TS-011",
+    "tier": "must",
+    "rank": 9,
+    "title": "never type",
+    "file": "01-foundations.md",
+    "score": 92,
+    "why": "Exhaustiveness and impossible states; senior-level fluency signal."
+  },
+  {
+    "id": "TS-036",
+    "tier": "must",
+    "rank": 10,
+    "title": "Typing React props",
+    "file": "01-foundations.md",
+    "score": 91,
+    "why": "Daily full-stack work; React.FC debates still appear in interviews."
+  },
+  {
+    "id": "TS-050",
+    "tier": "must",
+    "rank": 11,
+    "title": "Practical boundary validation pattern",
+    "file": "01-foundations.md",
+    "score": 90,
+    "why": "End-to-end contract pattern interviewers expect from seniors."
+  },
+  {
+    "id": "TS-031",
+    "tier": "must",
+    "rank": 12,
+    "title": "Typing JSON.parse",
+    "file": "01-foundations.md",
+    "score": 89,
+    "why": "Litmus test for unknown + validation vs blind assertions."
+  },
+  {
+    "id": "TS-032",
+    "tier": "must",
+    "rank": 13,
+    "title": "Typing fetch responses",
+    "file": "01-foundations.md",
+    "score": 88,
+    "why": "Practical client safety; pairs with shared DTO strategies."
+  },
+  {
+    "id": "TS-009",
+    "tier": "must",
+    "rank": 14,
+    "title": "Custom type predicates",
+    "file": "01-foundations.md",
+    "score": 87,
+    "why": "Bridge between runtime checks and narrowing; honesty matters."
+  },
+  {
+    "id": "TS-021",
+    "tier": "must",
+    "rank": 15,
+    "title": "Generic constraints",
+    "file": "01-foundations.md",
+    "score": 86,
+    "why": "Stops hand-wavy generics; keyof patterns start here."
+  },
+  {
+    "id": "TS-022",
+    "tier": "must",
+    "rank": 16,
+    "title": "keyof and indexed access",
+    "file": "01-foundations.md",
+    "score": 85,
+    "why": "Type-safe property access; forms, sorting, and config keys."
+  },
+  {
+    "id": "TS-019",
+    "tier": "must",
+    "rank": 17,
+    "title": "Type assertions vs casting",
+    "file": "01-foundations.md",
+    "score": 84,
+    "why": "Assertions are not conversions; catches dangerous as-habits."
+  },
+  {
+    "id": "TS-024",
+    "tier": "must",
+    "rank": 18,
+    "title": "Utility type Partial",
+    "file": "01-foundations.md",
+    "score": 83,
+    "why": "PATCH/update modeling; shallow Partial pitfalls are fair game."
+  },
+  {
+    "id": "TS-025",
+    "tier": "must",
+    "rank": 19,
+    "title": "Required, Readonly, Pick, Omit",
+    "file": "01-foundations.md",
+    "score": 82,
+    "why": "DTO shaping without duplication; common whiteboard ask."
+  },
+  {
+    "id": "TS-038",
+    "tier": "must",
+    "rank": 20,
+    "title": "Typing useState and useRef",
+    "file": "01-foundations.md",
+    "score": 81,
+    "why": "Inference traps with null refs and state unions."
+  },
+  {
+    "id": "TS-037",
+    "tier": "must",
+    "rank": 21,
+    "title": "Typing React events",
+    "file": "01-foundations.md",
+    "score": 80,
+    "why": "Specific event generics show practical React TS skill."
+  },
+  {
+    "id": "TS-014",
+    "tier": "must",
+    "rank": 22,
+    "title": "const assertions",
+    "file": "01-foundations.md",
+    "score": 79,
+    "why": "Literal narrowing for actions, routes, and status maps."
+  },
+  {
+    "id": "TS-015",
+    "tier": "must",
+    "rank": 23,
+    "title": "Enums vs union literals",
+    "file": "01-foundations.md",
+    "score": 78,
+    "why": "Modern preference signal; enum pitfalls are interview favorites."
+  },
+  {
+    "id": "TS-008",
+    "tier": "must",
+    "rank": 24,
+    "title": "Type guards with typeof and instanceof",
+    "file": "01-foundations.md",
+    "score": 77,
+    "why": "Built-in narrowing limits; JSON/class caveats."
+  },
+  {
+    "id": "TS-004",
+    "tier": "must",
+    "rank": 25,
+    "title": "Excess property checks",
+    "file": "01-foundations.md",
+    "score": 76,
+    "why": "Explains literal vs variable assignability quirks."
+  },
+  {
+    "id": "TS-033",
+    "tier": "must",
+    "rank": 26,
+    "title": "Result types for APIs",
+    "file": "01-foundations.md",
+    "score": 75,
+    "why": "Typed success/failure without overusing throws."
+  },
+  {
+    "id": "TS-006",
+    "tier": "must",
+    "rank": 27,
+    "title": "Intersection types",
+    "file": "01-foundations.md",
+    "score": 74,
+    "why": "Composition tool; never-from-conflict is a common follow-up."
+  },
+  {
+    "id": "TS-012",
+    "tier": "must",
+    "rank": 28,
+    "title": "Optional vs undefined properties",
+    "file": "01-foundations.md",
+    "score": 73,
+    "why": "Missing vs undefined semantics; exactOptionalPropertyTypes."
+  },
+  {
+    "id": "TS-040",
+    "tier": "must",
+    "rank": 29,
+    "title": "Express request and response typing",
+    "file": "01-foundations.md",
+    "score": 72,
+    "why": "Backend half of full-stack TS; body/user augmentation."
+  },
+  {
+    "id": "TS-039",
+    "tier": "must",
+    "rank": 30,
+    "title": "Typing custom hooks",
+    "file": "01-foundations.md",
+    "score": 71,
+    "why": "Generic hooks and status unions show React depth."
+  },
+  {
+    "id": "TS-026",
+    "tier": "must",
+    "rank": 31,
+    "title": "Record type",
+    "file": "01-foundations.md",
+    "score": 70,
+    "why": "Lookup tables and constrained key maps."
+  },
+  {
+    "id": "TS-035",
+    "tier": "must",
+    "rank": 32,
+    "title": "Control flow analysis",
+    "file": "01-foundations.md",
+    "score": 69,
+    "why": "Why narrowing fails in closures; early-return style."
+  },
+  {
+    "id": "TS-028",
+    "tier": "must",
+    "rank": 33,
+    "title": "ReturnType and Parameters",
+    "file": "01-foundations.md",
+    "score": 68,
+    "why": "Derive from functions to prevent signature drift."
+  },
+  {
+    "id": "TS-027",
+    "tier": "must",
+    "rank": 34,
+    "title": "Exclude Extract NonNullable",
+    "file": "01-foundations.md",
+    "score": 67,
+    "why": "Union surgery utilities used across codebases."
+  },
+  {
+    "id": "TS-023",
+    "tier": "must",
+    "rank": 35,
+    "title": "typeof operator in types",
+    "file": "01-foundations.md",
+    "score": 66,
+    "why": "Value-to-type queries; config-driven typing."
+  },
+  {
+    "id": "TS-088",
+    "tier": "must",
+    "rank": 36,
+    "title": "Using never for impossible states",
+    "file": "02-advanced-patterns.md",
+    "score": 65,
+    "why": "Make illegal states unrepresentable\u2014senior design mantra."
+  },
+  {
+    "id": "TS-043",
+    "tier": "must",
+    "rank": 37,
+    "title": "Strict mode flags that matter",
+    "file": "01-foundations.md",
+    "score": 64,
+    "why": "Config judgment; noUncheckedIndexedAccess etc."
+  },
+  {
+    "id": "TS-013",
+    "tier": "must",
+    "rank": 38,
+    "title": "readonly and ReadonlyArray",
+    "file": "01-foundations.md",
+    "score": 63,
+    "why": "Shallow immutability for props and shared data."
+  },
+  {
+    "id": "TS-045",
+    "tier": "must",
+    "rank": 39,
+    "title": "Modules: type-only imports",
+    "file": "01-foundations.md",
+    "score": 62,
+    "why": "Erase-only imports; verbatimModuleSyntax readiness."
+  },
+  {
+    "id": "TS-017",
+    "tier": "must",
+    "rank": 40,
+    "title": "Optional chaining and narrowing",
+    "file": "01-foundations.md",
+    "score": 61,
+    "why": "Safe access vs true narrowing; nullish coalescing."
+  },
+  {
+    "id": "TS-058",
+    "tier": "important",
+    "rank": 1,
+    "title": "Branded / nominal types",
+    "file": "02-advanced-patterns.md",
+    "score": 60,
+    "why": "Prevents ID mixups; high signal without heavy type magic."
+  },
+  {
+    "id": "TS-070",
+    "tier": "important",
+    "rank": 2,
+    "title": "Validation layer and type inference",
+    "file": "02-advanced-patterns.md",
+    "score": 59,
+    "why": "Schema-first coupling of runtime and static types."
+  },
+  {
+    "id": "TS-041",
+    "tier": "important",
+    "rank": 3,
+    "title": "NestJS DTOs lightly",
+    "file": "01-foundations.md",
+    "score": 58,
+    "why": "Classes for validation metadata vs erased interfaces."
+  },
+  {
+    "id": "TS-042",
+    "tier": "important",
+    "rank": 4,
+    "title": "Prisma-ish result typing",
+    "file": "01-foundations.md",
+    "score": 57,
+    "why": "Query-shaped types and DTO mapping discipline."
+  },
+  {
+    "id": "TS-066",
+    "tier": "important",
+    "rank": 5,
+    "title": "Exhaustiveness in reducers",
+    "file": "02-advanced-patterns.md",
+    "score": 56,
+    "why": "never checks in useReducer; scalable UI state."
+  },
+  {
+    "id": "TS-065",
+    "tier": "important",
+    "rank": 6,
+    "title": "Discriminated props in React",
+    "file": "02-advanced-patterns.md",
+    "score": 55,
+    "why": "Mutually exclusive props modeled as unions."
+  },
+  {
+    "id": "TS-016",
+    "tier": "important",
+    "rank": 7,
+    "title": "Function parameter bivariance intuition",
+    "file": "01-foundations.md",
+    "score": 54,
+    "why": "Explains unsafe callback assignability and React history."
+  },
+  {
+    "id": "TS-048",
+    "tier": "important",
+    "rank": 8,
+    "title": "Satisfies operator",
+    "file": "01-foundations.md",
+    "score": 53,
+    "why": "Validate without widening; modern config typing."
+  },
+  {
+    "id": "TS-029",
+    "tier": "important",
+    "rank": 9,
+    "title": "Awaited utility",
+    "file": "01-foundations.md",
+    "score": 52,
+    "why": "Async return unwrapping for loaders and services."
+  },
+  {
+    "id": "TS-069",
+    "tier": "important",
+    "rank": 10,
+    "title": "Middleware typing in Express",
+    "file": "02-advanced-patterns.md",
+    "score": 51,
+    "why": "Augmented Request after auth; common backend ask."
+  },
+  {
+    "id": "TS-099",
+    "tier": "important",
+    "rank": 11,
+    "title": "Pattern: parsed vs raw request types",
+    "file": "02-advanced-patterns.md",
+    "score": 50,
+    "why": "Encodes validation stage in the type system."
+  },
+  {
+    "id": "TS-067",
+    "tier": "important",
+    "rank": 12,
+    "title": "Typing context without default lies",
+    "file": "02-advanced-patterns.md",
+    "score": 49,
+    "why": "Avoid fake defaults; throw-and-narrow hook pattern."
+  },
+  {
+    "id": "TS-076",
+    "tier": "important",
+    "rank": 13,
+    "title": "Narrowing with assertion functions",
+    "file": "02-advanced-patterns.md",
+    "score": 48,
+    "why": "asserts keyword for guards that throw."
+  },
+  {
+    "id": "TS-064",
+    "tier": "important",
+    "rank": 14,
+    "title": "Typing forwardRef",
+    "file": "02-advanced-patterns.md",
+    "score": 47,
+    "why": "Generic order pitfalls; still common in component libs."
+  },
+  {
+    "id": "TS-082",
+    "tier": "important",
+    "rank": 15,
+    "title": "Type predicates with array filter",
+    "file": "02-advanced-patterns.md",
+    "score": 46,
+    "why": "Nullable list cleanup; practical predicate use."
+  },
+  {
+    "id": "TS-095",
+    "tier": "important",
+    "rank": 16,
+    "title": "Standard Schema / shared contracts mindset",
+    "file": "02-advanced-patterns.md",
+    "score": 45,
+    "why": "Contracts beyond shared interfaces alone."
+  },
+  {
+    "id": "TS-093",
+    "tier": "important",
+    "rank": 17,
+    "title": "Differentiating null and undefined in APIs",
+    "file": "02-advanced-patterns.md",
+    "score": 44,
+    "why": "PATCH semantics; JSON omit vs null."
+  },
+  {
+    "id": "TS-075",
+    "tier": "important",
+    "rank": 18,
+    "title": "Typing process.env",
+    "file": "02-advanced-patterns.md",
+    "score": 43,
+    "why": "Startup schema for env; no non-null spam."
+  },
+  {
+    "id": "TS-018",
+    "tier": "important",
+    "rank": 19,
+    "title": "Non-null assertion",
+    "file": "01-foundations.md",
+    "score": 42,
+    "why": "When ! is acceptable vs lazy escape hatch."
+  },
+  {
+    "id": "TS-091",
+    "tier": "important",
+    "rank": 20,
+    "title": "Progressive adoption strategies",
+    "file": "02-advanced-patterns.md",
+    "score": 41,
+    "why": "Migration judgment for real codebases."
+  },
+  {
+    "id": "TS-092",
+    "tier": "important",
+    "rank": 21,
+    "title": "Type-safe routing params",
+    "file": "02-advanced-patterns.md",
+    "score": 40,
+    "why": "Router generics plus runtime validation."
+  },
+  {
+    "id": "TS-086",
+    "tier": "important",
+    "rank": 22,
+    "title": "Safe indexing patterns",
+    "file": "02-advanced-patterns.md",
+    "score": 39,
+    "why": "noUncheckedIndexedAccess survival skills."
+  },
+  {
+    "id": "TS-046",
+    "tier": "important",
+    "rank": 23,
+    "title": "Tuple types",
+    "file": "01-foundations.md",
+    "score": 38,
+    "why": "Positional pairs vs objects; rest params."
+  },
+  {
+    "id": "TS-034",
+    "tier": "important",
+    "rank": 24,
+    "title": "Narrowing with in operator",
+    "file": "01-foundations.md",
+    "score": 37,
+    "why": "Object-union narrowing without a shared tag."
+  },
+  {
+    "id": "TS-049",
+    "tier": "important",
+    "rank": 25,
+    "title": "Narrowing with equality and switch",
+    "file": "01-foundations.md",
+    "score": 36,
+    "why": "Literal refinement basics that enable discriminants."
+  },
+  {
+    "id": "TS-080",
+    "tier": "important",
+    "rank": 26,
+    "title": "Satisfies vs as const for config maps",
+    "file": "02-advanced-patterns.md",
+    "score": 35,
+    "why": "Combine precision with structural checking."
+  },
+  {
+    "id": "TS-098",
+    "tier": "important",
+    "rank": 27,
+    "title": "Class vs interface for domain models",
+    "file": "02-advanced-patterns.md",
+    "score": 34,
+    "why": "Runtime behavior vs pure data contracts."
+  },
+  {
+    "id": "TS-044",
+    "tier": "important",
+    "rank": 28,
+    "title": "Declaration files and ambient types",
+    "file": "01-foundations.md",
+    "score": 33,
+    "why": "Shimming untyped modules and assets."
+  },
+  {
+    "id": "TS-085",
+    "tier": "important",
+    "rank": 29,
+    "title": "Typing error boundaries and fallback props",
+    "file": "02-advanced-patterns.md",
+    "score": 32,
+    "why": "unknown thrown values; fallback prop shapes."
+  },
+  {
+    "id": "TS-079",
+    "tier": "important",
+    "rank": 30,
+    "title": "Typing CSS modules and assets",
+    "file": "02-advanced-patterns.md",
+    "score": 31,
+    "why": "Ambient module declarations for bundler imports."
+  },
+  {
+    "id": "TS-051",
+    "tier": "advanced",
+    "rank": 1,
+    "title": "Conditional types basics",
+    "file": "02-advanced-patterns.md",
+    "score": 30,
+    "why": "Gateway to library-level TypeScript."
+  },
+  {
+    "id": "TS-053",
+    "tier": "advanced",
+    "rank": 2,
+    "title": "infer keyword",
+    "file": "02-advanced-patterns.md",
+    "score": 29,
+    "why": "Unpacking nested types in custom utilities."
+  },
+  {
+    "id": "TS-054",
+    "tier": "advanced",
+    "rank": 3,
+    "title": "Mapped types",
+    "file": "02-advanced-patterns.md",
+    "score": 28,
+    "why": "How Partial/Readonly work; derive transforms."
+  },
+  {
+    "id": "TS-052",
+    "tier": "advanced",
+    "rank": 4,
+    "title": "Distributive conditional types",
+    "file": "02-advanced-patterns.md",
+    "score": 27,
+    "why": "Union distribution surprises; tuple wrap trick."
+  },
+  {
+    "id": "TS-100",
+    "tier": "advanced",
+    "rank": 5,
+    "title": "Staff-level judgment: when not to be clever",
+    "file": "02-advanced-patterns.md",
+    "score": 26,
+    "why": "Taste over type Tetris; staff differentiator."
+  },
+  {
+    "id": "TS-061",
+    "tier": "advanced",
+    "rank": 6,
+    "title": "Variance: covariance and contravariance intuition",
+    "file": "02-advanced-patterns.md",
+    "score": 25,
+    "why": "Deep assignability for callbacks and collections."
+  },
+  {
+    "id": "TS-055",
+    "tier": "advanced",
+    "rank": 7,
+    "title": "Key remapping with as",
+    "file": "02-advanced-patterns.md",
+    "score": 24,
+    "why": "Filter/rename keys in mapped types."
+  },
+  {
+    "id": "TS-056",
+    "tier": "advanced",
+    "rank": 8,
+    "title": "Template literal types",
+    "file": "02-advanced-patterns.md",
+    "score": 23,
+    "why": "String-level type construction for events/routes."
+  },
+  {
+    "id": "TS-063",
+    "tier": "advanced",
+    "rank": 9,
+    "title": "Polymorphic React components",
+    "file": "02-advanced-patterns.md",
+    "score": 22,
+    "why": "as-prop design-system typing."
+  },
+  {
+    "id": "TS-062",
+    "tier": "advanced",
+    "rank": 10,
+    "title": "Typing higher-order React components",
+    "file": "02-advanced-patterns.md",
+    "score": 21,
+    "why": "Injected props with Omit; still asked."
+  },
+  {
+    "id": "TS-059",
+    "tier": "advanced",
+    "rank": 11,
+    "title": "Opaque results and API error modeling",
+    "file": "02-advanced-patterns.md",
+    "score": 20,
+    "why": "Structured error unions across client/server."
+  },
+  {
+    "id": "TS-047",
+    "tier": "advanced",
+    "rank": 12,
+    "title": "Function overloads",
+    "file": "01-foundations.md",
+    "score": 19,
+    "why": "Multi-call contracts when unions weaken returns."
+  },
+  {
+    "id": "TS-060",
+    "tier": "advanced",
+    "rank": 13,
+    "title": "Type-safe event emitters",
+    "file": "02-advanced-patterns.md",
+    "score": 18,
+    "why": "Event maps tying names to payloads."
+  },
+  {
+    "id": "TS-081",
+    "tier": "advanced",
+    "rank": 14,
+    "title": "Building DeepPartial",
+    "file": "02-advanced-patterns.md",
+    "score": 17,
+    "why": "Recursive mapped types with array caveats."
+  },
+  {
+    "id": "TS-068",
+    "tier": "advanced",
+    "rank": 15,
+    "title": "Generic repository pattern on the backend",
+    "file": "02-advanced-patterns.md",
+    "score": 16,
+    "why": "CRUD generics without fighting the ORM."
+  },
+  {
+    "id": "TS-083",
+    "tier": "advanced",
+    "rank": 16,
+    "title": "Const type parameters",
+    "file": "02-advanced-patterns.md",
+    "score": 15,
+    "why": "Modern literal inference at call sites."
+  },
+  {
+    "id": "TS-071",
+    "tier": "advanced",
+    "rank": 17,
+    "title": "Conditional types for function overloads alternatives",
+    "file": "02-advanced-patterns.md",
+    "score": 14,
+    "why": "Single signature with conditional returns."
+  },
+  {
+    "id": "TS-072",
+    "tier": "advanced",
+    "rank": 18,
+    "title": "Extracting promise and generator types",
+    "file": "02-advanced-patterns.md",
+    "score": 13,
+    "why": "Custom unwrap beyond Awaited."
+  },
+  {
+    "id": "TS-078",
+    "tier": "advanced",
+    "rank": 19,
+    "title": "Covariance of promises and arrays pitfalls",
+    "file": "02-advanced-patterns.md",
+    "score": 12,
+    "why": "Mutable array unsafety; readonly inputs."
+  },
+  {
+    "id": "TS-084",
+    "tier": "advanced",
+    "rank": 20,
+    "title": "NoInfer and inference control",
+    "file": "02-advanced-patterns.md",
+    "score": 11,
+    "why": "Modern inference steering for library APIs."
+  },
+  {
+    "id": "TS-057",
+    "tier": "advanced",
+    "rank": 21,
+    "title": "Recursive types carefully",
+    "file": "02-advanced-patterns.md",
+    "score": 10,
+    "why": "Trees/DeepReadonly vs compiler cost."
+  },
+  {
+    "id": "TS-089",
+    "tier": "advanced",
+    "rank": 22,
+    "title": "Intersection of functions and overloads",
+    "file": "02-advanced-patterns.md",
+    "score": 9,
+    "why": "Surprising callability of function unions."
+  },
+  {
+    "id": "TS-094",
+    "tier": "advanced",
+    "rank": 23,
+    "title": "Utility type: Uppercase keys mapper example",
+    "file": "02-advanced-patterns.md",
+    "score": 8,
+    "why": "Mapped + template exercise often used in screens."
+  },
+  {
+    "id": "TS-096",
+    "tier": "advanced",
+    "rank": 24,
+    "title": "Typing websockets or SSE messages",
+    "file": "02-advanced-patterns.md",
+    "score": 7,
+    "why": "Realtime protocol unions with validation."
+  },
+  {
+    "id": "TS-090",
+    "tier": "advanced",
+    "rank": 25,
+    "title": "Typing SQL/query builders lightly",
+    "file": "02-advanced-patterns.md",
+    "score": 6,
+    "why": "Raw SQL safety without full ORM inference."
+  },
+  {
+    "id": "TS-074",
+    "tier": "advanced",
+    "rank": 26,
+    "title": "ModuleResolution bundler vs Node",
+    "file": "02-advanced-patterns.md",
+    "score": 5,
+    "why": "ESM/CJS resolution mismatches in monorepos."
+  },
+  {
+    "id": "TS-073",
+    "tier": "advanced",
+    "rank": 27,
+    "title": "Path mapping and project references awareness",
+    "file": "02-advanced-patterns.md",
+    "score": 4,
+    "why": "Aliases and references that match runtime."
+  },
+  {
+    "id": "TS-087",
+    "tier": "advanced",
+    "rank": 28,
+    "title": "Dual packages and types versions",
+    "file": "02-advanced-patterns.md",
+    "score": 3,
+    "why": "Shipping types for React and Node consumers."
+  },
+  {
+    "id": "TS-077",
+    "tier": "advanced",
+    "rank": 29,
+    "title": "this parameter typing",
+    "file": "02-advanced-patterns.md",
+    "score": 2,
+    "why": "Fake this param; niche but occasionally asked."
+  },
+  {
+    "id": "TS-097",
+    "tier": "advanced",
+    "rank": 30,
+    "title": "Performance of types in large codebases",
+    "file": "02-advanced-patterns.md",
+    "score": 1,
+    "why": "Staff ops: slow types, project references, export discipline."
+  }
+]

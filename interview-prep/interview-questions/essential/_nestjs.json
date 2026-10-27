@@ -1,0 +1,812 @@
+[
+  {
+    "id": "NEST-002",
+    "tier": "must",
+    "rank": 1,
+    "title": "The four @Module arrays",
+    "file": "01-fundamentals.md",
+    "score": 4.9,
+    "why": "Module boundary literacy: imports/controllers/providers/exports is the Nest mental model every senior is expected to teach."
+  },
+  {
+    "id": "NEST-051",
+    "tier": "must",
+    "rank": 2,
+    "title": "The order one HTTP request walks",
+    "file": "02-request-lifecycle.md",
+    "score": 4.9,
+    "why": "Request pipeline order is the map for placing auth, validation, and response shaping correctly."
+  },
+  {
+    "id": "NEST-004",
+    "tier": "must",
+    "rank": 3,
+    "title": "How constructor injection chooses a token",
+    "file": "01-fundamentals.md",
+    "score": 4.85,
+    "why": "Explains how design:paramtypes becomes a token and when @Inject is mandatory\u2014core DI fluency."
+  },
+  {
+    "id": "NEST-014",
+    "tier": "must",
+    "rank": 4,
+    "title": "useClass, useValue, useFactory, and useExisting",
+    "file": "01-fundamentals.md",
+    "score": 4.9,
+    "why": "All four custom-provider forms; interviewers use this to probe wiring and testability."
+  },
+  {
+    "id": "NEST-005",
+    "tier": "must",
+    "rank": 5,
+    "title": "What the default scope actually guarantees",
+    "file": "01-fundamentals.md",
+    "score": 4.85,
+    "why": "Singleton means per registration, not per process\u2014prevents shared-state bugs and wrong scope choices."
+  },
+  {
+    "id": "NEST-173",
+    "tier": "must",
+    "rank": 6,
+    "title": "Guard vs middleware vs interceptor",
+    "file": "04-auth.md",
+    "score": 4.9,
+    "why": "Choosing the right enhancer for allow/deny vs parse vs wrap is a classic senior filter question."
+  },
+  {
+    "id": "NEST-013",
+    "tier": "must",
+    "rank": 7,
+    "title": "Sharing one instance across modules",
+    "file": "01-fundamentals.md",
+    "score": 4.75,
+    "why": "Exports + one providing module is how you share a true singleton across features."
+  },
+  {
+    "id": "NEST-151",
+    "tier": "must",
+    "rank": 8,
+    "title": "Authentication vs authorization in Nest",
+    "file": "04-auth.md",
+    "score": 4.65,
+    "why": "Separating authentication from authorization keeps guards composable and public routes clean."
+  },
+  {
+    "id": "NEST-252",
+    "tier": "must",
+    "rank": 9,
+    "title": "What does `whitelist: true` do in `ValidationPipe`",
+    "file": "06-validation-api.md",
+    "score": 4.65,
+    "why": "whitelist is the default mass-assignment defense; seniors must explain the silent-strip pitfall."
+  },
+  {
+    "id": "NEST-104",
+    "tier": "must",
+    "rank": 10,
+    "title": "Scope bubbling",
+    "file": "03-dependency-injection.md",
+    "score": 4.65,
+    "why": "Scope bubbling explains why injecting REQUEST scope rebuilds half the graph\u2014performance and design."
+  },
+  {
+    "id": "NEST-060",
+    "tier": "must",
+    "rank": 11,
+    "title": "useGlobalGuards and APP_GUARD",
+    "file": "02-request-lifecycle.md",
+    "score": 4.6,
+    "why": "APP_GUARD gets DI; new RolesGuard() does not\u2014and registration order matters."
+  },
+  {
+    "id": "NEST-209",
+    "tier": "must",
+    "rank": 12,
+    "title": "[Both] DTO vs entity \u2014 why separate them",
+    "file": "05-database.md",
+    "score": 4.65,
+    "why": "DTO/entity separation is the API boundary that stops leaking persistence and privileged fields."
+  },
+  {
+    "id": "NEST-063",
+    "tier": "must",
+    "rank": 13,
+    "title": "Interceptors on the way in and on the way out",
+    "file": "02-request-lifecycle.md",
+    "score": 4.5,
+    "why": "Inbound/outbound interceptor order is required for logging, timing, and response envelopes."
+  },
+  {
+    "id": "NEST-066",
+    "tier": "must",
+    "rank": 14,
+    "title": "How pipes are applied to arguments",
+    "file": "02-request-lifecycle.md",
+    "score": 4.5,
+    "why": "Pipes are per-argument and parallel across params\u2014validation placement depends on this."
+  },
+  {
+    "id": "NEST-003",
+    "tier": "must",
+    "rank": 15,
+    "title": "Why a class must be registered",
+    "file": "01-fundamentals.md",
+    "score": 4.5,
+    "why": "Unregistered classes are invisible to the container; the most common Nest startup confusion."
+  },
+  {
+    "id": "NEST-110",
+    "tier": "must",
+    "rank": 16,
+    "title": "useFactory and inject",
+    "file": "03-dependency-injection.md",
+    "score": 4.5,
+    "why": "useFactory + inject is how ConfigService, clients, and conditional wiring actually get built."
+  },
+  {
+    "id": "NEST-155",
+    "tier": "must",
+    "rank": 17,
+    "title": "Configuring `JwtStrategy`",
+    "file": "04-auth.md",
+    "score": 4.5,
+    "why": "JwtStrategy validate/payload shape is the spine of Nest JWT auth interviews."
+  },
+  {
+    "id": "NEST-177",
+    "tier": "must",
+    "rank": 18,
+    "title": "`@Roles()` and `RolesGuard`",
+    "file": "04-auth.md",
+    "score": 4.5,
+    "why": "Roles metadata + RolesGuard is the baseline authorization pattern seniors implement."
+  },
+  {
+    "id": "NEST-211",
+    "tier": "must",
+    "rank": 19,
+    "title": "[TypeORM] How do you use a QueryRunner transaction",
+    "file": "05-database.md",
+    "score": 4.5,
+    "why": "QueryRunner + manager (not injected repos) is the TypeORM transaction gotcha interviews love."
+  },
+  {
+    "id": "NEST-356",
+    "tier": "must",
+    "rank": 20,
+    "title": "overrideProvider",
+    "file": "08-testing.md",
+    "score": 4.5,
+    "why": "overrideProvider is how Nest unit tests stay honest to the module graph."
+  },
+  {
+    "id": "NEST-414",
+    "tier": "must",
+    "rank": 21,
+    "title": "ValidationPipe as a security boundary",
+    "file": "09-security-performance.md",
+    "score": 4.5,
+    "why": "ValidationPipe is a security boundary\u2014and still not authorization; critical nuance."
+  },
+  {
+    "id": "NEST-130",
+    "tier": "must",
+    "rank": 22,
+    "title": "forRootAsync()",
+    "file": "03-dependency-injection.md",
+    "score": 4.5,
+    "why": "forRootAsync is the standard seam for ConfigService-driven DB/queue/JWT modules."
+  },
+  {
+    "id": "NEST-006",
+    "tier": "must",
+    "rank": 23,
+    "title": "What belongs on a controller, and what belongs on a service",
+    "file": "01-fundamentals.md",
+    "score": 4.5,
+    "why": "Thin controllers / fat services is Nest architecture hygiene interviewers expect."
+  },
+  {
+    "id": "NEST-184",
+    "tier": "must",
+    "rank": 24,
+    "title": "401 vs 403",
+    "file": "04-auth.md",
+    "score": 4.5,
+    "why": "401 vs 403 proves you understand authn failure vs authz failure in HTTP terms."
+  },
+  {
+    "id": "NEST-220",
+    "tier": "must",
+    "rank": 25,
+    "title": "[Both] Migrations vs `synchronize: true`",
+    "file": "05-database.md",
+    "score": 4.5,
+    "why": "synchronize:true vs migrations is a production-safety litmus test."
+  },
+  {
+    "id": "NEST-071",
+    "tier": "must",
+    "rank": 26,
+    "title": "Which exception filter is selected",
+    "file": "02-request-lifecycle.md",
+    "score": 4.3,
+    "why": "Filter specificity selection drives consistent error envelopes across the app."
+  },
+  {
+    "id": "NEST-106",
+    "tier": "must",
+    "rank": 27,
+    "title": "Performance cost of request scope",
+    "file": "03-dependency-injection.md",
+    "score": 4.45,
+    "why": "Request-scope cost is the counterargument when juniors inject REQUEST everywhere."
+  },
+  {
+    "id": "NEST-175",
+    "tier": "must",
+    "rank": 28,
+    "title": "The `@Public()` decorator",
+    "file": "04-auth.md",
+    "score": 4.4,
+    "why": "@Public + reflector metadata is how global JWT guards stay usable."
+  },
+  {
+    "id": "NEST-202",
+    "tier": "must",
+    "rank": 29,
+    "title": "[TypeORM] What do forFeature and @InjectRepository do",
+    "file": "05-database.md",
+    "score": 4.4,
+    "why": "forFeature + @InjectRepository is TypeORM module wiring every Nest shop uses."
+  },
+  {
+    "id": "NEST-254",
+    "tier": "must",
+    "rank": 30,
+    "title": "What does `transform: true` do",
+    "file": "06-validation-api.md",
+    "score": 4.4,
+    "why": "transform:true makes DTO instances real\u2014needed for nested validation and typed pipes."
+  },
+  {
+    "id": "NEST-301",
+    "tier": "must",
+    "rank": 31,
+    "title": "Why a handler should queue slow work",
+    "file": "07-async-distributed.md",
+    "score": 4.4,
+    "why": "Queue slow work / 202 Accepted is the default scalability answer for Nest HTTP handlers."
+  },
+  {
+    "id": "NEST-351",
+    "tier": "must",
+    "rank": 32,
+    "title": "What a TestingModule is",
+    "file": "08-testing.md",
+    "score": 4.4,
+    "why": "TestingModule is the Nest testing contract; new Service() skips the graph."
+  },
+  {
+    "id": "NEST-128",
+    "tier": "must",
+    "rank": 33,
+    "title": "Debugging \"can't resolve dependencies\"",
+    "file": "03-dependency-injection.md",
+    "score": 4.35,
+    "why": "Reading 'can't resolve dependencies' is daily Nest debugging skill."
+  },
+  {
+    "id": "NEST-041",
+    "tier": "must",
+    "rank": 34,
+    "title": "Read the startup error: the provider is not exported",
+    "file": "01-fundamentals.md",
+    "score": 4.25,
+    "why": "Not-exported provider errors teach module privacy better than theory alone."
+  },
+  {
+    "id": "NEST-058",
+    "tier": "must",
+    "rank": 35,
+    "title": "return false and throw UnauthorizedException",
+    "file": "02-request-lifecycle.md",
+    "score": 4.35,
+    "why": "return false vs throw UnauthorizedException changes status and client messaging."
+  },
+  {
+    "id": "NEST-162",
+    "tier": "must",
+    "rank": 36,
+    "title": "Sessions vs JWT",
+    "file": "04-auth.md",
+    "score": 4.3,
+    "why": "Sessions vs JWT trade-offs dominate auth architecture discussions."
+  },
+  {
+    "id": "NEST-008",
+    "tier": "must",
+    "rank": 37,
+    "title": "onModuleInit versus onApplicationBootstrap",
+    "file": "01-fundamentals.md",
+    "score": 4.05,
+    "why": "onModuleInit vs onApplicationBootstrap orders boot work correctly (clients, seeds)."
+  },
+  {
+    "id": "NEST-297",
+    "tier": "must",
+    "rank": 38,
+    "title": "Why use response DTOs instead of returning entities",
+    "file": "06-validation-api.md",
+    "score": 4.35,
+    "why": "Response DTOs prevent entity leakage and accidental N+1 via serializers."
+  },
+  {
+    "id": "NEST-449",
+    "tier": "must",
+    "rank": 39,
+    "title": "What breaks when you add replicas",
+    "file": "09-security-performance.md",
+    "score": 4.6,
+    "why": "Multi-replica breakage (memory throttle/cache/cron/ws) is senior production Nest."
+  },
+  {
+    "id": "NEST-451",
+    "tier": "must",
+    "rank": 40,
+    "title": "Modular monolith vs microservices",
+    "file": "10-enterprise.md",
+    "score": 4.3,
+    "why": "Modular monolith first is the architecture default before microservices talk."
+  },
+  {
+    "id": "NEST-015",
+    "tier": "important",
+    "rank": 1,
+    "title": "Interfaces, abstract classes, and tokens",
+    "file": "01-fundamentals.md",
+    "score": 4.55,
+    "why": "Interface erasure forces tokens\u2014completes DI story after constructor injection."
+  },
+  {
+    "id": "NEST-157",
+    "tier": "important",
+    "rank": 2,
+    "title": "Access and refresh tokens",
+    "file": "04-auth.md",
+    "score": 4.5,
+    "why": "Access/refresh pairing is the practical JWT session design interviewers expect."
+  },
+  {
+    "id": "NEST-016",
+    "tier": "important",
+    "rank": 3,
+    "title": "What a dynamic module returns",
+    "file": "01-fundamentals.md",
+    "score": 4.4,
+    "why": "DynamicModule return shape is how libraries and forRoot patterns actually compose."
+  },
+  {
+    "id": "NEST-253",
+    "tier": "important",
+    "rank": 4,
+    "title": "What does `forbidNonWhitelisted` add on top of `whitelist`",
+    "file": "06-validation-api.md",
+    "score": 4.25,
+    "why": "forbidNonWhitelisted turns silent strip into a loud 400\u2014team-policy choice."
+  },
+  {
+    "id": "NEST-107",
+    "tier": "important",
+    "rank": 5,
+    "title": "Accessing the request in a provider",
+    "file": "03-dependency-injection.md",
+    "score": 4.35,
+    "why": "REQUEST injection vs passing args\u2014when per-request data belongs in a provider."
+  },
+  {
+    "id": "NEST-010",
+    "tier": "important",
+    "rank": 6,
+    "title": "Why a global module hides a dependency",
+    "file": "01-fundamentals.md",
+    "score": 4.25,
+    "why": "Global modules hide import edges; seniors know when that opacity hurts."
+  },
+  {
+    "id": "NEST-160",
+    "tier": "important",
+    "rank": 7,
+    "title": "localStorage vs httpOnly cookies",
+    "file": "04-auth.md",
+    "score": 4.25,
+    "why": "httpOnly cookies vs localStorage is the XSS/token-storage interview staple."
+  },
+  {
+    "id": "NEST-179",
+    "tier": "important",
+    "rank": 8,
+    "title": "RBAC, ABAC, permissions",
+    "file": "04-auth.md",
+    "score": 4.4,
+    "why": "RBAC vs ABAC/permissions frames how far RolesGuard should go."
+  },
+  {
+    "id": "NEST-227",
+    "tier": "important",
+    "rank": 9,
+    "title": "[TypeORM] What causes N+1 in Nest services",
+    "file": "05-database.md",
+    "score": 4.25,
+    "why": "N+1 in Nest services is the usual ORM performance failure mode."
+  },
+  {
+    "id": "NEST-335",
+    "tier": "important",
+    "rank": 10,
+    "title": "The dual-write problem the outbox solves",
+    "file": "07-async-distributed.md",
+    "score": 4.4,
+    "why": "Dual-write/outbox is the reliability answer when DB + emit must stay consistent."
+  },
+  {
+    "id": "NEST-344",
+    "tier": "important",
+    "rank": 11,
+    "title": "Why every replica fires the same cron",
+    "file": "07-async-distributed.md",
+    "score": 4.35,
+    "why": "Cron on every replica is the classic multi-instance footgun with Nest Schedule."
+  },
+  {
+    "id": "NEST-085",
+    "tier": "important",
+    "rank": 12,
+    "title": "APP_INTERCEPTOR and useGlobalInterceptors",
+    "file": "02-request-lifecycle.md",
+    "score": 4.2,
+    "why": "APP_INTERCEPTOR vs useGlobalInterceptors mirrors the DI lesson from guards."
+  },
+  {
+    "id": "NEST-119",
+    "tier": "important",
+    "rank": 13,
+    "title": "ModuleRef.resolve() vs get()",
+    "file": "03-dependency-injection.md",
+    "score": 4.1,
+    "why": "resolve vs get is how you correctly fetch scoped providers outside constructors."
+  },
+  {
+    "id": "NEST-028",
+    "tier": "important",
+    "rank": 14,
+    "title": "What forwardRef delays",
+    "file": "01-fundamentals.md",
+    "score": 3.85,
+    "why": "forwardRef delays token resolution\u2014necessary but usually a design smell."
+  },
+  {
+    "id": "NEST-052",
+    "tier": "important",
+    "rank": 15,
+    "title": "What middleware is allowed to touch",
+    "file": "02-request-lifecycle.md",
+    "score": 3.95,
+    "why": "Middleware can touch raw req/res but not ExecutionContext/handler metadata."
+  },
+  {
+    "id": "NEST-164",
+    "tier": "important",
+    "rank": 16,
+    "title": "CSRF with cookie auth",
+    "file": "04-auth.md",
+    "score": 4.1,
+    "why": "Cookie auth without CSRF thinking is incomplete for browser clients."
+  },
+  {
+    "id": "NEST-182",
+    "tier": "important",
+    "rank": 17,
+    "title": "Ownership checks",
+    "file": "04-auth.md",
+    "score": 4.1,
+    "why": "Ownership checks are the resource-level authz gap RolesGuard does not cover."
+  },
+  {
+    "id": "NEST-203",
+    "tier": "important",
+    "rank": 18,
+    "title": "[Prisma] How should PrismaService be defined",
+    "file": "05-database.md",
+    "score": 4.1,
+    "why": "PrismaService as injectable lifecycle-aware client is the Nest+Prisma standard."
+  },
+  {
+    "id": "NEST-213",
+    "tier": "important",
+    "rank": 19,
+    "title": "[Prisma] $transaction: array vs interactive",
+    "file": "05-database.md",
+    "score": 4.05,
+    "why": "Array vs interactive $transaction\u2014when you need intermediate reads."
+  },
+  {
+    "id": "NEST-250",
+    "tier": "important",
+    "rank": 20,
+    "title": "[Both] How do you map DB errors to HTTP errors",
+    "file": "05-database.md",
+    "score": 4.1,
+    "why": "Mapping unique violations to 409/400 is production API hygiene."
+  },
+  {
+    "id": "NEST-256",
+    "tier": "important",
+    "rank": 21,
+    "title": "What are DTO design principles for a good API",
+    "file": "06-validation-api.md",
+    "score": 4.1,
+    "why": "DTO design principles keep create/update/query shapes honest and documentable."
+  },
+  {
+    "id": "NEST-304",
+    "tier": "important",
+    "rank": 22,
+    "title": "What a processor does and how concurrency works",
+    "file": "07-async-distributed.md",
+    "score": 4.1,
+    "why": "Processor concurrency is how BullMQ throughput and ordering trade off."
+  },
+  {
+    "id": "NEST-368",
+    "tier": "important",
+    "rank": 23,
+    "title": "createNestApplication",
+    "file": "08-testing.md",
+    "score": 3.95,
+    "why": "createNestApplication is the bridge from TestingModule to HTTP e2e."
+  },
+  {
+    "id": "NEST-021",
+    "tier": "important",
+    "rank": 24,
+    "title": "What is unsafe in a constructor",
+    "file": "01-fundamentals.md",
+    "score": 4.05,
+    "why": "Async work in constructors races lifecycle\u2014boot bugs seniors diagnose fast."
+  },
+  {
+    "id": "NEST-176",
+    "tier": "important",
+    "rank": 25,
+    "title": "`getAllAndOverride` vs `getAllAndMerge`",
+    "file": "04-auth.md",
+    "score": 4.05,
+    "why": "getAllAndOverride vs merge decides how @Public/@Roles compose on class+method."
+  },
+  {
+    "id": "NEST-139",
+    "tier": "important",
+    "rank": 26,
+    "title": "@Global() modules",
+    "file": "03-dependency-injection.md",
+    "score": 3.75,
+    "why": "@Global() is convenient and costly to the dependency graph\u2014know both sides."
+  },
+  {
+    "id": "NEST-263",
+    "tier": "important",
+    "rank": 27,
+    "title": "How do you customize validation error responses",
+    "file": "06-validation-api.md",
+    "score": 3.8,
+    "why": "Custom validation error shape is what clients and FE teams actually need."
+  },
+  {
+    "id": "NEST-267",
+    "tier": "important",
+    "rank": 28,
+    "title": "What's the difference between `app.useGlobalPipes()` and `APP_PIPE`",
+    "file": "06-validation-api.md",
+    "score": 3.95,
+    "why": "APP_PIPE gets DI and module order; bootstrap useGlobalPipes does not."
+  },
+  {
+    "id": "NEST-310",
+    "tier": "important",
+    "rank": 29,
+    "title": "Attempts and backoff",
+    "file": "07-async-distributed.md",
+    "score": 3.7,
+    "why": "Attempts/backoff separates transient failures from poison messages."
+  },
+  {
+    "id": "NEST-400",
+    "tier": "important",
+    "rank": 30,
+    "title": "A practical Nest test portfolio",
+    "file": "08-testing.md",
+    "score": 3.75,
+    "why": "A practical Nest test portfolio beats chasing coverage percentage."
+  },
+  {
+    "id": "NEST-120",
+    "tier": "advanced",
+    "rank": 1,
+    "title": "ContextId",
+    "file": "03-dependency-injection.md",
+    "score": 3.35,
+    "why": "ContextId is how request-scoped DI is keyed\u2014needed for durable/resolve depth."
+  },
+  {
+    "id": "NEST-148",
+    "tier": "advanced",
+    "rank": 2,
+    "title": "Scope of global enhancers",
+    "file": "03-dependency-injection.md",
+    "score": 3.55,
+    "why": "Global enhancer scope bubbling surprises teams that inject REQUEST into APP_*."
+  },
+  {
+    "id": "NEST-158",
+    "tier": "advanced",
+    "rank": 3,
+    "title": "Refresh token rotation",
+    "file": "04-auth.md",
+    "score": 3.7,
+    "why": "Refresh rotation is the senior hardening of access/refresh token design."
+  },
+  {
+    "id": "NEST-215",
+    "tier": "advanced",
+    "rank": 4,
+    "title": "[Both] How do you propagate a transaction without passing `tx` everywhere",
+    "file": "05-database.md",
+    "score": 3.85,
+    "why": "Propagating a transaction without threading tx is Unit-of-Work/CLS senior territory."
+  },
+  {
+    "id": "NEST-287",
+    "tier": "advanced",
+    "rank": 5,
+    "title": "How do you implement idempotency keys in Nest",
+    "file": "06-validation-api.md",
+    "score": 3.8,
+    "why": "Idempotency keys for write APIs are production Nest patterns at scale."
+  },
+  {
+    "id": "NEST-307",
+    "tier": "advanced",
+    "rank": 6,
+    "title": "What Redis stores for BullMQ, and what it does not promise",
+    "file": "07-async-distributed.md",
+    "score": 3.55,
+    "why": "What Redis stores for BullMQ\u2014and what it does not promise\u2014avoids false durability."
+  },
+  {
+    "id": "NEST-314",
+    "tier": "advanced",
+    "rank": 7,
+    "title": "Why queue concurrency breaks ordering",
+    "file": "07-async-distributed.md",
+    "score": 3.7,
+    "why": "Concurrency vs ordering is the job-queue design question after 'just use Bull'."
+  },
+  {
+    "id": "NEST-338",
+    "tier": "advanced",
+    "rank": 8,
+    "title": "At-least-once plus idempotency",
+    "file": "07-async-distributed.md",
+    "score": 3.85,
+    "why": "At-least-once + idempotent consumers is the distributed messaging contract."
+  },
+  {
+    "id": "NEST-169",
+    "tier": "advanced",
+    "rank": 9,
+    "title": "Revocation and blacklist trade-offs",
+    "file": "04-auth.md",
+    "score": 3.7,
+    "why": "JWT revocation/blacklist trade-offs force stateful checks back into the design."
+  },
+  {
+    "id": "NEST-112",
+    "tier": "advanced",
+    "rank": 10,
+    "title": "Async providers",
+    "file": "03-dependency-injection.md",
+    "score": 3.55,
+    "why": "Async providers control boot ordering for connections that must be ready."
+  },
+  {
+    "id": "NEST-191",
+    "tier": "advanced",
+    "rank": 11,
+    "title": "Tenant isolation below the auth layer",
+    "file": "04-auth.md",
+    "score": 3.55,
+    "why": "Tenant isolation below auth is where multi-tenant Nest apps actually fail."
+  },
+  {
+    "id": "NEST-325",
+    "tier": "advanced",
+    "rank": 12,
+    "title": "Two instances: a copy each, or shared work",
+    "file": "07-async-distributed.md",
+    "score": 3.55,
+    "why": "Fan-out vs competing consumers when scaling Nest microservice instances."
+  },
+  {
+    "id": "NEST-330",
+    "tier": "advanced",
+    "rank": 13,
+    "title": "When CQRS is unnecessary",
+    "file": "07-async-distributed.md",
+    "score": 3.6,
+    "why": "Knowing when CQRS is unnecessary shows architectural judgment, not cargo cult."
+  },
+  {
+    "id": "NEST-367",
+    "tier": "advanced",
+    "rank": 14,
+    "title": "Request-scoped providers and resolve",
+    "file": "08-testing.md",
+    "score": 3.4,
+    "why": "Testing request-scoped providers needs resolve/ContextId\u2014easy to get wrong."
+  },
+  {
+    "id": "NEST-382",
+    "tier": "advanced",
+    "rank": 15,
+    "title": "Globals that live only in main.ts",
+    "file": "08-testing.md",
+    "score": 3.8,
+    "why": "Globals registered only in main.ts vanish from TestingModule\u2014common e2e trap."
+  },
+  {
+    "id": "NEST-413",
+    "tier": "advanced",
+    "rank": 16,
+    "title": "One limit across many pods",
+    "file": "09-security-performance.md",
+    "score": 3.8,
+    "why": "Per-pod throttling is wrong; shared store makes rate limits real under load."
+  },
+  {
+    "id": "NEST-441",
+    "tier": "advanced",
+    "rank": 17,
+    "title": "Stampede and invalidation",
+    "file": "09-security-performance.md",
+    "score": 3.4,
+    "why": "Cache stampede/invalidation is the hard part after CacheInterceptor demos."
+  },
+  {
+    "id": "NEST-468",
+    "tier": "advanced",
+    "rank": 18,
+    "title": "Request context and CLS",
+    "file": "10-enterprise.md",
+    "score": 3.55,
+    "why": "CLS/request context powers tenant, tx, and audit propagation without param drilling."
+  },
+  {
+    "id": "NEST-480",
+    "tier": "advanced",
+    "rank": 19,
+    "title": "Circuit breakers for HttpService",
+    "file": "10-enterprise.md",
+    "score": 3.4,
+    "why": "Circuit breaking HttpService is resilience beyond retries for dependent APIs."
+  },
+  {
+    "id": "NEST-490",
+    "tier": "advanced",
+    "rank": 20,
+    "title": "When NOT to split a Nest service",
+    "file": "10-enterprise.md",
+    "score": 3.65,
+    "why": "When NOT to split a Nest service\u2014Staff-level antidote to premature microservices."
+  }
+]

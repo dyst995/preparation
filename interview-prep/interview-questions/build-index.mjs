@@ -7,8 +7,9 @@ const tracks = [
   ["NestJS", "nestjs"],
   ["Node.js", "nodejs"],
   ["Databases", "databases"],
+  ["TypeScript", "typescript"],
 ];
-const idRe = /^###\s+((?:REACT|NEST|NODE|DB)-\d+)\s+—\s+(.+)$/gm;
+const idRe = /^###\s+((?:REACT|NEST|NODE|DB|TS)-\d+)\s+—\s+(.+)$/gm;
 
 let body = `# Index
 

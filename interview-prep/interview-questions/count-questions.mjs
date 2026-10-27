@@ -2,8 +2,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = import.meta.dirname;
-const tracks = ["react", "nestjs", "nodejs", "databases"];
-const idRe = /^###\s+((?:REACT|NEST|NODE|DB)-\d+)\s+—\s+.+$/gm;
+const tracks = ["react", "nestjs", "nodejs", "databases", "typescript"];
+const idRe = /^###\s+((?:REACT|NEST|NODE|DB|TS)-\d+)\s+—\s+.+$/gm;
 
 let total = 0;
 for (const track of tracks) {

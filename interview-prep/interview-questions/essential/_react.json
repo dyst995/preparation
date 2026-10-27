@@ -1,0 +1,812 @@
+[
+  {
+    "id": "REACT-015",
+    "tier": "must",
+    "rank": 1,
+    "title": "Render describes, commit applies",
+    "file": "01-fundamentals.md",
+    "score": 4.85,
+    "why": "Render vs commit is the core mental model every senior answer hangs on."
+  },
+  {
+    "id": "REACT-011",
+    "tier": "must",
+    "rank": 2,
+    "title": "Reconciliation matches type at a position",
+    "file": "01-fundamentals.md",
+    "score": 4.8,
+    "why": "Reconciliation by type and position explains remounts, lost state, and key bugs."
+  },
+  {
+    "id": "REACT-013",
+    "tier": "must",
+    "rank": 3,
+    "title": "State stays where type and key stay",
+    "file": "01-fundamentals.md",
+    "score": 4.75,
+    "why": "State preservation rules are the interview follow-up to keys and conditionals."
+  },
+  {
+    "id": "REACT-012",
+    "tier": "must",
+    "rank": 4,
+    "title": "Index keys work while order is identity",
+    "file": "01-fundamentals.md",
+    "score": 4.72,
+    "why": "Index keys are the classic production bug interviewers use to test list identity."
+  },
+  {
+    "id": "REACT-021",
+    "tier": "must",
+    "rank": 5,
+    "title": "Hook identity is call order",
+    "file": "01-fundamentals.md",
+    "score": 4.7,
+    "why": "Hook call-order identity underpins Rules of Hooks and custom-hook design."
+  },
+  {
+    "id": "REACT-101",
+    "tier": "must",
+    "rank": 6,
+    "title": "What actually triggers a re-render?",
+    "file": "03-performance.md",
+    "score": 4.68,
+    "why": "Knowing what actually triggers renders prevents cargo-cult memoization."
+  },
+  {
+    "id": "REACT-054",
+    "tier": "must",
+    "rank": 7,
+    "title": "The interval keeps the first render's values",
+    "file": "02-hooks-state.md",
+    "score": 4.65,
+    "why": "Stale closures in effects/timers are the most common senior debugging trap."
+  },
+  {
+    "id": "REACT-203",
+    "tier": "must",
+    "rank": 8,
+    "title": "Race conditions in fetch effects",
+    "file": "05-async-data.md",
+    "score": 4.65,
+    "why": "Fetch races are the must-pass async correctness question for production React."
+  },
+  {
+    "id": "REACT-005",
+    "tier": "must",
+    "rank": 9,
+    "title": "setState schedules the next render",
+    "file": "01-fundamentals.md",
+    "score": 4.62,
+    "why": "setState schedules; it does not mutate the current render\u2014foundation for async UI."
+  },
+  {
+    "id": "REACT-020",
+    "tier": "must",
+    "rank": 10,
+    "title": "A parent render runs child functions",
+    "file": "01-fundamentals.md",
+    "score": 4.6,
+    "why": "Parent render running children explains why memo and composition matter."
+  },
+  {
+    "id": "REACT-110",
+    "tier": "must",
+    "rank": 11,
+    "title": "Why memo \"doesn't work\"",
+    "file": "03-performance.md",
+    "score": 4.58,
+    "why": "Unstable props defeating memo is the practical half of performance interviews."
+  },
+  {
+    "id": "REACT-106",
+    "tier": "must",
+    "rank": 12,
+    "title": "What does React.memo do?",
+    "file": "03-performance.md",
+    "score": 4.55,
+    "why": "React.memo\u2019s shallow compare is the baseline optimization tool to explain."
+  },
+  {
+    "id": "REACT-071",
+    "tier": "must",
+    "rank": 13,
+    "title": "Derived data is computed during render",
+    "file": "02-hooks-state.md",
+    "score": 4.55,
+    "why": "Derive during render instead of syncing with effects\u2014avoids flicker and loops."
+  },
+  {
+    "id": "REACT-056",
+    "tier": "must",
+    "rank": 14,
+    "title": "Passive effects run after the paint opportunity",
+    "file": "02-hooks-state.md",
+    "score": 4.52,
+    "why": "Passive effects after paint separates UX timing from layout-critical work."
+  },
+  {
+    "id": "REACT-130",
+    "tier": "must",
+    "rank": 15,
+    "title": "useLayoutEffect vs. useEffect",
+    "file": "03-performance.md",
+    "score": 4.5,
+    "why": "useLayoutEffect vs useEffect is the standard layout/flicker interview pair."
+  },
+  {
+    "id": "REACT-008",
+    "tier": "must",
+    "rank": 16,
+    "title": "React 18 batches outside React events",
+    "file": "01-fundamentals.md",
+    "score": 4.5,
+    "why": "React 18 automatic batching changes how many renders you expect after awaits."
+  },
+  {
+    "id": "REACT-083",
+    "tier": "must",
+    "rank": 17,
+    "title": "A new key mounts a new copy of the state",
+    "file": "02-hooks-state.md",
+    "score": 4.48,
+    "why": "Changing key to remount is the idiomatic reset pattern seniors must know."
+  },
+  {
+    "id": "REACT-251",
+    "tier": "must",
+    "rank": 18,
+    "title": "Controlled vs uncontrolled inputs",
+    "file": "06-forms-accessibility.md",
+    "score": 4.48,
+    "why": "Controlled vs uncontrolled is the forms foundation for APIs and libraries."
+  },
+  {
+    "id": "REACT-053",
+    "tier": "must",
+    "rank": 19,
+    "title": "The updater reads the pending state",
+    "file": "02-hooks-state.md",
+    "score": 4.45,
+    "why": "Functional updaters fix lost updates after concurrent or async handlers."
+  },
+  {
+    "id": "REACT-121",
+    "tier": "must",
+    "rank": 20,
+    "title": "startTransition",
+    "file": "03-performance.md",
+    "score": 4.45,
+    "why": "startTransition is the modern answer for keeping inputs snappy under heavy UI."
+  },
+  {
+    "id": "REACT-215",
+    "tier": "must",
+    "rank": 21,
+    "title": "Server state vs client state",
+    "file": "05-async-data.md",
+    "score": 4.45,
+    "why": "Server vs client state split drives caching, invalidation, and store choice."
+  },
+  {
+    "id": "REACT-168",
+    "tier": "must",
+    "rank": 22,
+    "title": "Prop drilling vs context",
+    "file": "04-architecture.md",
+    "score": 4.42,
+    "why": "Prop drilling vs context is the everyday architecture trade-off interview."
+  },
+  {
+    "id": "REACT-042",
+    "tier": "must",
+    "rank": 23,
+    "title": "A render error is caught above; a handler error is not",
+    "file": "01-fundamentals.md",
+    "score": 4.4,
+    "why": "Error boundaries catch render errors only\u2014critical for correct reliability design."
+  },
+  {
+    "id": "REACT-201",
+    "tier": "must",
+    "rank": 24,
+    "title": "Fetching in useEffect: the basic pattern and its pitfalls",
+    "file": "05-async-data.md",
+    "score": 4.4,
+    "why": "Effect-based fetch pitfalls are still asked even when teams use a query library."
+  },
+  {
+    "id": "REACT-084",
+    "tier": "must",
+    "rank": 25,
+    "title": "An async effect cannot return a cleanup",
+    "file": "02-hooks-state.md",
+    "score": 4.38,
+    "why": "Async effect callbacks break cleanup\u2014common source of race and leak bugs."
+  },
+  {
+    "id": "REACT-090",
+    "tier": "must",
+    "rank": 26,
+    "title": "Hooks stay above any early return",
+    "file": "02-hooks-state.md",
+    "score": 4.38,
+    "why": "Hooks above early returns is non-negotiable Rules of Hooks fluency."
+  },
+  {
+    "id": "REACT-031",
+    "tier": "must",
+    "rank": 27,
+    "title": "Strict Mode's extra render stays in development",
+    "file": "01-fundamentals.md",
+    "score": 4.36,
+    "why": "Strict Mode double-invoke is how seniors explain \u201cwhy does this run twice?\u201d."
+  },
+  {
+    "id": "REACT-209",
+    "tier": "must",
+    "rank": 28,
+    "title": "Modeling loading, error, and success states",
+    "file": "05-async-data.md",
+    "score": 4.35,
+    "why": "Loading/error/success modeling prevents impossible UI states in async screens."
+  },
+  {
+    "id": "REACT-068",
+    "tier": "must",
+    "rank": 29,
+    "title": "Values that change at different rates need different providers",
+    "file": "02-hooks-state.md",
+    "score": 4.35,
+    "why": "Splitting fast/slow context values is the fix for context re-render storms."
+  },
+  {
+    "id": "REACT-102",
+    "tier": "must",
+    "rank": 30,
+    "title": "State colocation",
+    "file": "03-performance.md",
+    "score": 4.32,
+    "why": "State colocation is the first performance/architecture move before memo."
+  },
+  {
+    "id": "REACT-036",
+    "tier": "must",
+    "rank": 31,
+    "title": "The input shows the value from this render",
+    "file": "01-fundamentals.md",
+    "score": 4.32,
+    "why": "Controlled inputs make React state the truth\u2014explains frozen cursors and filters."
+  },
+  {
+    "id": "REACT-189",
+    "tier": "must",
+    "rank": 32,
+    "title": "Error boundary placement",
+    "file": "04-architecture.md",
+    "score": 4.3,
+    "why": "Where to place error boundaries is the architecture half of error handling."
+  },
+  {
+    "id": "REACT-306",
+    "tier": "must",
+    "rank": 33,
+    "title": "Hydration",
+    "file": "07-rendering-strategies.md",
+    "score": 4.3,
+    "why": "Hydration is the SSR bridge every full-stack React interview expects."
+  },
+  {
+    "id": "REACT-315",
+    "tier": "must",
+    "rank": 34,
+    "title": "React Server Components",
+    "file": "07-rendering-strategies.md",
+    "score": 4.28,
+    "why": "RSC basics reshape where data and JS live\u2014core modern React literacy."
+  },
+  {
+    "id": "REACT-194",
+    "tier": "must",
+    "rank": 35,
+    "title": "Server/client component boundary",
+    "file": "04-architecture.md",
+    "score": 4.28,
+    "why": "Server/client boundary placement is the practical RSC architecture skill."
+  },
+  {
+    "id": "REACT-064",
+    "tier": "must",
+    "rank": 36,
+    "title": "useMemo caches a result while dependencies compare equal",
+    "file": "02-hooks-state.md",
+    "score": 4.25,
+    "why": "useMemo semantics (deps + Object.is) are required to discuss memoization honestly."
+  },
+  {
+    "id": "REACT-018",
+    "tier": "must",
+    "rank": 37,
+    "title": "Transitions keep the keystroke urgent",
+    "file": "01-fundamentals.md",
+    "score": 4.25,
+    "why": "Urgent input + deferred list is the textbook concurrent UX pattern."
+  },
+  {
+    "id": "REACT-351",
+    "tier": "must",
+    "rank": 38,
+    "title": "Testing the way a person uses the screen",
+    "file": "08-testing.md",
+    "score": 4.22,
+    "why": "User-centric testing philosophy is what seniors defend in test-strategy rounds."
+  },
+  {
+    "id": "REACT-289",
+    "tier": "must",
+    "rank": 39,
+    "title": "Accessible modals",
+    "file": "06-forms-accessibility.md",
+    "score": 4.2,
+    "why": "Accessible modals (focus trap, Escape, return focus) are table-stakes UI craft."
+  },
+  {
+    "id": "REACT-282",
+    "tier": "must",
+    "rank": 40,
+    "title": "Button vs clickable div",
+    "file": "06-forms-accessibility.md",
+    "score": 4.18,
+    "why": "Button vs clickable div is the highest-signal a11y/semantic HTML interview check."
+  },
+  {
+    "id": "REACT-007",
+    "tier": "important",
+    "rank": 1,
+    "title": "Updates in one batch run in order",
+    "file": "01-fundamentals.md",
+    "score": 4.15,
+    "why": "Updater ordering inside a batch separates replace vs functional update mastery."
+  },
+  {
+    "id": "REACT-014",
+    "tier": "important",
+    "rank": 2,
+    "title": "Two conditional slots are two positions",
+    "file": "01-fundamentals.md",
+    "score": 4.12,
+    "why": "Conditional slot identity explains \u201cwrong draft after toggle\u201d bugs."
+  },
+  {
+    "id": "REACT-059",
+    "tier": "important",
+    "rank": 3,
+    "title": "The in-flight request has to be dropped",
+    "file": "02-hooks-state.md",
+    "score": 4.08,
+    "why": "Dropping stale in-flight results is the effect-level race remedy to verbalize."
+  },
+  {
+    "id": "REACT-002",
+    "tier": "important",
+    "rank": 4,
+    "title": "Props are owned by the parent",
+    "file": "01-fundamentals.md",
+    "score": 4.05,
+    "why": "Props ownership vs local state copies explains stale controlled/uncontrolled bugs."
+  },
+  {
+    "id": "REACT-063",
+    "tier": "important",
+    "rank": 5,
+    "title": "A ref keeps the latest value for a later callback",
+    "file": "02-hooks-state.md",
+    "score": 4.05,
+    "why": "Latest-value refs are the clean fix for effect deps without resubscribing."
+  },
+  {
+    "id": "REACT-085",
+    "tier": "important",
+    "rank": 6,
+    "title": "Cleanup must remove the listener it added",
+    "file": "02-hooks-state.md",
+    "score": 4.02,
+    "why": "Cleanup must remove the same listener\u2014classic leak interview scenario."
+  },
+  {
+    "id": "REACT-104",
+    "tier": "important",
+    "rank": 7,
+    "title": "Children composition to skip renders",
+    "file": "03-performance.md",
+    "score": 4.0,
+    "why": "Children composition skips renders without memo\u2014architecture over micro-opt."
+  },
+  {
+    "id": "REACT-109",
+    "tier": "important",
+    "rank": 8,
+    "title": "What useCallback really does",
+    "file": "03-performance.md",
+    "score": 3.98,
+    "why": "useCallback stabilizes identity; it does not make the function itself faster."
+  },
+  {
+    "id": "REACT-111",
+    "tier": "important",
+    "rank": 9,
+    "title": "Context fan-out",
+    "file": "03-performance.md",
+    "score": 3.95,
+    "why": "Context fan-out forces seniors to design providers and selectors carefully."
+  },
+  {
+    "id": "REACT-170",
+    "tier": "important",
+    "rank": 10,
+    "title": "Context re-render design",
+    "file": "04-architecture.md",
+    "score": 3.92,
+    "why": "Designing context to limit re-renders is the architecture follow-up to fan-out."
+  },
+  {
+    "id": "REACT-122",
+    "tier": "important",
+    "rank": 11,
+    "title": "useDeferredValue",
+    "file": "03-performance.md",
+    "score": 3.9,
+    "why": "useDeferredValue is the other concurrent knob for lagging expensive UI."
+  },
+  {
+    "id": "REACT-072",
+    "tier": "important",
+    "rank": 12,
+    "title": "Reset the draft when the entity changes, without an effect",
+    "file": "02-hooks-state.md",
+    "score": 3.88,
+    "why": "Resetting draft on entity change during render beats fragile sync effects."
+  },
+  {
+    "id": "REACT-204",
+    "tier": "important",
+    "rank": 13,
+    "title": "Cancelling requests with AbortController",
+    "file": "05-async-data.md",
+    "score": 3.85,
+    "why": "AbortController is the standard cancellation tool alongside ignore flags."
+  },
+  {
+    "id": "REACT-224",
+    "tier": "important",
+    "rank": 14,
+    "title": "Optimistic updates",
+    "file": "05-async-data.md",
+    "score": 3.82,
+    "why": "Optimistic updates are the senior mutation UX pattern interviewers probe."
+  },
+  {
+    "id": "REACT-164",
+    "tier": "important",
+    "rank": 15,
+    "title": "Controlled vs uncontrolled ownership",
+    "file": "04-architecture.md",
+    "score": 3.8,
+    "why": "Component API ownership (controlled/uncontrolled) is reusable-library literacy."
+  },
+  {
+    "id": "REACT-216",
+    "tier": "important",
+    "rank": 16,
+    "title": "Why context is the wrong tool for server state",
+    "file": "05-async-data.md",
+    "score": 3.78,
+    "why": "Context for server state is a common anti-pattern; query caches win instead."
+  },
+  {
+    "id": "REACT-228",
+    "tier": "important",
+    "rank": 17,
+    "title": "Request waterfalls",
+    "file": "05-async-data.md",
+    "score": 3.75,
+    "why": "Request waterfalls are the data-loading performance killer on both client and server."
+  },
+  {
+    "id": "REACT-185",
+    "tier": "important",
+    "rank": 18,
+    "title": "Loaders vs component-level fetching",
+    "file": "04-architecture.md",
+    "score": 3.72,
+    "why": "Route loaders vs component fetch is the modern data-boundary design choice."
+  },
+  {
+    "id": "REACT-191",
+    "tier": "important",
+    "rank": 19,
+    "title": "Suspense boundaries as architecture",
+    "file": "04-architecture.md",
+    "score": 3.7,
+    "why": "Suspense boundaries as architecture control loading UX and streaming shape."
+  },
+  {
+    "id": "REACT-162",
+    "tier": "important",
+    "rank": 20,
+    "title": "Compound components",
+    "file": "04-architecture.md",
+    "score": 3.68,
+    "why": "Compound components are a core composition pattern for flexible UI APIs."
+  },
+  {
+    "id": "REACT-308",
+    "tier": "important",
+    "rank": 21,
+    "title": "Hydration mismatches",
+    "file": "07-rendering-strategies.md",
+    "score": 3.65,
+    "why": "Hydration mismatches are the production SSR failure mode you must diagnose."
+  },
+  {
+    "id": "REACT-318",
+    "tier": "important",
+    "rank": 22,
+    "title": "When to mark `use client`",
+    "file": "07-rendering-strategies.md",
+    "score": 3.62,
+    "why": "When to mark use client controls bundle size and server capability."
+  },
+  {
+    "id": "REACT-302",
+    "tier": "important",
+    "rank": 23,
+    "title": "Server-side rendering",
+    "file": "07-rendering-strategies.md",
+    "score": 3.6,
+    "why": "SSR trade-offs (TTFB, SEO, hydration cost) are full-stack baseline knowledge."
+  },
+  {
+    "id": "REACT-125",
+    "tier": "important",
+    "rank": 24,
+    "title": "React.lazy and code splitting",
+    "file": "03-performance.md",
+    "score": 3.58,
+    "why": "React.lazy + Suspense is the default route/feature code-splitting tool."
+  },
+  {
+    "id": "REACT-260",
+    "tier": "important",
+    "rank": 25,
+    "title": "Validation timing UX",
+    "file": "06-forms-accessibility.md",
+    "score": 3.55,
+    "why": "Validation timing (blur vs submit vs change) is forms UX seniors must justify."
+  },
+  {
+    "id": "REACT-274",
+    "tier": "important",
+    "rank": 26,
+    "title": "Labels and `useId`",
+    "file": "06-forms-accessibility.md",
+    "score": 3.52,
+    "why": "Labels + useId is the accessible form wiring interviewers expect."
+  },
+  {
+    "id": "REACT-355",
+    "tier": "important",
+    "rank": 27,
+    "title": "getByRole and the accessible name",
+    "file": "08-testing.md",
+    "score": 3.5,
+    "why": "getByRole queries encode a11y and resilient RTL testing in one skill."
+  },
+  {
+    "id": "REACT-352",
+    "tier": "important",
+    "rank": 28,
+    "title": "Leaving implementation details out of the test",
+    "file": "08-testing.md",
+    "score": 3.48,
+    "why": "Avoiding implementation-detail tests keeps suites maintainable under refactors."
+  },
+  {
+    "id": "REACT-423",
+    "tier": "important",
+    "rank": 29,
+    "title": "Discriminated unions for UI state",
+    "file": "09-typescript.md",
+    "score": 3.45,
+    "why": "Discriminated unions for UI status are the TypeScript pattern that prevents bad states."
+  },
+  {
+    "id": "REACT-471",
+    "tier": "important",
+    "rank": 30,
+    "title": "XSS via dangerouslySetInnerHTML",
+    "file": "10-production.md",
+    "score": 3.42,
+    "why": "dangerouslySetInnerHTML XSS is the highest-risk client security question."
+  },
+  {
+    "id": "REACT-017",
+    "tier": "advanced",
+    "rank": 1,
+    "title": "Render can yield; commit runs through",
+    "file": "01-fundamentals.md",
+    "score": 3.55,
+    "why": "Interruptible render vs atomic commit is the concurrent model depth question."
+  },
+  {
+    "id": "REACT-044",
+    "tier": "advanced",
+    "rank": 2,
+    "title": "An urgent update and a transition are two passes",
+    "file": "01-fundamentals.md",
+    "score": 3.52,
+    "why": "Urgent + transition as two passes explains why batching intuition fails."
+  },
+  {
+    "id": "REACT-095",
+    "tier": "advanced",
+    "rank": 3,
+    "title": "startTransition does not follow an await",
+    "file": "02-hooks-state.md",
+    "score": 3.5,
+    "why": "Transitions do not survive await\u2014critical for correct concurrent async code."
+  },
+  {
+    "id": "REACT-134",
+    "tier": "advanced",
+    "rank": 4,
+    "title": "useSyncExternalStore",
+    "file": "03-performance.md",
+    "score": 3.48,
+    "why": "useSyncExternalStore is the correct bridge to non-React stores under concurrency."
+  },
+  {
+    "id": "REACT-135",
+    "tier": "advanced",
+    "rank": 5,
+    "title": "Tearing",
+    "file": "03-performance.md",
+    "score": 3.45,
+    "why": "Tearing is why external stores need sync subscription semantics."
+  },
+  {
+    "id": "REACT-149",
+    "tier": "advanced",
+    "rank": 6,
+    "title": "Streaming SSR and selective hydration",
+    "file": "03-performance.md",
+    "score": 3.42,
+    "why": "Streaming SSR + selective hydration is advanced rendering-strategy literacy."
+  },
+  {
+    "id": "REACT-196",
+    "tier": "advanced",
+    "rank": 7,
+    "title": "Composing server into client",
+    "file": "04-architecture.md",
+    "score": 3.4,
+    "why": "Passing server-rendered children into client components is the RSC composition pattern."
+  },
+  {
+    "id": "REACT-238",
+    "tier": "advanced",
+    "rank": 8,
+    "title": "Server vs client data placement",
+    "file": "05-async-data.md",
+    "score": 3.38,
+    "why": "Where to fetch (server vs client) is the staff-level data-placement judgment call."
+  },
+  {
+    "id": "REACT-234",
+    "tier": "advanced",
+    "rank": 9,
+    "title": "Promises created during render",
+    "file": "05-async-data.md",
+    "score": 3.35,
+    "why": "Promises created during render interact with Suspense and cache identity."
+  },
+  {
+    "id": "REACT-086",
+    "tier": "advanced",
+    "rank": 10,
+    "title": "The aborted request's finally clears the next loading flag",
+    "file": "02-hooks-state.md",
+    "score": 3.32,
+    "why": "Aborted finally clobbering the next request\u2019s loading flag is a subtle race."
+  },
+  {
+    "id": "REACT-124",
+    "tier": "advanced",
+    "rank": 11,
+    "title": "Transitions and Suspense",
+    "file": "03-performance.md",
+    "score": 3.3,
+    "why": "Transitions + Suspense keep prior UI instead of flashing fallbacks."
+  },
+  {
+    "id": "REACT-047",
+    "tier": "advanced",
+    "rank": 12,
+    "title": "A portal moves the DOM node, not the fiber",
+    "file": "01-fundamentals.md",
+    "score": 3.28,
+    "why": "Portals move DOM, not React parentage\u2014context and events still follow the fiber."
+  },
+  {
+    "id": "REACT-225",
+    "tier": "advanced",
+    "rank": 13,
+    "title": "Rolling back failed optimistic updates",
+    "file": "05-async-data.md",
+    "score": 3.25,
+    "why": "Rollback after failed optimistic updates separates solid mutation design."
+  },
+  {
+    "id": "REACT-319",
+    "tier": "advanced",
+    "rank": 14,
+    "title": "How the client boundary spreads",
+    "file": "07-rendering-strategies.md",
+    "score": 3.22,
+    "why": "Client boundary spread explains accidental client-bundle growth in RSC apps."
+  },
+  {
+    "id": "REACT-198",
+    "tier": "advanced",
+    "rank": 15,
+    "title": "Custom hook design",
+    "file": "04-architecture.md",
+    "score": 3.2,
+    "why": "Custom hook design (inputs/outputs/effects) is senior refactoring judgment."
+  },
+  {
+    "id": "REACT-050",
+    "tier": "advanced",
+    "rank": 16,
+    "title": "The sort wrote through the state array",
+    "file": "01-fundamentals.md",
+    "score": 3.18,
+    "why": "Mutating state during render (in-place sort) is a purity bug seniors must spot."
+  },
+  {
+    "id": "REACT-296",
+    "tier": "advanced",
+    "rank": 17,
+    "title": "Custom widgets: combobox, select, tabs",
+    "file": "06-forms-accessibility.md",
+    "score": 3.15,
+    "why": "Building ARIA widgets (combobox/tabs) is advanced a11y beyond semantics."
+  },
+  {
+    "id": "REACT-445",
+    "tier": "advanced",
+    "rank": 18,
+    "title": "Mutually exclusive props",
+    "file": "09-typescript.md",
+    "score": 3.12,
+    "why": "Mutually exclusive props typing is a high-signal React+TS API design skill."
+  },
+  {
+    "id": "REACT-473",
+    "tier": "advanced",
+    "rank": 19,
+    "title": "Storing tokens: memory vs cookie",
+    "file": "10-production.md",
+    "score": 3.1,
+    "why": "Token storage (memory vs HttpOnly cookie) is production auth security judgment."
+  },
+  {
+    "id": "REACT-493",
+    "tier": "advanced",
+    "rank": 20,
+    "title": "Long tasks and INP in React UIs",
+    "file": "10-production.md",
+    "score": 3.08,
+    "why": "Long tasks and INP tie React render strategy to real Core Web Vitals."
+  }
+]

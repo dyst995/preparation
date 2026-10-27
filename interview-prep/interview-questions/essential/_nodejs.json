@@ -1,0 +1,812 @@
+[
+  {
+    "id": "NODE-052",
+    "tier": "must",
+    "rank": 1,
+    "title": "One callback, then nextTick, then promise jobs",
+    "file": "02-event-loop.md",
+    "score": 4.9,
+    "why": "The after-callback checkpoint (nextTick then promise jobs) is the most-tested Node mental model."
+  },
+  {
+    "id": "NODE-051",
+    "tier": "must",
+    "rank": 2,
+    "title": "The phases a Node 20 loop actually walks",
+    "file": "02-event-loop.md",
+    "score": 4.85,
+    "why": "Phase order (timers \u2192 pending \u2192 poll \u2192 check \u2192 close) is the scaffold for every scheduling question."
+  },
+  {
+    "id": "NODE-002",
+    "tier": "must",
+    "rank": 3,
+    "title": "One call stack per isolate, and where an async callback actually runs",
+    "file": "01-runtime-foundations.md",
+    "score": 4.85,
+    "why": "One JS call stack per isolate; libuv pool never runs your JavaScript callbacks."
+  },
+  {
+    "id": "NODE-102",
+    "tier": "must",
+    "rank": 4,
+    "title": "Why I/O scales on one thread and CPU does not",
+    "file": "03-concurrency.md",
+    "score": 4.85,
+    "why": "Why Node scales I/O on one thread but CPU work stalls everyone\u2014core senior framing."
+  },
+  {
+    "id": "NODE-003",
+    "tier": "must",
+    "rank": 5,
+    "title": "Why a synchronous loop stalls callbacks that are already finished",
+    "file": "01-runtime-foundations.md",
+    "score": 4.8,
+    "why": "Sync work blocks already-finished async callbacks until the stack clears."
+  },
+  {
+    "id": "NODE-257",
+    "tier": "must",
+    "rank": 6,
+    "title": "What triggers `unhandledRejection` and what does Node 15+ do?",
+    "file": "06-errors-reliability.md",
+    "score": 4.8,
+    "why": "Unhandled rejections crash by default on modern Node\u2014must know process-level behavior."
+  },
+  {
+    "id": "NODE-056",
+    "tier": "must",
+    "rank": 7,
+    "title": "await resumes as a microtask on this same thread",
+    "file": "02-event-loop.md",
+    "score": 4.75,
+    "why": "await resumes as a microtask on the same thread, not a later phase."
+  },
+  {
+    "id": "NODE-253",
+    "tier": "must",
+    "rank": 8,
+    "title": "Operational vs programmer errors?",
+    "file": "06-errors-reliability.md",
+    "score": 4.75,
+    "why": "Operational vs programmer errors drives whether you retry, fail the request, or crash."
+  },
+  {
+    "id": "NODE-155",
+    "tier": "must",
+    "rank": 9,
+    "title": "Backpressure",
+    "file": "04-streams.md",
+    "score": 4.7,
+    "why": "Backpressure is how Node services stay memory-safe under load."
+  },
+  {
+    "id": "NODE-069",
+    "tier": "must",
+    "rank": 10,
+    "title": "A long synchronous callback stalls every later phase",
+    "file": "02-event-loop.md",
+    "score": 4.7,
+    "why": "A long synchronous callback stalls every later phase\u2014classic production outage pattern."
+  },
+  {
+    "id": "NODE-079",
+    "tier": "must",
+    "rank": 11,
+    "title": "fs.readFile uses the pool because a file read can block; a TCP read does not",
+    "file": "02-event-loop.md",
+    "score": 4.7,
+    "why": "fs/dns.lookup/crypto use the pool; TCP sockets do not\u2014explains mysterious latency."
+  },
+  {
+    "id": "NODE-292",
+    "tier": "must",
+    "rank": 12,
+    "title": "Graceful shutdown with connection draining?",
+    "file": "06-errors-reliability.md",
+    "score": 4.7,
+    "why": "SIGTERM + drain in-flight work is expected senior production knowledge."
+  },
+  {
+    "id": "NODE-101",
+    "tier": "must",
+    "rank": 13,
+    "title": "Why async is not parallel",
+    "file": "03-concurrency.md",
+    "score": 4.65,
+    "why": "Async concurrency is interleaving, not parallel JS\u2014clears the biggest misconception."
+  },
+  {
+    "id": "NODE-057",
+    "tier": "must",
+    "rank": 14,
+    "title": "A tight nextTick loop starves I/O",
+    "file": "02-event-loop.md",
+    "score": 4.65,
+    "why": "Tight nextTick loops starve I/O and timers; shows microtask/nextTick danger."
+  },
+  {
+    "id": "NODE-082",
+    "tier": "must",
+    "rank": 15,
+    "title": "An async function that throws rejects; a non-async throw escapes the turn",
+    "file": "02-event-loop.md",
+    "score": 4.65,
+    "why": "Throw in async rejects; throw in a plain callback escapes the turn\u2014error-handling trap."
+  },
+  {
+    "id": "NODE-262",
+    "tier": "must",
+    "rank": 16,
+    "title": "What is `AbortController`/`AbortSignal` and how do errors surface?",
+    "file": "06-errors-reliability.md",
+    "score": 4.65,
+    "why": "AbortController/AbortSignal is the standard cancellation story across fetch, HTTP, and timers."
+  },
+  {
+    "id": "NODE-259",
+    "tier": "must",
+    "rank": 17,
+    "title": "What should you do on `uncaughtException`?",
+    "file": "06-errors-reliability.md",
+    "score": 4.65,
+    "why": "uncaughtException means process state is unknown\u2014log and exit, do not recover."
+  },
+  {
+    "id": "NODE-103",
+    "tier": "must",
+    "rank": 18,
+    "title": "Options for CPU-heavy work",
+    "file": "03-concurrency.md",
+    "score": 4.6,
+    "why": "Workers, child processes, or offload\u2014interviewers expect a clear CPU-work menu."
+  },
+  {
+    "id": "NODE-055",
+    "tier": "must",
+    "rank": 19,
+    "title": "Timeout versus immediate inside I/O, and at the top level",
+    "file": "02-event-loop.md",
+    "score": 4.6,
+    "why": "Timeout vs immediate ordering depends on I/O vs top-level\u2014classic gotcha."
+  },
+  {
+    "id": "NODE-156",
+    "tier": "must",
+    "rank": 20,
+    "title": "pipe vs pipeline",
+    "file": "04-streams.md",
+    "score": 4.6,
+    "why": "pipeline cleans up and forwards errors; pipe does not\u2014prefer pipeline in production."
+  },
+  {
+    "id": "NODE-289",
+    "tier": "must",
+    "rank": 21,
+    "title": "EventEmitter `'error'` event behavior?",
+    "file": "06-errors-reliability.md",
+    "score": 4.6,
+    "why": "Missing 'error' listener crashes; emit is sync on the current stack."
+  },
+  {
+    "id": "NODE-119",
+    "tier": "must",
+    "rank": 22,
+    "title": "UV_THREADPOOL_SIZE versus worker threads",
+    "file": "03-concurrency.md",
+    "score": 4.55,
+    "why": "UV_THREADPOOL_SIZE vs worker_threads\u2014different tools for different bottlenecks."
+  },
+  {
+    "id": "NODE-053",
+    "tier": "must",
+    "rank": 23,
+    "title": "setTimeout(fn, 0) is a timer with a minimum, not \"run next\"",
+    "file": "02-event-loop.md",
+    "score": 4.55,
+    "why": "setTimeout(fn,0) is a timer with a minimum delay, not 'run next'."
+  },
+  {
+    "id": "NODE-274",
+    "tier": "must",
+    "rank": 24,
+    "title": "Why set timeouts on everything?",
+    "file": "06-errors-reliability.md",
+    "score": 4.55,
+    "why": "Timeouts on every outbound call prevent cascading hangs."
+  },
+  {
+    "id": "NODE-276",
+    "tier": "must",
+    "rank": 25,
+    "title": "What is idempotency and why vital with retries?",
+    "file": "06-errors-reliability.md",
+    "score": 4.55,
+    "why": "Idempotency is required once you add retries in distributed APIs."
+  },
+  {
+    "id": "NODE-178",
+    "tier": "must",
+    "rank": 26,
+    "title": "Memory blowup from wrong buffering",
+    "file": "04-streams.md",
+    "score": 4.55,
+    "why": "Wrong stream buffering OOMs the process\u2014high-signal streams failure mode."
+  },
+  {
+    "id": "NODE-338",
+    "tier": "must",
+    "rank": 27,
+    "title": "Sync I/O on the request path",
+    "file": "07-performance-memory.md",
+    "score": 4.55,
+    "why": "Sync fs/crypto/JSON on the request path destroys p99 for everyone."
+  },
+  {
+    "id": "NODE-399",
+    "tier": "must",
+    "rank": 28,
+    "title": "Event-loop denial of service and JSON bombs",
+    "file": "08-security.md",
+    "score": 4.55,
+    "why": "ReDoS/JSON bombs as event-loop DoS\u2014security meets the single-threaded model."
+  },
+  {
+    "id": "NODE-239",
+    "tier": "must",
+    "rank": 29,
+    "title": "Graceful HTTP shutdown",
+    "file": "05-http.md",
+    "score": 4.55,
+    "why": "server.close + idle connection cleanup for zero-downtime deploys."
+  },
+  {
+    "id": "NODE-355",
+    "tier": "must",
+    "rank": 30,
+    "title": "ReDoS on the event loop",
+    "file": "08-security.md",
+    "score": 4.55,
+    "why": "Catastrophic regex on user input freezes the event loop\u2014top Node security ask."
+  },
+  {
+    "id": "NODE-120",
+    "tier": "must",
+    "rank": 31,
+    "title": "What uses the libuv threadpool",
+    "file": "03-concurrency.md",
+    "score": 4.5,
+    "why": "Know what shares the default 4-thread pool so you can diagnose saturation."
+  },
+  {
+    "id": "NODE-104",
+    "tier": "must",
+    "rank": 32,
+    "title": "What a worker thread is",
+    "file": "03-concurrency.md",
+    "score": 4.5,
+    "why": "Worker threads = separate isolates for true parallel JS CPU work."
+  },
+  {
+    "id": "NODE-269",
+    "tier": "must",
+    "rank": 33,
+    "title": "Why do retries need backoff and jitter?",
+    "file": "06-errors-reliability.md",
+    "score": 4.5,
+    "why": "Backoff + jitter prevents retry storms after outages."
+  },
+  {
+    "id": "NODE-179",
+    "tier": "must",
+    "rank": 34,
+    "title": "Ignoring write() return value",
+    "file": "04-streams.md",
+    "score": 4.5,
+    "why": "Ignoring write() false means you ignore backpressure and buffer forever."
+  },
+  {
+    "id": "NODE-010",
+    "tier": "must",
+    "rank": 35,
+    "title": "What V8 does, what Node adds, and where libuv starts",
+    "file": "01-runtime-foundations.md",
+    "score": 4.5,
+    "why": "V8 vs Node APIs vs libuv boundary is the architecture diagram seniors sketch."
+  },
+  {
+    "id": "NODE-361",
+    "tier": "must",
+    "rank": 36,
+    "title": "Command injection through `exec`",
+    "file": "08-security.md",
+    "score": 4.5,
+    "why": "exec with shell interpolation is classic RCE\u2014prefer execFile/spawn without shell."
+  },
+  {
+    "id": "NODE-351",
+    "tier": "must",
+    "rank": 37,
+    "title": "What prototype pollution is",
+    "file": "08-security.md",
+    "score": 4.5,
+    "why": "Prototype pollution via unsafe merges is a recurring Node library vulnerability."
+  },
+  {
+    "id": "NODE-255",
+    "tier": "must",
+    "rank": 38,
+    "title": "Error handling patterns: callbacks, promises, async/await?",
+    "file": "06-errors-reliability.md",
+    "score": 4.45,
+    "why": "Callbacks vs promises vs async/await error propagation must be fluent."
+  },
+  {
+    "id": "NODE-209",
+    "tier": "must",
+    "rank": 39,
+    "title": "Request body size limits",
+    "file": "05-http.md",
+    "score": 4.45,
+    "why": "Unbounded request bodies are an easy memory/DoS footgun."
+  },
+  {
+    "id": "NODE-330",
+    "tier": "must",
+    "rank": 40,
+    "title": "RSS, heapTotal, and heapUsed",
+    "file": "07-performance-memory.md",
+    "score": 4.4,
+    "why": "RSS vs heapTotal vs heapUsed is the baseline for any memory discussion."
+  },
+  {
+    "id": "NODE-058",
+    "tier": "important",
+    "rank": 1,
+    "title": "What poll does, and when it waits",
+    "file": "02-event-loop.md",
+    "score": 4.4,
+    "why": "Poll waits for I/O and runs completions\u2014where most async callbacks land."
+  },
+  {
+    "id": "NODE-070",
+    "tier": "important",
+    "rank": 2,
+    "title": "A promise chain that never empties is starvation too",
+    "file": "02-event-loop.md",
+    "score": 4.4,
+    "why": "Never-ending promise/microtask chains starve the loop as badly as nextTick."
+  },
+  {
+    "id": "NODE-314",
+    "tier": "important",
+    "rank": 3,
+    "title": "Usual causes of loop lag",
+    "file": "07-performance-memory.md",
+    "score": 4.4,
+    "why": "Usual causes of event-loop lag: sync CPU, GC, saturated pool, huge JSON."
+  },
+  {
+    "id": "NODE-176",
+    "tier": "important",
+    "rank": 4,
+    "title": "pipe error-handling pitfalls",
+    "file": "04-streams.md",
+    "score": 4.4,
+    "why": "pipe error-handling pitfalls explain many half-closed stream bugs."
+  },
+  {
+    "id": "NODE-358",
+    "tier": "important",
+    "rank": 5,
+    "title": "Path traversal with `path.join`",
+    "file": "08-security.md",
+    "score": 4.4,
+    "why": "path.join with user segments enables traversal unless you resolve and root-check."
+  },
+  {
+    "id": "NODE-054",
+    "tier": "important",
+    "rank": 6,
+    "title": "setImmediate is the check phase",
+    "file": "02-event-loop.md",
+    "score": 4.35,
+    "why": "setImmediate is the check phase\u2014needed to reason about post-I/O work."
+  },
+  {
+    "id": "NODE-035",
+    "tier": "important",
+    "rank": 7,
+    "title": "What keeps the process from exiting",
+    "file": "01-runtime-foundations.md",
+    "score": 4.35,
+    "why": "Handles, timers, servers, and workers vote to keep the process alive."
+  },
+  {
+    "id": "NODE-159",
+    "tier": "important",
+    "rank": 8,
+    "title": "destroy and error propagation",
+    "file": "04-streams.md",
+    "score": 4.35,
+    "why": "destroy and error propagation determine whether pipelines tear down cleanly."
+  },
+  {
+    "id": "NODE-200",
+    "tier": "important",
+    "rank": 9,
+    "title": "Reading a body to JSON safely",
+    "file": "04-streams.md",
+    "score": 4.35,
+    "why": "Reading a body to JSON safely needs size limits and stream error handling."
+  },
+  {
+    "id": "NODE-131",
+    "tier": "important",
+    "rank": 10,
+    "title": "child_process versus workers",
+    "file": "03-concurrency.md",
+    "score": 4.35,
+    "why": "child_process for OS tools/isolation vs workers for in-process CPU."
+  },
+  {
+    "id": "NODE-207",
+    "tier": "important",
+    "rank": 11,
+    "title": "headersTimeout and requestTimeout",
+    "file": "05-http.md",
+    "score": 4.35,
+    "why": "headersTimeout/requestTimeout harden servers against slowloris-style clients."
+  },
+  {
+    "id": "NODE-270",
+    "tier": "important",
+    "rank": 12,
+    "title": "What should be retried, and what not?",
+    "file": "06-errors-reliability.md",
+    "score": 4.35,
+    "why": "Retry only idempotent/transient failures\u2014avoids duplicate side effects."
+  },
+  {
+    "id": "NODE-285",
+    "tier": "important",
+    "rank": 13,
+    "title": "`AsyncLocalStorage` for request context?",
+    "file": "06-errors-reliability.md",
+    "score": 4.35,
+    "why": "AsyncLocalStorage is the Node way to carry request context across awaits."
+  },
+  {
+    "id": "NODE-311",
+    "tier": "important",
+    "rank": 14,
+    "title": "`monitorEventLoopDelay`",
+    "file": "07-performance-memory.md",
+    "score": 4.35,
+    "why": "monitorEventLoopDelay is the production signal for loop health."
+  },
+  {
+    "id": "NODE-324",
+    "tier": "important",
+    "rank": 15,
+    "title": "Leak versus a large cache",
+    "file": "07-performance-memory.md",
+    "score": 4.35,
+    "why": "Distinguish a growing cache from a true leak before you chase ghosts."
+  },
+  {
+    "id": "NODE-340",
+    "tier": "important",
+    "rank": 16,
+    "title": "`JSON.parse` and `JSON.stringify`",
+    "file": "07-performance-memory.md",
+    "score": 4.35,
+    "why": "Large JSON.parse/stringify blocks the loop\u2014stream or worker when huge."
+  },
+  {
+    "id": "NODE-364",
+    "tier": "important",
+    "rank": 17,
+    "title": "SSRF and cloud metadata",
+    "file": "08-security.md",
+    "score": 4.35,
+    "why": "SSRF to cloud metadata is a high-severity Node service risk."
+  },
+  {
+    "id": "NODE-013",
+    "tier": "important",
+    "rank": 18,
+    "title": "ESM live bindings and the CommonJS exports object are different mechanisms",
+    "file": "01-runtime-foundations.md",
+    "score": 4.3,
+    "why": "ESM live bindings vs CJS exports object\u2014module-system interview staple."
+  },
+  {
+    "id": "NODE-012",
+    "tier": "important",
+    "rank": 19,
+    "title": "require.cache is one module object, not a value snapshot",
+    "file": "01-runtime-foundations.md",
+    "score": 4.3,
+    "why": "require.cache holds one module object; mutations and singletons follow."
+  },
+  {
+    "id": "NODE-115",
+    "tier": "important",
+    "rank": 20,
+    "title": "What a worker pool is for",
+    "file": "03-concurrency.md",
+    "score": 4.3,
+    "why": "A worker pool bounds CPU parallelism without unbounded thread spawn."
+  },
+  {
+    "id": "NODE-141",
+    "tier": "important",
+    "rank": 21,
+    "title": "How cluster distributes connections",
+    "file": "03-concurrency.md",
+    "score": 4.3,
+    "why": "How cluster shares the listen socket and distributes connections."
+  },
+  {
+    "id": "NODE-221",
+    "tier": "important",
+    "rank": 22,
+    "title": "AbortSignal with fetch and http.request",
+    "file": "05-http.md",
+    "score": 4.3,
+    "why": "AbortSignal with fetch/http.request is practical cancellation wiring."
+  },
+  {
+    "id": "NODE-231",
+    "tier": "important",
+    "rank": 23,
+    "title": "Trusting X-Forwarded headers",
+    "file": "05-http.md",
+    "score": 4.3,
+    "why": "Trusting X-Forwarded-* only behind a known proxy prevents IP spoofing."
+  },
+  {
+    "id": "NODE-272",
+    "tier": "important",
+    "rank": 24,
+    "title": "Circuit breaker concept?",
+    "file": "06-errors-reliability.md",
+    "score": 4.3,
+    "why": "Circuit breakers stop retry amplification against a failing dependency."
+  },
+  {
+    "id": "NODE-322",
+    "tier": "important",
+    "rank": 25,
+    "title": "Shallow size versus retained size",
+    "file": "07-performance-memory.md",
+    "score": 4.3,
+    "why": "Shallow vs retained size is how you read heap snapshots usefully."
+  },
+  {
+    "id": "NODE-373",
+    "tier": "important",
+    "rank": 26,
+    "title": "HttpOnly, Secure, and SameSite",
+    "file": "08-security.md",
+    "score": 4.3,
+    "why": "HttpOnly, Secure, SameSite are table-stakes cookie hardening."
+  },
+  {
+    "id": "NODE-429",
+    "tier": "important",
+    "rank": 27,
+    "title": "Metrics, logs, and traces",
+    "file": "09-testing-ops.md",
+    "score": 4.3,
+    "why": "Metrics, logs, and traces\u2014what each is for in a Node service."
+  },
+  {
+    "id": "NODE-442",
+    "tier": "important",
+    "rank": 28,
+    "title": "Liveness, readiness, and startup",
+    "file": "09-testing-ops.md",
+    "score": 4.25,
+    "why": "Liveness vs readiness vs startup probes\u2014wrong probes cause flapping."
+  },
+  {
+    "id": "NODE-448",
+    "tier": "important",
+    "rank": 29,
+    "title": "Graceful shutdown on SIGTERM",
+    "file": "09-testing-ops.md",
+    "score": 4.25,
+    "why": "Graceful shutdown on SIGTERM for rolling/K8s deploys."
+  },
+  {
+    "id": "NODE-466",
+    "tier": "important",
+    "rank": 30,
+    "title": "Backpressure across queues and HTTP",
+    "file": "10-advanced-design.md",
+    "score": 4.25,
+    "why": "Backpressure must span HTTP, queues, and workers\u2014not just streams."
+  },
+  {
+    "id": "NODE-063",
+    "tier": "advanced",
+    "rank": 1,
+    "title": "A nextTick queued from a promise job still beats the next phase",
+    "file": "02-event-loop.md",
+    "score": 4.2,
+    "why": "nextTick queued from a promise job still beats the next phase\u2014deep ordering."
+  },
+  {
+    "id": "NODE-097",
+    "tier": "advanced",
+    "rank": 2,
+    "title": "A chain of setImmediate reaches later phases; a chain of microtasks does not",
+    "file": "02-event-loop.md",
+    "score": 4.2,
+    "why": "Immediate chains yield to later phases; microtask chains never do."
+  },
+  {
+    "id": "NODE-150",
+    "tier": "advanced",
+    "rank": 3,
+    "title": "Choosing a concurrency tool",
+    "file": "03-concurrency.md",
+    "score": 4.2,
+    "why": "Synthesis: pick workers, pool, child_process, or cluster for the bottleneck."
+  },
+  {
+    "id": "NODE-275",
+    "tier": "advanced",
+    "rank": 4,
+    "title": "Deadline propagation?",
+    "file": "06-errors-reliability.md",
+    "score": 4.15,
+    "why": "Deadline propagation across service calls prevents zombie work."
+  },
+  {
+    "id": "NODE-279",
+    "tier": "advanced",
+    "rank": 5,
+    "title": "Load shedding vs backpressure?",
+    "file": "06-errors-reliability.md",
+    "score": 4.15,
+    "why": "Load shedding vs backpressure\u2014when to refuse work vs slow producers."
+  },
+  {
+    "id": "NODE-297",
+    "tier": "advanced",
+    "rank": 6,
+    "title": "At-least-once vs at-most-once vs exactly-once?",
+    "file": "06-errors-reliability.md",
+    "score": 4.15,
+    "why": "At-least-once vs at-most-once vs exactly-once for messaging design."
+  },
+  {
+    "id": "NODE-484",
+    "tier": "advanced",
+    "rank": 7,
+    "title": "Exactly-once illusions",
+    "file": "10-advanced-design.md",
+    "score": 4.15,
+    "why": "Exactly-once is usually an illusion\u2014design for idempotent consumers."
+  },
+  {
+    "id": "NODE-121",
+    "tier": "advanced",
+    "rank": 8,
+    "title": "Diagnosing threadpool saturation",
+    "file": "03-concurrency.md",
+    "score": 4.1,
+    "why": "Diagnosing threadpool saturation (fs/dns/crypto contention)."
+  },
+  {
+    "id": "NODE-116",
+    "tier": "advanced",
+    "rank": 9,
+    "title": "Designing a worker pool",
+    "file": "03-concurrency.md",
+    "score": 4.1,
+    "why": "Designing a worker pool: queue, sizing, backpressure, failure handling."
+  },
+  {
+    "id": "NODE-142",
+    "tier": "advanced",
+    "rank": 10,
+    "title": "Cluster versus worker_threads",
+    "file": "03-concurrency.md",
+    "score": 4.1,
+    "why": "Cluster for multi-process scaling vs workers for parallel CPU in-process."
+  },
+  {
+    "id": "NODE-250",
+    "tier": "advanced",
+    "rank": 11,
+    "title": "Defending against slow and abusive clients",
+    "file": "05-http.md",
+    "score": 4.1,
+    "why": "Defending against slow and abusive HTTP clients end-to-end."
+  },
+  {
+    "id": "NODE-194",
+    "tier": "advanced",
+    "rank": 12,
+    "title": "Gzip with streams and the libuv pool",
+    "file": "04-streams.md",
+    "score": 4.05,
+    "why": "zlib streams and the libuv pool\u2014compression can saturate the pool."
+  },
+  {
+    "id": "NODE-328",
+    "tier": "advanced",
+    "rank": 13,
+    "title": "Buffer slices that retain a slab",
+    "file": "07-performance-memory.md",
+    "score": 4.05,
+    "why": "Buffer slices retaining a large slab is a subtle leak pattern."
+  },
+  {
+    "id": "NODE-350",
+    "tier": "advanced",
+    "rank": 14,
+    "title": "Investigating a latency regression",
+    "file": "07-performance-memory.md",
+    "score": 4.05,
+    "why": "Investigating a p99 latency regression with profiles and loop metrics."
+  },
+  {
+    "id": "NODE-305",
+    "tier": "advanced",
+    "rank": 15,
+    "title": "Why a public inspector is RCE",
+    "file": "07-performance-memory.md",
+    "score": 4.0,
+    "why": "A public --inspect port is remote code execution\u2014ops security."
+  },
+  {
+    "id": "NODE-365",
+    "tier": "advanced",
+    "rank": 16,
+    "title": "DNS rebinding and redirects",
+    "file": "08-security.md",
+    "score": 4.0,
+    "why": "DNS rebinding and redirects defeat naive SSRF URL allowlists."
+  },
+  {
+    "id": "NODE-386",
+    "tier": "advanced",
+    "rank": 17,
+    "title": "Typosquatting and dependency confusion",
+    "file": "08-security.md",
+    "score": 4.0,
+    "why": "Typosquatting and dependency confusion in the npm supply chain."
+  },
+  {
+    "id": "NODE-449",
+    "tier": "advanced",
+    "rank": 18,
+    "title": "The race with the load balancer",
+    "file": "09-testing-ops.md",
+    "score": 3.95,
+    "why": "Load-balancer race with shutdown\u2014readiness before SIGTERM handling."
+  },
+  {
+    "id": "NODE-450",
+    "tier": "advanced",
+    "rank": 19,
+    "title": "Container memory limits and the V8 heap",
+    "file": "09-testing-ops.md",
+    "score": 3.95,
+    "why": "Container memory limits vs V8 heap\u2014OOMKilled without heap pressure."
+  },
+  {
+    "id": "NODE-460",
+    "tier": "advanced",
+    "rank": 20,
+    "title": "Transactional outbox",
+    "file": "10-advanced-design.md",
+    "score": 3.95,
+    "why": "Transactional outbox reliably publishes after DB commits."
+  }
+]

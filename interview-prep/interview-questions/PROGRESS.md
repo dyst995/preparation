@@ -6,9 +6,9 @@ Updated when question files change. Recount with:
 node interview-prep/interview-questions/count-questions.mjs
 ```
 
-**Status:** complete. Sections 01–10 of each track are a full 50. Counts checked with `count-questions.mjs`.
+**Status:** complete. Sections 01–10 of each main track are a full 50. TypeScript add-on is 100. Counts checked with `count-questions.mjs`.
 
-**Continuation point:** none — target **2000** reached. Use the study loop in `STUDY_GUIDE.md` for drills; add new IDs only if a track needs a refresh pass.
+**Continuation point:** none for the 2000 + 100 banks. For interviews with little time, drill [essential/](./essential/) (460 curated items).
 
 ## Totals
 
@@ -18,7 +18,16 @@ node interview-prep/interview-questions/count-questions.mjs
 | NestJS | 500 | 500 | 0 |
 | Node.js | 500 | 500 | 0 |
 | Databases | 500 | 500 | 0 |
-| **Total** | **2000** | **2000** | **0** |
+| TypeScript | 100 | 100 | 0 |
+| **Total** | **2100** | **2100** | **0** |
+
+## Essential (3-day)
+
+| Collection | Selected | Must · Important · Advanced |
+|---|---:|---|
+| React / Nest / Node / Databases | 90 each | 40 · 30 · 20 |
+| TypeScript | 100 | 40 · 30 · 30 |
+| **Essential total** | **460** | — |
 
 ## Sections
 
@@ -83,3 +92,10 @@ Each row is 50 questions. `0` means the file is not written yet.
 | `databases/08-nosql-distributed.md` | DB-351–400 | 50 |
 | `databases/09-security-reliability.md` | DB-401–450 | 50 |
 | `databases/10-real-world-architecture.md` | DB-451–500 | 50 |
+
+### TypeScript
+
+| File | IDs | Written |
+|---|---|---:|
+| `typescript/01-foundations.md` | TS-001–050 | 50 |
+| `typescript/02-advanced-patterns.md` | TS-051–100 | 50 |

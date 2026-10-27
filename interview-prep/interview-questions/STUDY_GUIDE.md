@@ -2,9 +2,11 @@
 
 This is a reference and a drill bank. Reading it cover to cover will not make the answers retrievable in an interview.
 
+**Short on time?** Use [essential/README.md](./essential/README.md): 90 high-value IDs per main track plus 100 TypeScript questions, tiered Must Know → Important → Advanced for a three-day plan.
+
 ## One sitting (45–70 minutes)
 
-1. Pick **one section** you have not touched in the longest time (or the weakest row in `PROGRESS.md`).
+1. Pick **one section** you have not touched in the longest time (or the next Must Know block in `essential/`).
 2. Open the topic file. Cover the answer. Read only **Question**.
 3. Answer out loud in under ~90 seconds: what is happening, why, any material trade-off.
 4. Uncover **Answer**. Mark the gap in one sentence (wrong mechanism, missing constraint, or jumped to a tool).
