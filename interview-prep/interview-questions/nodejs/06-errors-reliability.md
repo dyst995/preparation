@@ -18,13 +18,13 @@ Why subclass `Error`, and how do you do it correctly?
 
 **Answer:**
 
-Subclasses let callers branch on type (`instanceof`) or a stable `code` instead of parsing messages. Use `class AppError extends Error`, call `super(message, { cause })`, set `this.name = new.target.name`, and add fields like `code`, `status`, `isOperational`. `Error.captureStackTrace(this, new.target)` trims constructor frames in V8.
+Subclasses let callers react to the kind of error, using `instanceof` or a stable `code`, instead of parsing message text. To write one, use `class AppError extends Error` and call `super(message, { cause })`. Set `this.name = new.target.name`, and add useful fields such as `code`, `status`, and `isOperational`. In V8, `Error.captureStackTrace(this, new.target)` also removes the constructor frames from the stack trace.
 
 **Follow-up:**
 
 Why prefer `code` over `instanceof` across module boundaries?
 
-Answer: Duplicate package copies or realms (vm, workers) create different class identities, so `instanceof` fails. A string `code` such as `ERR_X` survives serialization and duplication, which is why Node's own errors expose `code`.
+Answer: Duplicate copies of a package, or separate realms such as `vm` and workers, create different class identities, so `instanceof` fails. A string `code` like `ERR_X` survives serialization and duplication. That is why Node's own errors expose `code`.
 
 ### NODE-252 — What is `error.cause` and why use it?
 
@@ -38,13 +38,13 @@ What is `error.cause` and why use it?
 
 **Answer:**
 
-Node 16.9+/ES2022 supports `new Error('msg', { cause: err })`. It preserves the original failure while adding context at each layer, so logs show the full chain instead of losing the root error.
+`error.cause` holds the original error that triggered a new one. You set it with `new Error('msg', { cause: err })`, which is supported since Node 16.9 and ES2022. As an error moves up through layers, each layer can add context while keeping the root error attached. That way, logs show the whole chain instead of losing the real cause.
 
 **Follow-up:**
 
 How do you log a cause chain?
 
-Answer: Loggers like pino serialize `cause` recursively with its error serializer; otherwise walk `err.cause` in a loop. `util.inspect` already prints nested causes, but `JSON.stringify(err)` drops non-enumerable fields, so serialize explicitly.
+Answer: Loggers like pino serialize `cause` recursively with their error serializer. Otherwise, walk `err.cause` in a loop. `util.inspect` already prints nested causes, but `JSON.stringify(err)` drops non-enumerable fields, so serialize explicitly.
 
 ### NODE-253 — Operational vs programmer errors?
 
@@ -54,17 +54,17 @@ Answer: Loggers like pino serialize `cause` recursively with its error serialize
 
 **Question:**
 
-Operational vs programmer errors?
+What is the difference between operational errors and programmer errors?
 
 **Answer:**
 
-Operational errors are expected runtime failures: ECONNREFUSED, timeouts, invalid input, disk full. Handle them: retry, degrade, return 4xx/5xx. Programmer errors are bugs: TypeError on undefined, wrong argument types, broken invariants. You can't recover reliably; fix the code and, if one escapes, crash and restart.
+Operational errors are expected runtime failures: `ECONNREFUSED`, timeouts, invalid user input, a full disk. You handle them by retrying, degrading, or returning a 4xx or 5xx. Programmer errors are bugs: a `TypeError` on `undefined`, wrong argument types, a broken invariant. You cannot reliably recover from them. Fix the code, and if one escapes, crash and restart.
 
 **Follow-up:**
 
 Why not catch programmer errors and continue?
 
-Answer: State may be partially mutated or inconsistent (half-written caches, leaked locks). Continuing risks corruption and hides bugs. Fail fast, log, and let the supervisor restart a clean process.
+Answer: State may be partly changed or inconsistent, for example a half-written cache or a leaked lock. Continuing risks corruption and hides the bug. Fail fast, log, and let the supervisor start a clean process.
 
 ### NODE-254 — How do you tell the two apart in code?
 
@@ -78,13 +78,13 @@ How do you tell the two apart in code?
 
 **Answer:**
 
-Tag errors you create (`isOperational: true`) and map known system codes (`ECONNRESET`, `ETIMEDOUT`, `ENOENT`) as operational. Anything unrecognized defaults to "programmer/unknown". Central error handler decides response and whether to exit.
+Mark errors you create yourself with `isOperational: true`. Also treat known system error codes, such as `ECONNRESET`, `ETIMEDOUT`, and `ENOENT`, as operational. Anything you do not recognize defaults to "programmer error or unknown". A central error handler then decides what response to send and whether the process should exit.
 
 **Follow-up:**
 
 Danger of marking everything operational?
 
-Answer: Real bugs get swallowed as "expected failures", process stays up with corrupt state, and alerts never fire. Default to unknown-is-fatal.
+Answer: Real bugs get swallowed as "expected failures". The process stays up with corrupt state, and alerts never fire. Treat unknown errors as fatal by default.
 
 ### NODE-255 — Error handling patterns: callbacks, promises, async/await?
 
@@ -94,17 +94,17 @@ Answer: Real bugs get swallowed as "expected failures", process stays up with co
 
 **Question:**
 
-Error handling patterns: callbacks, promises, async/await?
+How does error handling differ between callbacks, promises, and async/await?
 
 **Answer:**
 
-Callbacks use error-first `(err, data)` and must be checked; throwing inside async callbacks escapes `try/catch`. Promises propagate via rejection to `.catch`. `async/await` lets `try/catch` handle rejections in the same function. Pick one style per API and always return/await promises.
+Callbacks use the error-first style `(err, data)`, and you must check `err` yourself. Throwing inside an async callback escapes any surrounding `try/catch`. Promises pass errors along as rejections, which you handle with `.catch`. With `async/await`, a normal `try/catch` handles rejections inside the same function. Pick one style per API, and always return or await your promises.
 
 **Follow-up:**
 
 Why does `try { setTimeout(() => { throw e }) } catch {}` not catch?
 
-Answer: The callback runs later on a fresh stack after the try block exited. The throw becomes an `uncaughtException`. Wrap inside the callback or use promisified timers with `await`.
+Answer: The callback runs later, on a fresh call stack, after the `try` block has already exited. The throw becomes an `uncaughtException`. Put the `try/catch` inside the callback, or use promisified timers with `await`.
 
 ### NODE-256 — Common async error propagation bugs?
 
@@ -114,17 +114,17 @@ Answer: The callback runs later on a fresh stack after the try block exited. The
 
 **Question:**
 
-Common async error propagation bugs?
+What are common async error propagation bugs?
 
 **Answer:**
 
-Forgetting `return`/`await` (floating promises), `try { return promise } catch` (doesn't catch without `await`), `forEach(async ...)` (errors not awaited), and creating promises inside event handlers with no `.catch`.
+The usual ones are: forgetting `return` or `await`, which leaves a "floating" promise; writing `try { return promise } catch`, which does not catch without `await`; using `forEach(async ...)`, where nobody awaits the errors; and creating promises in event handlers with no `.catch`. In each case a rejection ends up with no handler.
 
 **Follow-up:**
 
 `return p` vs `return await p` inside try?
 
-Answer: `return p` hands off the promise; its rejection bypasses the catch. `return await p` makes rejection throw inside the try block so the catch/finally logic applies. Outside try/catch, they're equivalent (except stack traces slightly).
+Answer: `return p` hands the promise to the caller, so its rejection bypasses your `catch`. `return await p` makes the rejection throw inside the `try` block, so your `catch` and `finally` logic applies. Outside a `try/catch`, the two are equivalent, apart from slightly different stack traces.
 
 ### NODE-257 — What triggers `unhandledRejection` and what does Node 15+ do?
 
@@ -138,13 +138,13 @@ What triggers `unhandledRejection` and what does Node 15+ do?
 
 **Answer:**
 
-A promise rejects with no handler by the time microtasks drain/process ticks. Since Node 15 default `--unhandled-rejections=throw`: it's raised as an `uncaughtException` and the process exits with code 1 unless a handler exists.
+It fires when a promise is rejected and no handler is attached by the time the microtask queue and process ticks have drained. Since Node 15, the default mode is `--unhandled-rejections=throw`. The rejection is raised as an `uncaughtException`, and the process exits with code 1 unless you have installed a handler.
 
 **Follow-up:**
 
 Recommended handler?
 
-Answer: Log with context, flush logs, then exit non-zero (let supervisor restart). Treat it like uncaughtException; don't just log and continue. Better yet, fix by always attaching handlers.
+Answer: Log with context, flush the logs, then exit with a non-zero code so the supervisor restarts the process. Treat it like `uncaughtException`; do not just log and carry on. Even better, fix the cause by always attaching handlers.
 
 ### NODE-258 — `rejectionHandled` and `PromiseRejectionEvent` — why care?
 
@@ -154,17 +154,17 @@ Answer: Log with context, flush logs, then exit non-zero (let supervisor restart
 
 **Question:**
 
-`rejectionHandled` and `PromiseRejectionEvent` — why care?
+What is `rejectionHandled`, and why should you care about it?
 
 **Answer:**
 
-`process.on('rejectionHandled')` fires if a handler attaches after `unhandledRejection` was reported. It signals late-attached handlers, often an ordering bug like creating a promise now and awaiting it later.
+`process.on('rejectionHandled')` fires when a handler is attached to a promise after `unhandledRejection` was already reported for it. It points to a late-attached handler, which is often an ordering bug: you create a promise now but only await it later. In the meantime, the rejection looks unhandled.
 
 **Follow-up:**
 
 How to avoid false positives with parallel promises?
 
-Answer: Attach handlers immediately: use `Promise.all`/`allSettled`, or `p.catch(() => {})` on a branch while keeping the original for later consumption.
+Answer: Attach handlers right away. Use `Promise.all` or `allSettled`, or add `p.catch(() => {})` on a branch while keeping the original promise for later use.
 
 ### NODE-259 — What should you do on `uncaughtException`?
 
@@ -178,13 +178,13 @@ What should you do on `uncaughtException`?
 
 **Answer:**
 
-Treat the process as unreliable. Log synchronously/with flush, stop accepting new work, attempt short graceful shutdown with a hard timeout, and exit non-zero. Never resume normal operation.
+Treat the process as unreliable. Log the error, making sure the log is flushed, and stop accepting new work. Then try a short graceful shutdown with a hard timeout, and exit with a non-zero code. Never go back to normal operation.
 
 **Follow-up:**
 
 `uncaughtExceptionMonitor`?
 
-Answer: It observes the event without changing the default crash behavior, so it's ideal for telemetry (e.g., Sentry) without accidentally swallowing the exception like a regular handler would.
+Answer: It lets you observe the event without changing the default crash behavior. That makes it a good fit for telemetry such as Sentry, because it cannot accidentally swallow the exception the way a regular handler can.
 
 ### NODE-260 — Why shouldn't you "recover" in `uncaughtException`?
 
@@ -198,13 +198,13 @@ Why shouldn't you "recover" in `uncaughtException`?
 
 **Answer:**
 
-The stack was unwound at an arbitrary point, leaving resources, invariants, and in-flight operations undefined. The Node docs explicitly say it's unsafe to resume; it's only for synchronous cleanup before exit.
+The exception unwound the stack at an arbitrary point. That leaves resources, invariants, and in-flight operations in an unknown state. The Node documentation says explicitly that resuming is unsafe. The handler is meant only for synchronous cleanup before the process exits.
 
 **Follow-up:**
 
 What cleanup is acceptable?
 
-Answer: Synchronous, bounded work: flush logger, close sockets quickly, release lock files, then `process.exit(1)`. Avoid async chains that depend on possibly broken subsystems; add a kill timer.
+Answer: Short, synchronous work: flush the logger, close sockets quickly, release lock files, then call `process.exit(1)`. Avoid async chains that depend on subsystems that may be broken, and add a kill timer as a safety net.
 
 ### NODE-261 — `process.exit()` vs `process.exitCode`?
 
@@ -214,17 +214,17 @@ Answer: Synchronous, bounded work: flush logger, close sockets quickly, release 
 
 **Question:**
 
-`process.exit()` vs `process.exitCode`?
+What is the difference between `process.exit()` and `process.exitCode`?
 
 **Answer:**
 
-`process.exit()` terminates immediately, potentially truncating pending async I/O (stdout pipes, logs). Setting `process.exitCode` and letting the loop drain naturally gives a clean exit with that code.
+`process.exit()` ends the process immediately, which can cut off pending async I/O such as writes to stdout pipes or logs. If you set `process.exitCode` and let the event loop finish naturally, the process exits cleanly with that code after pending work is done.
 
 **Follow-up:**
 
 When is `process.exit` acceptable?
 
-Answer: In fatal paths after flushing, or after a graceful drain timeout. Typical: `server.close()`, close DB, then set exitCode; force `exit` only via a timeout fallback.
+Answer: On fatal paths after you have flushed logs, or after a graceful drain timeout. A typical sequence is `server.close()`, close the database, then set `exitCode`. Use a forced `exit` only as a timeout fallback.
 
 ### NODE-262 — What is `AbortController`/`AbortSignal` and how do errors surface?
 
@@ -238,13 +238,13 @@ What is `AbortController`/`AbortSignal` and how do errors surface?
 
 **Answer:**
 
-A cancellation primitive. `controller.abort()` sets `signal.aborted`; APIs accepting `signal` (fetch, timers/promises, fs, events.once, child_process) reject with `AbortError` (`name: 'AbortError'`, `code: 'ABORT_ERR'`).
+They are the standard way to cancel async work. Calling `controller.abort()` sets `signal.aborted` to `true`. APIs that accept a `signal`, such as fetch, timers/promises, fs, `events.once`, and child_process, then reject with an `AbortError`, which has `name: 'AbortError'` and `code: 'ABORT_ERR'`.
 
 **Follow-up:**
 
 How do you distinguish abort from real failure?
 
-Answer: Check `err.name === 'AbortError'` or `err.code === 'ABORT_ERR'`, and inspect `signal.reason`. Treat it as expected cancellation: don't alert or retry blindly.
+Answer: Check `err.name === 'AbortError'` or `err.code === 'ABORT_ERR'`, and look at `signal.reason`. Treat it as an expected cancellation: do not alert, and do not retry blindly.
 
 ### NODE-263 — `AbortSignal.timeout()` and `AbortSignal.any()`?
 
@@ -254,17 +254,17 @@ Answer: Check `err.name === 'AbortError'` or `err.code === 'ABORT_ERR'`, and ins
 
 **Question:**
 
-`AbortSignal.timeout()` and `AbortSignal.any()`?
+What do `AbortSignal.timeout()` and `AbortSignal.any()` do?
 
 **Answer:**
 
-`AbortSignal.timeout(ms)` (Node 17.3+/18) aborts with a `TimeoutError` DOMException after ms. `AbortSignal.any([a, b])` (Node 20.3+) combines signals, e.g., caller cancellation plus a deadline.
+`AbortSignal.timeout(ms)` creates a signal that aborts after `ms` milliseconds with a `TimeoutError` DOMException. It exists since Node 17.3 and 18. `AbortSignal.any([a, b])`, available from Node 20.3, combines several signals into one that aborts when the first of them does. A typical use is combining caller cancellation with a deadline.
 
 **Follow-up:**
 
 Difference in `reason` for timeout vs manual abort?
 
-Answer: Timeout produces `reason.name === 'TimeoutError'`; manual `abort()` without args yields `AbortError` DOMException. Passing a custom reason lets you carry domain info.
+Answer: A timeout gives `reason.name === 'TimeoutError'`. A manual `abort()` with no argument gives an `AbortError` DOMException. If you pass your own reason, you can carry domain-specific information.
 
 ### NODE-264 — How do you make your own function cancellable?
 
@@ -278,13 +278,13 @@ How do you make your own function cancellable?
 
 **Answer:**
 
-Accept `{ signal }`, check `signal.throwIfAborted()` at start and between steps, listen with `signal.addEventListener('abort', ..., { once: true })` to cancel underlying work, and remove listeners in `finally`.
+Accept an options object with `{ signal }`. Call `signal.throwIfAborted()` at the start and between steps. To cancel the underlying work, listen with `signal.addEventListener('abort', ..., { once: true })`. Finally, remove the listener in a `finally` block so it does not linger.
 
 **Follow-up:**
 
 Leak risk?
 
-Answer: Adding listeners to a long-lived signal per call without removal accumulates them (MaxListeners warning). Use `{ once: true }` and remove in `finally`, or use `events.once`/`addAbortListener`.
+Answer: Adding a listener to a long-lived signal on every call, without removing it, makes listeners pile up and triggers a MaxListeners warning. Use `{ once: true }` and remove the listener in `finally`, or use `events.once` or `addAbortListener`.
 
 ### NODE-265 — What is `AggregateError`?
 
@@ -298,13 +298,13 @@ What is `AggregateError`?
 
 **Answer:**
 
-An error wrapping many errors in `.errors`, thrown by `Promise.any` when all reject. You can create it manually to report multiple failures (e.g., validating batches).
+`AggregateError` is an error that wraps several other errors in its `.errors` array. `Promise.any` throws one when all of its promises reject. You can also create one yourself to report multiple failures at once, for example when validating a batch of items.
 
 **Follow-up:**
 
 `Promise.all` vs `allSettled` vs `any` on errors?
 
-Answer: `all` rejects on first failure (others continue running); `allSettled` never rejects and reports each outcome; `any` resolves on first success, rejects with `AggregateError` if all fail.
+Answer: `all` rejects on the first failure, while the other promises keep running. `allSettled` never rejects and reports each outcome. `any` resolves on the first success, and rejects with an `AggregateError` only if all of them fail.
 
 ### NODE-266 — Does `Promise.all` cancel the other tasks on failure?
 
@@ -318,13 +318,13 @@ Does `Promise.all` cancel the other tasks on failure?
 
 **Answer:**
 
-No. It rejects immediately but remaining promises keep running; their later rejections are handled silently by `all`. You must use `AbortController` for real cancellation.
+No. `Promise.all` rejects as soon as one promise fails, but the remaining promises keep running. Their later rejections are handled silently by `all`, so you will not see them. If you want real cancellation, you need an `AbortController` and tasks that respect its signal.
 
 **Follow-up:**
 
 Pattern for fail-fast with cancellation?
 
-Answer: Share a controller; on first error call `controller.abort()` in a catch, pass `signal` to all tasks, and use `allSettled` to wait for them to actually stop before cleanup.
+Answer: Share one controller. On the first error, call `controller.abort()` in a catch, and pass the `signal` to every task. Then use `allSettled` to wait until the tasks have actually stopped before you clean up.
 
 ### NODE-267 — Resource cleanup with `try/finally`?
 
@@ -334,17 +334,17 @@ Answer: Share a controller; on first error call `controller.abort()` in a catch,
 
 **Question:**
 
-Resource cleanup with `try/finally`?
+How do you use `try/finally` for resource cleanup?
 
 **Answer:**
 
-`finally` runs on success, throw, or return, so use it to close files, release DB clients, unlock, and clear timers. Await async cleanup inside `finally`.
+A `finally` block runs whether the code succeeds, throws, or returns. That makes it the right place to close files, release database clients, unlock locks, and clear timers. If the cleanup is async, `await` it inside `finally`.
 
 **Follow-up:**
 
 What if `finally` throws?
 
-Answer: It replaces the original error, losing it. Wrap cleanup in its own try/catch, log secondary failures, and rethrow the original (or use `AggregateError`/`cause`).
+Answer: The new error replaces the original one, and the original is lost. Wrap the cleanup in its own `try/catch`, log secondary failures, and rethrow the original error. You can also combine them with `AggregateError` or `cause`.
 
 ### NODE-268 — `using` / `Symbol.dispose` and explicit resource management?
 
@@ -354,17 +354,17 @@ Answer: It replaces the original error, losing it. Wrap cleanup in its own try/c
 
 **Question:**
 
-`using` / `Symbol.dispose` and explicit resource management?
+What are `using` and `Symbol.dispose`, and can you use them in Node 20/22?
 
 **Answer:**
 
-The TC39 `using`/`await using` proposal with `Symbol.dispose`/`asyncDispose` gives scoped cleanup. Node 20/22 have the symbols (polyfilled/experimental), but syntax needs TypeScript 5.2+ or Babel; native syntax support depends on V8 version (not general in 20/22).
+They come from the TC39 explicit resource management proposal. `using` and `await using`, together with `Symbol.dispose` and `Symbol.asyncDispose`, give you cleanup that runs automatically at the end of a scope. Node 20 and 22 provide the symbols (polyfilled or experimental), but the syntax needs TypeScript 5.2+ or Babel. Native syntax support depends on the V8 version and is not generally available in 20 or 22.
 
 **Follow-up:**
 
 Alternatives today?
 
-Answer: `try/finally`, helper `withResource(acquire, fn)` that guarantees release, `stream.pipeline`, and `FileHandle` (supports `asyncDispose` in newer Node).
+Answer: Use `try/finally`, or a helper like `withResource(acquire, fn)` that guarantees release. `stream.pipeline` also handles cleanup, and `FileHandle` supports `asyncDispose` in newer Node versions.
 
 ### NODE-269 — Why do retries need backoff and jitter?
 
@@ -378,13 +378,13 @@ Why do retries need backoff and jitter?
 
 **Answer:**
 
-Immediate retries amplify load on a struggling dependency (retry storm). Exponential backoff spaces attempts; jitter randomizes delays so clients don't synchronize (thundering herd).
+Retrying immediately adds load to a dependency that is already struggling, which creates a retry storm. Exponential backoff spaces the attempts further apart each time. Jitter adds randomness to the delays, so many clients do not all retry at the same moment, which would cause a thundering herd.
 
 **Follow-up:**
 
 Which jitter strategy?
 
-Answer: "Full jitter": `sleep = random(0, min(cap, base * 2^attempt))` — AWS analysis shows it minimizes contention and completion time versus equal or no jitter.
+Answer: "Full jitter": `sleep = random(0, min(cap, base * 2^attempt))`. AWS's analysis found that it reduces contention and total completion time compared with equal jitter or no jitter.
 
 ### NODE-270 — What should be retried, and what not?
 
@@ -398,13 +398,13 @@ What should be retried, and what not?
 
 **Answer:**
 
-Retry transient, idempotent operations: network resets, timeouts, 503/429 (respect `Retry-After`). Don't retry validation errors (400/422), auth failures, or non-idempotent calls without idempotency keys.
+Retry operations that are both transient and idempotent: network resets, timeouts, and 503 or 429 responses (respecting `Retry-After`). Do not retry validation errors (400 or 422) or authentication failures. Also do not retry non-idempotent calls unless they carry an idempotency key.
 
 **Follow-up:**
 
 Retry budgets?
 
-Answer: Cap retries per request and as a percentage of total traffic (e.g., ≤10%) so retries can't double load during outages; combine with circuit breaker.
+Answer: Limit retries per request and as a share of total traffic, for example at most 10%, so retries cannot double the load during an outage. Combine this with a circuit breaker.
 
 ### NODE-271 — Implement a retry helper concisely.
 
@@ -414,17 +414,17 @@ Answer: Cap retries per request and as a percentage of total traffic (e.g., ≤1
 
 **Question:**
 
-Implement a retry helper concisely.
+How would you implement a concise retry helper?
 
 **Answer:**
 
-Loop up to N attempts, `await fn({ signal })`, catch retryable errors, compute delay with full jitter, `await timers/promises.setTimeout(delay, undefined, { signal })`, rethrow last error with attempt count in `cause`.
+Loop for up to N attempts. In each one, `await fn({ signal })` and catch errors that are retryable. Compute the delay with full jitter, then wait with `await timers/promises.setTimeout(delay, undefined, { signal })` so the wait can be cancelled. After the last attempt, rethrow the final error, with the attempt count included in its `cause`.
 
 **Follow-up:**
 
 Where does the overall deadline fit?
 
-Answer: Pass a single deadline signal (`AbortSignal.timeout(total)`) across attempts; stop retrying when it fires instead of per-attempt timeouts alone.
+Answer: Pass one deadline signal, such as `AbortSignal.timeout(total)`, across all attempts, and stop retrying when it fires. Per-attempt timeouts alone do not bound the total time.
 
 ### NODE-272 — Circuit breaker concept?
 
@@ -434,17 +434,17 @@ Answer: Pass a single deadline signal (`AbortSignal.timeout(total)`) across atte
 
 **Question:**
 
-Circuit breaker concept?
+What is a circuit breaker?
 
 **Answer:**
 
-Wraps calls to a dependency with states: Closed (normal), Open (fail fast after threshold failures), Half-Open (probe a few calls after cooldown). Protects callers from slow failures and gives the dependency time to recover.
+A circuit breaker wraps calls to a dependency and has three states. Closed is normal operation. Open means calls fail immediately after too many failures. Half-Open means that after a cooldown, a few probe calls are allowed through to test recovery. It protects callers from slow failures and gives the dependency time to recover.
 
 **Follow-up:**
 
 Common Node libraries and tuning?
 
-Answer: `opossum` is typical. Tune error percentage threshold, rolling window, minimum volume, reset timeout, and per-call timeout; provide a fallback and emit metrics on state changes.
+Answer: `opossum` is the typical choice. Tune the error-percentage threshold, rolling window, minimum request volume, reset timeout, and per-call timeout. Provide a fallback, and emit metrics when the state changes.
 
 ### NODE-273 — Bulkhead pattern?
 
@@ -454,17 +454,17 @@ Answer: `opossum` is typical. Tune error percentage threshold, rolling window, m
 
 **Question:**
 
-Bulkhead pattern?
+What is the bulkhead pattern?
 
 **Answer:**
 
-Isolate resources per dependency/tenant (separate pools, concurrency limits, queues) so one slow component can't exhaust shared capacity, like ship compartments.
+The bulkhead pattern isolates resources for each dependency or tenant, using separate pools, concurrency limits, or queues. One slow component then cannot use up the capacity shared by everything else. The name comes from the sealed compartments in a ship.
 
 **Follow-up:**
 
 How in Node?
 
-Answer: Per-dependency concurrency limiters (`p-limit`, semaphore), separate HTTP agents with `maxSockets`, separate DB pools, bounded queues that reject (shed) when full, or separate processes/workers.
+Answer: Use per-dependency concurrency limiters (`p-limit` or a semaphore), separate HTTP agents with `maxSockets`, and separate database pools. Add bounded queues that reject work when full, or use separate processes or workers.
 
 ### NODE-274 — Why set timeouts on everything?
 
@@ -478,13 +478,13 @@ Why set timeouts on everything?
 
 **Answer:**
 
-Without timeouts, a hung dependency holds sockets, memory, and event-loop callbacks indefinitely, cascading into outages. Set connect, request, and overall deadlines for HTTP, DB, and queue operations.
+Without a timeout, a hung dependency holds sockets, memory, and event-loop callbacks indefinitely, and one slow service can cascade into a wider outage. Set connect timeouts, request timeouts, and an overall deadline for HTTP, database, and queue operations.
 
 **Follow-up:**
 
 Node http server timeouts?
 
-Answer: `server.headersTimeout`, `requestTimeout` (default 300s in 18+), `keepAliveTimeout` (5s), and `server.timeout` (legacy). Tune keepAliveTimeout above the load balancer's idle timeout to avoid 502s.
+Answer: The main ones are `server.headersTimeout`, `requestTimeout` (default 300 s in Node 18+), `keepAliveTimeout` (5 s), and the legacy `server.timeout`. Set `keepAliveTimeout` above the load balancer's idle timeout to avoid 502s.
 
 ### NODE-275 — Deadline propagation?
 
@@ -494,17 +494,17 @@ Answer: `server.headersTimeout`, `requestTimeout` (default 300s in 18+), `keepAl
 
 **Question:**
 
-Deadline propagation?
+What is deadline propagation?
 
 **Answer:**
 
-Compute an absolute deadline at the edge and pass remaining time downstream (header like `x-deadline` or gRPC deadline) so inner calls use remaining budget rather than fresh full timeouts.
+You compute an absolute deadline at the edge of your system, then pass the remaining time downstream, for example in an `x-deadline` header or a gRPC deadline. Inner calls then use the time that is left, instead of each starting with a fresh full timeout.
 
 **Follow-up:**
 
 Why better than independent timeouts?
 
-Answer: Independent per-hop timeouts can sum beyond the client's patience, doing work no one waits for. Propagation lets downstream abort early and save resources.
+Answer: Independent per-hop timeouts can add up to more than the client is willing to wait, so you do work nobody is waiting for. With propagation, downstream services can stop early and save resources.
 
 ### NODE-276 — What is idempotency and why vital with retries?
 
@@ -514,17 +514,17 @@ Answer: Independent per-hop timeouts can sum beyond the client's patience, doing
 
 **Question:**
 
-What is idempotency and why vital with retries?
+What is idempotency and why is it vital with retries?
 
 **Answer:**
 
-An operation is idempotent if repeating it yields the same effect as once. Retries, redeliveries, and client double-clicks make duplicates inevitable; idempotent handlers make them safe.
+An operation is idempotent if doing it several times has the same effect as doing it once. Retries, message redeliveries, and double-clicks make duplicate requests unavoidable. If your handlers are idempotent, those duplicates are harmless.
 
 **Follow-up:**
 
 Which HTTP methods are idempotent?
 
-Answer: GET, HEAD, PUT, DELETE, OPTIONS (by spec); POST and PATCH are not by default, so use idempotency keys for them.
+Answer: By specification, GET, HEAD, PUT, DELETE, and OPTIONS. POST and PATCH are not idempotent by default, so use idempotency keys for them.
 
 ### NODE-277 — How do you implement idempotency keys?
 
@@ -538,13 +538,13 @@ How do you implement idempotency keys?
 
 **Answer:**
 
-Client sends `Idempotency-Key`. Server stores key + request fingerprint + result in a durable store with a unique constraint; first request executes, duplicates return the stored response (or 409 if in-flight/mismatch). Set TTL.
+The client sends an `Idempotency-Key` header. The server stores the key, a fingerprint of the request, and the result in a durable store with a unique constraint. The first request runs normally. A duplicate gets the stored response back, or a 409 if the original is still in progress or the request does not match. Give the records a TTL.
 
 **Follow-up:**
 
 Race between two concurrent same-key requests?
 
-Answer: Atomically insert the key with "in-progress" status (unique index / `SET NX`); the loser waits or gets 409. Update to "completed" with the response in the same transaction as the side effect when possible.
+Answer: Insert the key atomically with an "in-progress" status, using a unique index or `SET NX`. The loser waits or gets a 409. When possible, mark it "completed" with the response in the same transaction as the side effect.
 
 ### NODE-278 — Graceful degradation?
 
@@ -554,17 +554,17 @@ Answer: Atomically insert the key with "in-progress" status (unique index / `SET
 
 **Question:**
 
-Graceful degradation?
+What is graceful degradation?
 
 **Answer:**
 
-When a dependency fails, keep core functionality with reduced features: serve stale cache, default recommendations, disable optional widgets, queue writes, or return partial responses.
+When a dependency fails, you keep the core functionality working with fewer features, instead of failing completely. Examples are serving stale cache, showing default recommendations, hiding optional widgets, queueing writes for later, or returning a partial response.
 
 **Follow-up:**
 
 How to decide what's degradable?
 
-Answer: Classify features as critical vs optional, define fallbacks per dependency, use circuit breakers/feature flags, and test failure modes (chaos/fault injection).
+Answer: Classify features as critical or optional, and define a fallback for each dependency. Use circuit breakers and feature flags, and test failure modes with chaos or fault injection.
 
 ### NODE-279 — Load shedding vs backpressure?
 
@@ -574,17 +574,17 @@ Answer: Classify features as critical vs optional, define fallbacks per dependen
 
 **Question:**
 
-Load shedding vs backpressure?
+What is the difference between load shedding and backpressure?
 
 **Answer:**
 
-Backpressure slows producers when consumers lag (streams `highWaterMark`, `drain`). Load shedding rejects excess work (429/503) to keep latency bounded for accepted requests.
+Backpressure slows the producers down when consumers fall behind, for example stream `highWaterMark` and `drain`. Load shedding rejects excess work, with 429 or 503, so that accepted requests keep a bounded latency. Backpressure makes work wait; shedding turns it away.
 
 **Follow-up:**
 
 Signal to shed in Node?
 
-Answer: Event-loop delay (`perf_hooks.monitorEventLoopDelay`), queue depth, in-flight count, or memory; libraries like `under-pressure` return 503 with `Retry-After`.
+Answer: Common signals are event-loop delay (`perf_hooks.monitorEventLoopDelay`), queue depth, the number of in-flight requests, or memory use. Libraries like `under-pressure` return 503 with `Retry-After`.
 
 ### NODE-280 — Liveness vs readiness vs startup probes?
 
@@ -594,17 +594,17 @@ Answer: Event-loop delay (`perf_hooks.monitorEventLoopDelay`), queue depth, in-f
 
 **Question:**
 
-Liveness vs readiness vs startup probes?
+What is the difference between liveness, readiness, and startup probes?
 
 **Answer:**
 
-Liveness: is the process healthy enough that restart is the only fix? Readiness: can it serve traffic now (deps ready, not draining)? Startup: has slow initialization finished? Failing readiness removes from load balancing; failing liveness restarts.
+Liveness asks: is the process so unhealthy that restarting is the only fix? Readiness asks: can it serve traffic right now, with its dependencies ready and not draining? Startup asks: has slow initialization finished? A failing readiness probe removes the instance from load balancing, while a failing liveness probe restarts it.
 
 **Follow-up:**
 
 Common mistake?
 
-Answer: Checking downstream dependencies in liveness, so a DB outage restarts every pod in a loop. Liveness should be cheap and local; put dependency checks in readiness (and with care).
+Answer: Checking downstream dependencies in the liveness probe, so a database outage restarts every pod in a loop. Liveness should be cheap and local. Put dependency checks in readiness, and use them carefully.
 
 ### NODE-281 — What should a health endpoint do?
 
@@ -618,13 +618,13 @@ What should a health endpoint do?
 
 **Answer:**
 
-Respond fast (<100ms), no auth, minimal work, return 200/503 plus small JSON (status, version, uptime). Don't run heavy queries; cache dependency check results briefly.
+It should respond quickly, ideally in under 100 ms, with no authentication and very little work. Return 200 or 503, plus a small JSON body with the status, version, and uptime. Do not run heavy queries. If you check dependencies, cache the results for a short time.
 
 **Follow-up:**
 
 Readiness during shutdown?
 
-Answer: Flip a `shuttingDown` flag so `/ready` returns 503 immediately on SIGTERM, letting the load balancer drain before the server stops accepting connections.
+Answer: Set a `shuttingDown` flag so `/ready` returns 503 as soon as SIGTERM arrives. This lets the load balancer drain traffic before the server stops accepting connections.
 
 ### NODE-282 — Structured logging principles?
 
@@ -634,17 +634,17 @@ Answer: Flip a `shuttingDown` flag so `/ready` returns 503 immediately on SIGTER
 
 **Question:**
 
-Structured logging principles?
+What are the principles of structured logging?
 
 **Answer:**
 
-Emit JSON with consistent fields: timestamp, level, message, service, version, requestId/traceId, error {name, message, stack, code}. Machine-parsable logs enable search, aggregation, and alerts.
+Write logs as JSON with consistent fields: timestamp, level, message, service, version, `requestId` or `traceId`, and an error object with name, message, stack, and code. Machine-readable logs make it easy to search, aggregate, and set up alerts.
 
 **Follow-up:**
 
 Why pino over console.log?
 
-Answer: Pino is fast (async-ish, minimal serialization overhead), JSON by default, supports child loggers with bound context and redaction of secrets, with separate transports (`pino.transport`) off the main thread.
+Answer: Pino is fast, with minimal serialization overhead, and outputs JSON by default. It supports child loggers with bound context, redaction of secrets, and transports (`pino.transport`) that run off the main thread.
 
 ### NODE-283 — Log levels and what not to log?
 
@@ -654,17 +654,17 @@ Answer: Pino is fast (async-ish, minimal serialization overhead), JSON by defaul
 
 **Question:**
 
-Log levels and what not to log?
+Which log levels should you use, and what should you never log?
 
 **Answer:**
 
-Use error (needs action), warn (degraded), info (lifecycle/business events), debug/trace (off in prod). Never log secrets, tokens, full PII, or full request bodies; redact paths.
+Use `error` for things that need action, `warn` for degraded behavior, `info` for lifecycle and business events, and `debug` or `trace` for details that stay off in production. Never log secrets, tokens, full personal data, or full request bodies. Redact sensitive paths.
 
 **Follow-up:**
 
 Log-and-throw anti-pattern?
 
-Answer: Logging at every layer and rethrowing produces duplicate noise. Log once at the boundary that handles the error; lower layers add context via `cause`.
+Answer: Logging at every layer and then rethrowing creates duplicate noise. Log once, at the boundary that actually handles the error. Lower layers should add context through `cause`.
 
 ### NODE-284 — Correlation IDs?
 
@@ -674,17 +674,17 @@ Answer: Logging at every layer and rethrowing produces duplicate noise. Log once
 
 **Question:**
 
-Correlation IDs?
+What is a correlation ID?
 
 **Answer:**
 
-A unique ID per request (accept incoming `x-request-id` or generate with `crypto.randomUUID()`), attached to all logs and forwarded to downstream calls, so you can trace a request across services.
+A correlation ID is a unique ID for each request. Accept an incoming `x-request-id`, or generate one with `crypto.randomUUID()`. Attach it to every log line and forward it on downstream calls. Then you can follow one request across several services.
 
 **Follow-up:**
 
 Correlation ID vs trace ID?
 
-Answer: Correlation IDs are simple opaque links; W3C Trace Context (`traceparent`) adds span hierarchy and sampling for distributed tracing (OpenTelemetry). Prefer trace context where available and log its IDs.
+Answer: A correlation ID is a simple opaque link. W3C Trace Context (`traceparent`) adds span hierarchy and sampling for distributed tracing, as used by OpenTelemetry. Prefer trace context where it is available, and log its IDs.
 
 ### NODE-285 — `AsyncLocalStorage` for request context?
 
@@ -694,17 +694,17 @@ Answer: Correlation IDs are simple opaque links; W3C Trace Context (`traceparent
 
 **Question:**
 
-`AsyncLocalStorage` for request context?
+How do you use `AsyncLocalStorage` for request context?
 
 **Answer:**
 
-`AsyncLocalStorage` (`node:async_hooks`) keeps context across async continuations. `als.run(store, () => next())` in middleware; any code later calls `als.getStore()` to read requestId without passing parameters.
+`AsyncLocalStorage`, from `node:async_hooks`, keeps context available across async continuations. In middleware, call `als.run(store, () => next())`. Any code that runs later in that request can call `als.getStore()` to read values like the request ID, without passing them as parameters.
 
 **Follow-up:**
 
 Gotchas?
 
-Answer: Context can be lost with callback-based libraries/custom thenables/pools (use `AsyncResource.bind`), and has some overhead (improved in Node 22 via AsyncContextFrame work). `enterWith` leaks scope; prefer `run`.
+Answer: Context can be lost with callback-based libraries, custom thenables, and connection pools; use `AsyncResource.bind` to fix that. It also has some overhead, which newer Node versions have been reducing. `enterWith` leaks the scope to code that follows, so prefer `run`.
 
 ### NODE-286 — Connecting ALS with logging?
 
@@ -714,17 +714,17 @@ Answer: Context can be lost with callback-based libraries/custom thenables/pools
 
 **Question:**
 
-Connecting ALS with logging?
+How do you connect `AsyncLocalStorage` with logging?
 
 **Answer:**
 
-Create a logger mixin (pino `mixin()`) that reads `als.getStore()` and adds `requestId`, `userId` to each log line, so no code needs to pass a logger around.
+Create a logger mixin, for example pino's `mixin()`, that reads `als.getStore()` and adds fields like `requestId` and `userId` to every log line. Then no code needs to pass a logger around just to include request context.
 
 **Follow-up:**
 
 Handling background jobs?
 
-Answer: Start a new `als.run` with a generated job/correlation ID (or the one carried in the message) at the job entry so logs from workers remain traceable.
+Answer: At the job's entry point, start a new `als.run` with a generated ID, or the one carried in the message. This keeps logs from workers traceable.
 
 ### NODE-287 — Crash-only design?
 
@@ -734,17 +734,17 @@ Answer: Start a new `als.run` with a generated job/correlation ID (or the one ca
 
 **Question:**
 
-Crash-only design?
+What is crash-only design?
 
 **Answer:**
 
-Design software so the only way to stop is crashing and the only way to start is recovery. Shutdown paths equal crash paths, so recovery is always exercised: durable state, idempotent startup, no reliance on clean exit.
+In crash-only design, the only way to stop the software is to crash it, and the only way to start it is to run recovery. Shutdown and crash use the same path, so recovery is always exercised. This means durable state, idempotent startup, and no reliance on a clean exit.
 
 **Follow-up:**
 
 Implications for Node services?
 
-Answer: Keep state in external stores, make handlers idempotent, persist queue offsets/acks after side effects, keep startup fast, and use a supervisor to restart. Graceful drain is an optimization, not a requirement.
+Answer: Keep state in external stores and make handlers idempotent. Persist queue offsets or acks only after the side effects are done. Keep startup fast and use a supervisor to restart the process. Graceful draining is an optimization, not a requirement.
 
 ### NODE-288 — Why were `domain` modules deprecated?
 
@@ -754,17 +754,17 @@ Answer: Keep state in external stores, make handlers idempotent, persist queue o
 
 **Question:**
 
-Why were `domain` modules deprecated?
+Why was the `domain` module deprecated?
 
 **Answer:**
 
-Domains tried to route uncaught errors to handlers by binding emitters/callbacks, but they were implicit, unreliable (lost context, memory leaks), encouraged resuming after errors, and had performance/maintenance costs. Docs mark them pending deprecation.
+Domains tried to send uncaught errors to handlers by binding emitters and callbacks. But they worked implicitly and unreliably, lost context, could leak memory, and encouraged people to resume after an error. They also had performance and maintenance costs. The docs mark them as pending deprecation.
 
 **Follow-up:**
 
 Replacement?
 
-Answer: Explicit error handling (promises, `error` event listeners), `AsyncLocalStorage` for context, and process-level crash + restart for unknown errors.
+Answer: Use explicit error handling with promises and `error` event listeners, `AsyncLocalStorage` for context, and a process-level crash and restart for unknown errors.
 
 ### NODE-289 — EventEmitter `'error'` event behavior?
 
@@ -774,17 +774,17 @@ Answer: Explicit error handling (promises, `error` event listeners), `AsyncLocal
 
 **Question:**
 
-EventEmitter `'error'` event behavior?
+How does the `'error'` event behave on an EventEmitter?
 
 **Answer:**
 
-Emitting `'error'` with no listener throws the error (crashing the process if uncaught). Streams, sockets, and servers emit it, so each must have an `error` handler.
+If an emitter emits `'error'` and no listener is attached, the error is thrown, and it crashes the process if nothing catches it. Streams, sockets, and servers all emit `'error'`, so each one needs an `error` handler.
 
 **Follow-up:**
 
 `captureRejections` option?
 
-Answer: `new EventEmitter({ captureRejections: true })` routes rejected async listener promises to the `'error'` event (or `Symbol.for('nodejs.rejection')`) instead of unhandledRejection.
+Answer: `new EventEmitter({ captureRejections: true })` sends rejected promises from async listeners to the `'error'` event, or to `Symbol.for('nodejs.rejection')`, instead of `unhandledRejection`.
 
 ### NODE-290 — Handling stream errors reliably?
 
@@ -794,17 +794,17 @@ Answer: `new EventEmitter({ captureRejections: true })` routes rejected async li
 
 **Question:**
 
-Handling stream errors reliably?
+How do you handle stream errors reliably?
 
 **Answer:**
 
-Use `stream.pipeline` / `stream/promises.pipeline`, which forwards errors, destroys all streams, and cleans up. Bare `.pipe()` doesn't propagate errors or destroy the destination.
+Use `stream.pipeline`, or `pipeline` from `stream/promises`. It forwards errors, destroys all the streams, and cleans up. Plain `.pipe()` does not propagate errors and does not destroy the destination.
 
 **Follow-up:**
 
 What does a premature close look like?
 
-Answer: `ERR_STREAM_PREMATURE_CLOSE` when a stream closes before ending. For HTTP, client disconnects trigger it; handle by aborting upstream work.
+Answer: You get `ERR_STREAM_PREMATURE_CLOSE` when a stream closes before it ends. In HTTP, a client disconnect triggers it. Handle it by aborting upstream work.
 
 ### NODE-291 — Handling process signals (SIGTERM, SIGINT)?
 
@@ -814,17 +814,17 @@ Answer: `ERR_STREAM_PREMATURE_CLOSE` when a stream closes before ending. For HTT
 
 **Question:**
 
-Handling process signals (SIGTERM, SIGINT)?
+How do you handle process signals such as SIGTERM and SIGINT?
 
 **Answer:**
 
-Orchestrators send SIGTERM then SIGKILL after a grace period. Register `process.once('SIGTERM', shutdown)` and `SIGINT`; SIGKILL can't be caught. Make shutdown idempotent so repeated signals don't re-enter.
+Orchestrators send SIGTERM first, and then SIGKILL after a grace period. Register `process.once('SIGTERM', shutdown)` and the same for `SIGINT`. SIGKILL cannot be caught. Make the shutdown function idempotent, so that repeated signals do not run it again.
 
 **Follow-up:**
 
 PID 1 issue in containers?
 
-Answer: Node as PID 1 doesn't get default signal handling and doesn't reap zombies; use `--init`/tini, or ensure explicit handlers. Also run `node` directly, not via `npm start`, which may not forward signals.
+Answer: When Node runs as PID 1, it does not get default signal handling and does not reap zombie processes. Use `--init` or tini, or add explicit handlers. Also run `node` directly rather than through `npm start`, which may not forward signals.
 
 ### NODE-292 — Graceful shutdown with connection draining?
 
@@ -834,17 +834,17 @@ Answer: Node as PID 1 doesn't get default signal handling and doesn't reap zombi
 
 **Question:**
 
-Graceful shutdown with connection draining?
+How do you shut down gracefully while draining connections?
 
 **Answer:**
 
-On SIGTERM: mark not-ready, wait briefly for LB deregistration, `server.close()` (stop new connections), call `server.closeIdleConnections()` (Node 18.2+), wait for in-flight requests, close DB/queues, exit; force-exit after a timeout.
+On SIGTERM, mark the service not-ready and wait briefly for the load balancer to deregister it. Call `server.close()` to stop new connections, then `server.closeIdleConnections()` (Node 18.2+). Wait for in-flight requests to finish, close databases and queues, and exit. Force the exit after a timeout.
 
 **Follow-up:**
 
 Why doesn't `server.close()` finish with keep-alive?
 
-Answer: It waits for existing connections to close; idle keep-alive sockets stay open. Use `closeIdleConnections()` and after a deadline `closeAllConnections()`; Node 19+ `close()` already closes idle ones.
+Answer: It waits for existing connections to close, and idle keep-alive sockets stay open. Use `closeIdleConnections()`, and after a deadline `closeAllConnections()`. In Node 19+, `close()` already closes idle ones.
 
 ### NODE-293 — Choosing a shutdown timeout?
 
@@ -854,17 +854,17 @@ Answer: It waits for existing connections to close; idle keep-alive sockets stay
 
 **Question:**
 
-Choosing a shutdown timeout?
+How do you choose a shutdown timeout?
 
 **Answer:**
 
-Must be less than the orchestrator's kill grace (k8s `terminationGracePeriodSeconds`, default 30s). Set app drain budget slightly lower and consider `preStop` sleep for LB propagation.
+It must be shorter than the orchestrator's kill grace period, for example Kubernetes `terminationGracePeriodSeconds`, which defaults to 30 s. Set your application's drain budget slightly lower than that. Consider a `preStop` sleep to give the load balancer time to stop sending traffic.
 
 **Follow-up:**
 
 What if requests exceed the budget?
 
-Answer: Abort them (via signal), return 503 where possible, and rely on client retries with idempotency; never exceed the hard kill.
+Answer: Abort them using a signal and return 503 where possible. Rely on client retries with idempotency. Never run past the hard kill.
 
 ### NODE-294 — Kubernetes restart policies and probe implications?
 
@@ -874,17 +874,17 @@ Answer: Abort them (via signal), return 503 where possible, and rely on client r
 
 **Question:**
 
-Kubernetes restart policies and probe implications?
+How do Kubernetes restart policies and probes affect a Node service?
 
 **Answer:**
 
-Pods use `restartPolicy` (Always for Deployments); crash causes kubelet restarts with exponential backoff (CrashLoopBackOff up to 5 min). Liveness failures kill containers; readiness failures only remove from endpoints.
+Pods have a `restartPolicy`, which is `Always` for Deployments. When a container crashes, the kubelet restarts it with exponential backoff, known as CrashLoopBackOff, up to 5 minutes. A failing liveness probe kills the container, while a failing readiness probe only removes the pod from the service endpoints.
 
 **Follow-up:**
 
 Why is a crash loop dangerous?
 
-Answer: Fatal startup errors (bad config, dependency down) cause repeated restarts and flapping; backoff delays recovery. Validate config early, fail with clear exit codes, and avoid liveness checks tied to external dependencies.
+Answer: Fatal startup errors, such as bad config or a dependency being down, cause repeated restarts, and the backoff delays recovery. Validate config early, fail with clear exit codes, and do not tie liveness checks to external dependencies.
 
 ### NODE-295 — supervisord / systemd / PM2 restart considerations?
 
@@ -894,17 +894,17 @@ Answer: Fatal startup errors (bad config, dependency down) cause repeated restar
 
 **Question:**
 
-supervisord / systemd / PM2 restart considerations?
+What should you consider when using supervisord, systemd, or PM2 to restart a service?
 
 **Answer:**
 
-They restart on exit; configure `autorestart`, `startretries`, `startsecs` (supervisord) or `Restart=on-failure`, `RestartSec` (systemd) to avoid tight loops. Ensure stop signals and timeouts match graceful shutdown.
+They restart the process when it exits. To avoid tight restart loops, configure `autorestart`, `startretries`, and `startsecs` in supervisord, or `Restart=on-failure` and `RestartSec` in systemd. Also make sure the stop signal and timeout match your graceful shutdown.
 
 **Follow-up:**
 
 Exit codes matter how?
 
-Answer: Distinguish clean (0) from failure (non-zero) and from "do not restart" codes (`exitcodes`/`RestartPreventExitStatus`). Fatal config errors should not infinitely restart.
+Answer: Use them to separate a clean exit (0), a failure (non-zero), and "do not restart" codes (`exitcodes` in supervisord, `RestartPreventExitStatus` in systemd). Fatal config errors should not restart forever.
 
 ### NODE-296 — Poison messages?
 
@@ -914,17 +914,17 @@ Answer: Distinguish clean (0) from failure (non-zero) and from "do not restart" 
 
 **Question:**
 
-Poison messages?
+What is a poison message?
 
 **Answer:**
 
-A message that always fails processing (malformed, triggers a bug) and gets redelivered forever, blocking the queue or burning resources. Mitigate with max attempts, dead-letter queues, and parking with error metadata.
+A poison message is one that always fails processing, for example because it is malformed or triggers a bug. It gets redelivered forever, blocking the queue or wasting resources. To handle it, set a maximum number of attempts, use dead-letter queues, and park the message together with error details.
 
 **Follow-up:**
 
 Handling in Kafka vs SQS/RabbitMQ?
 
-Answer: SQS: `maxReceiveCount` → DLQ via redrive policy. RabbitMQ: reject with `requeue=false` to a DLX. Kafka has no built-in DLQ: publish failures to a retry/dead topic yourself so the partition keeps advancing.
+Answer: In SQS, `maxReceiveCount` moves the message to a DLQ through a redrive policy. In RabbitMQ, reject with `requeue=false` to a dead-letter exchange. Kafka has no built-in DLQ, so publish failures to a retry or dead topic yourself so the partition keeps moving.
 
 ### NODE-297 — At-least-once vs at-most-once vs exactly-once?
 
@@ -934,17 +934,17 @@ Answer: SQS: `maxReceiveCount` → DLQ via redrive policy. RabbitMQ: reject with
 
 **Question:**
 
-At-least-once vs at-most-once vs exactly-once?
+What is the difference between at-least-once, at-most-once, and exactly-once delivery?
 
 **Answer:**
 
-At-most-once may lose messages; at-least-once never loses but may duplicate; "exactly-once" delivery is not achievable across arbitrary systems — you get exactly-once *effects* via at-least-once plus idempotent/transactional processing.
+At-most-once may lose messages. At-least-once never loses them but may deliver duplicates. True exactly-once delivery is not achievable across arbitrary systems. What you can get is exactly-once *effects*, by combining at-least-once delivery with idempotent or transactional processing.
 
 **Follow-up:**
 
 What does Kafka's "exactly-once" actually cover?
 
-Answer: Idempotent producer plus transactions across Kafka topics and offsets (read-process-write within Kafka). Side effects outside Kafka (DB, HTTP) still need idempotency or outbox/transactional patterns.
+Answer: An idempotent producer plus transactions across Kafka topics and offsets, meaning read-process-write inside Kafka. Side effects outside Kafka, such as a database or an HTTP call, still need idempotency or an outbox or transactional pattern.
 
 ### NODE-298 — Ack timing in a consumer?
 
@@ -954,17 +954,17 @@ Answer: Idempotent producer plus transactions across Kafka topics and offsets (r
 
 **Question:**
 
-Ack timing in a consumer?
+When should a consumer acknowledge a message?
 
 **Answer:**
 
-Ack after the work completes: crashes before ack cause redelivery (at-least-once). Ack before work risks loss (at-most-once). Pair late ack with idempotent processing and a visibility/ack timeout longer than max processing time.
+Acknowledge after the work is done. If the consumer crashes before the ack, the message is redelivered, which gives at-least-once delivery. Acknowledging before the work risks losing the message, which is at-most-once. Combine a late ack with idempotent processing, and set the visibility or ack timeout longer than your maximum processing time.
 
 **Follow-up:**
 
 Duplicate when ack fails after success?
 
-Answer: Yes, work done but redelivered. Dedupe via processed-message-ID table (unique constraint, ideally in the same transaction as the side effect) or naturally idempotent writes (upserts).
+Answer: Yes: the work was done, but the message is redelivered. Deduplicate with a processed-message-ID table, ideally with a unique constraint in the same transaction as the side effect, or use naturally idempotent writes such as upserts.
 
 ### NODE-299 — Outbox pattern?
 
@@ -974,17 +974,17 @@ Answer: Yes, work done but redelivered. Dedupe via processed-message-ID table (u
 
 **Question:**
 
-Outbox pattern?
+What is the outbox pattern?
 
 **Answer:**
 
-Write business data and an outbox event in one DB transaction; a separate relay publishes events to the broker and marks them sent. This avoids dual-write inconsistency between DB and queue.
+You write the business data and an outbox event in the same database transaction. A separate relay process then publishes the events to the broker and marks them as sent. This avoids the dual-write problem, where the database and the queue can disagree after a partial failure.
 
 **Follow-up:**
 
 Delivery guarantee?
 
-Answer: At-least-once (relay may publish then crash before marking sent), so consumers must be idempotent; events carry a stable ID for dedupe.
+Answer: At-least-once, because the relay may publish an event and then crash before marking it sent. Consumers must therefore be idempotent, and events should carry a stable ID for deduplication.
 
 ### NODE-300 — Build a minimal reliability checklist for a Node service.
 
@@ -994,14 +994,23 @@ Answer: At-least-once (relay may publish then crash before marking sent), so con
 
 **Question:**
 
-Build a minimal reliability checklist for a Node service.
+What would a minimal reliability checklist for a Node service include?
 
 **Answer:**
 
-Typed errors with `code`/`cause`; central error handler; fatal handlers (`uncaughtException`/`unhandledRejection`) that log and exit; timeouts and `AbortSignal` everywhere; bounded retries with jitter; circuit breaker and bulkheads; idempotency keys; health/readiness/liveness; structured logs with correlation IDs via ALS; SIGTERM drain shorter than grace period; DLQ for poison messages; chaos/failure testing.
+- Typed errors with `code` and `cause`, and a central error handler.
+- Fatal handlers for `uncaughtException` and `unhandledRejection` that log and exit.
+- Timeouts and `AbortSignal` everywhere.
+- Bounded retries with jitter, plus circuit breakers and bulkheads.
+- Idempotency keys.
+- Health, readiness, and liveness endpoints.
+- Structured logs with correlation IDs through `AsyncLocalStorage`.
+- A SIGTERM drain shorter than the grace period.
+- A dead-letter queue for poison messages.
+- Chaos and failure testing.
 
 **Follow-up:**
 
 How do you verify it works?
 
-Answer: Fault-injection tests (kill dependencies, add latency, drop connections), load tests with failure, rolling-restart drills checking zero 5xx, alerts on error rate/saturation, and runbooks tied to SLOs.
+Answer: Run fault-injection tests (kill dependencies, add latency, drop connections) and load tests that include failures. Do rolling-restart drills that check for zero 5xx responses. Set alerts on error rate and saturation, and keep runbooks tied to your SLOs.

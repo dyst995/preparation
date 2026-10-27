@@ -14,7 +14,9 @@ A function component calls `useState`, `useReducer`, `useRef`, `useMemo`, `useCa
 
 **Answer:**
 
-React matches one slot per call by order. `useState`/`useReducer` store value plus stable setter/`dispatch`; initializers/`init` run only on create. `useRef` returns the same `{ current }` object. `useMemo`/`useCallback` recompute when deps fail `Object.is`. `useEffect` stores setup and deps; it runs after commit, not during render. `useContext` reads the nearest provider and subscribes—no private copy. Same hook sequence every render is your job.
+React keeps one slot per hook call and matches them by call order, so the order must never change.
+
+`useState` and `useReducer` store the current value and a stable setter or `dispatch`. Their initial values are computed only when the slot is created. `useRef` returns the same `{ current }` object every time. `useMemo` and `useCallback` recompute only when a dependency changes. `useEffect` stores the setup function and dependencies, and runs after commit, not during render. `useContext` reads the nearest provider's value and subscribes to it.
 
 **Trade-offs:**
 
@@ -24,7 +26,7 @@ Several `useState` for independent fields; one `useReducer` for one transition; 
 
 `useState(expensive())` vs `useRef(expensive())` on the second render?
 
-Answer: Both evaluate `expensive()` every render. `useState` ignores the value after create (use `() => expensive()` to lazy-init). `useRef` has no lazy form; it keeps the first `current` and still returns the original object.
+Answer: Both call `expensive()` on every render. `useState` ignores the result after the first render, and you can use `() => expensive()` to initialize lazily. `useRef` has no lazy form, so it keeps the first `current` and discards later results.
 
 ### REACT-052 — The setter replaces the object
 
@@ -45,7 +47,13 @@ setDraft({ ...draft, body: "B" });
 
 **Answer:**
 
-`onTitle` replaces with `{ title: "A" }`—`body` is gone; `useState` does not shallow-merge. `onBody` merges via updater → `{ title: "", body: "B" }`. `applyBoth` queues two replaces from this render’s `draft`; the second wins → `{ title: "", body: "B" }`. Use a functional updater for the second call to build on the pending object.
+`useState` replaces state. It does not merge.
+
+`onTitle` sets `{ title: "A" }`, and `body` is gone. `onBody` uses an updater with a spread, so it keeps `title` and gives `{ title: "", body: "B" }`.
+
+`applyBoth` queues two replacements that both start from this render's `draft`. The second one wins, so the result is `{ title: "", body: "B" }`, and the title change is lost.
+
+To make the second call build on the first, use a functional updater so it receives the pending state.
 
 **Code:**
 
@@ -57,7 +65,7 @@ setDraft((prev) => ({ ...prev, title: "A", body: "B" }));
 
 Nested `author.city`: spread new `author` vs reuse `prev.author` then mutate—which leaves previous state unchanged?
 
-Answer: The nested spread. Reusing `prev.author` shares the object; later mutation pollutes both previous and next state.
+Answer: The nested spread. If you reuse `prev.author` and mutate it, the old and new state share the same object, so the change shows up in both.
 
 ### REACT-053 — The updater reads the pending state
 
@@ -71,7 +79,13 @@ Answer: The nested spread. Reusing `prev.author` shares the object; later mutati
 
 **Answer:**
 
-Both handlers close over `0`/`[]`. After await, bare setters both write `1` and `[1]`—one save lost. Functional `setCount` yields `2`, but `setHistory` still appends closed-over `1` twice → `[1, 1]`. Updaters must stay pure; nested setters inside them can run twice under Strict Mode. Prefer one reducer for “increment and append that number.”
+Both handlers started with `count` as `0` and `history` as `[]`. After the awaits, plain setters both write `1` and `[1]`, so one save is lost.
+
+With `setCount(c => c + 1)`, the count correctly reaches `2`. But `setHistory` still uses the stale `count + 1`, so history becomes `[1, 1]`.
+
+Putting `setHistory` inside the count updater is a bad fix. Updaters must be pure, and Strict Mode can call them twice, causing duplicate updates.
+
+A better approach is a single reducer that handles "increment and append that number" together.
 
 **Code:**
 
@@ -84,7 +98,7 @@ setHistory((h) => [...h, h.length + 1]);
 
 How do you store a function in `useState` and replace it with one that returns `1`?
 
-Answer: Initializer needs `() => () => 0`. `setFn(() => 1)` stores `1` (updater). Use `setFn(() => () => 1)` to store the function.
+Answer: React treats a function passed to the setter as an updater. So initialize with `() => () => 0`, and use `setFn(() => () => 1)`. If you write `setFn(() => 1)`, React stores `1`, not a function.
 
 ### REACT-054 — The interval keeps the first render's values
 
@@ -98,7 +112,11 @@ Answer: Initializer needs `() => () => 0`. `setFn(() => 1)` stores `1` (updater)
 
 **Answer:**
 
-Empty deps: interval closes over mount `count=0`, `step=1`; ticks call `setCount(1)` and bail out—stays `1`; never sees `5`. `[count, step]` restarts every tick (timer resets) but uses fresh values. Updater + `[step]` increments without resetting on count, and recreates when `step` changes. Strict Mode double-mounts the interval in development.
+An effect uses the values from the render that created it. With `[]`, the interval was created on mount, so it always sees `count = 0` and `step = 1`. Each tick sets `count` to `1`, and after that nothing changes. It never sees `step = 5`.
+
+With `[count, step]`, the values are fresh, but the interval is torn down and recreated on every tick, so the timer keeps resetting.
+
+The best option is `setCount(c => c + step)` with `[step]`. It uses the latest count and only restarts when `step` changes.
 
 **Code:**
 
@@ -113,7 +131,7 @@ useEffect(() => {
 
 With `[step]` and functional setCount, what does `console.log(count)` next to it print after three ticks?
 
-Answer: `0`, `0`, `0`—closure from the effect’s render. Committed count is `3`. Log inside the updater or a `count` effect for the latest value.
+Answer: It prints `0`, `0`, `0`, because the log reads the value from the render that created the effect. The real committed count is `3`. Log inside the updater or in a separate effect on `count` to see the latest value.
 
 ### REACT-055 — An empty dependency list freezes the closure
 
@@ -127,13 +145,19 @@ Answer: `0`, `0`, `0`—closure from the effect’s render. Committed count is `
 
 **Answer:**
 
-Setup closes over the first `query` and never re-runs. New query on screen; only request used the mount string—stale results. `[]` is honest only when the body reads no changing props/state/context, or reads latest handlers via a ref and depends on values that should restart the subscription. Fix fetch with `[query]` plus abort/ignore cleanup.
+With `[]`, the effect runs once on mount and keeps using the `query` from that first render. When the user types, the screen shows the new query, but the request was made with the old one, so results are stale.
+
+The dependency list is not a way to choose when to run. It should list every value the effect reads.
+
+`[]` is honest only when the effect reads nothing that changes, or when it reads the latest values through refs.
+
+Here, use `[query]` with a cleanup that aborts or ignores outdated requests.
 
 **Follow-up:**
 
 Effect calls `load(query)`; `load` is defined in the component and passed to a child. Adding `load` refetches every keystroke even when `query` is unchanged. What dependency is changing?
 
-Answer: `load`’s identity—new function every render. Define `load` inside the effect and depend on `[query]`, or `useCallback` with `[query]`.
+Answer: The identity of `load`. It is a new function on every render. Define it inside the effect and depend on `[query]`, or wrap it in `useCallback` with `[query]`.
 
 ### REACT-056 — Passive effects run after the paint opportunity
 
@@ -147,13 +171,19 @@ A component commits a new `userId`. It has `useEffect([userId])` and a previous 
 
 **Answer:**
 
-Commit updates DOM → layout effects → paint opportunity → passive effects. Cleanup for `"a"` then setup for `"b"`. `useEffect` does not run on the server. Strict Mode (React 18) setup→cleanup→setup on mount in development. Effects after paint: user can see `"b"` before the fetch starts. Put one-shot POSTs in event handlers.
+React first updates the DOM and runs layout effects. Then the browser gets a chance to paint. After that, React runs passive effects: first the cleanup from the previous `userId`, then the new setup.
+
+This means the user can see the new `userId` on screen before the new fetch starts.
+
+`useEffect` never runs on the server. In development, Strict Mode mounts the effect, cleans it up, and mounts it again to catch missing cleanup.
+
+For one-time actions like a POST, use an event handler, not an effect.
 
 **Follow-up:**
 
 Effect calls `setUser` and `setLoading(false)` in the same setup. How many extra renders, and can the user see loading from the render that started the fetch?
 
-Answer: One batched extra render. The committed `userId` render already had a paint chance with its loading flag; the effect’s `setLoading(false)` updates a later render.
+Answer: The two updates are batched into one extra render. The earlier render had already been painted with its own loading flag. The effect's `setLoading(false)` only affects a later render.
 
 ### REACT-057 — Layout effects run before the browser paints
 
@@ -167,7 +197,13 @@ A tooltip measures with `getBoundingClientRect` then `setTop`. What does the use
 
 **Answer:**
 
-`useLayoutEffect` runs after DOM write, before paint—`setTop` flushes so the user sees the corrected position. `useEffect` can paint the old `top` first (flash). Layout effects block paint; a fetch still finishes later, so use `useEffect` for network. Layout effects don’t run on the server; client corrects before paint after hydration.
+`useLayoutEffect` runs after React updates the DOM but before the browser paints. If it calls `setTop`, React re-renders immediately, so the user only sees the corrected position.
+
+With `useEffect`, the browser may paint the tooltip at the old position first, then move it, which looks like a flash.
+
+A fetch should use `useEffect`. Layout effects block painting, and a network request finishes later anyway, so blocking gains nothing.
+
+Layout effects do not run on the server. The client fixes the layout after hydration.
 
 **Code:**
 
@@ -182,7 +218,7 @@ useLayoutEffect(() => {
 
 Layout effect always `setTop({ y: measured })` with a new object even when the pixel is unchanged. What happens?
 
-Answer: Endless nested updates before paint (max update depth). Store a number or bail out when unchanged.
+Answer: It causes endless nested updates, because every call creates a new object that React sees as a change, until React stops with a maximum update depth error. Store a number, or return the previous value when nothing changed.
 
 ### REACT-058 — The effect writes a new object into its own dependency
 
@@ -196,7 +232,11 @@ Mount with `filters = { q: "", page: 1 }`. Effect does `setFilters({ q: filters.
 
 **Answer:**
 
-Effect allocates a new object; `Object.is` fails; re-render; deps change; loop until max depth. Prefer deleting the effect—`onChange` already sets `page: 1`. If needed, depend on `[filters.q]` and bail out: `setFilters(prev => prev.page === 1 ? prev : { ...prev, page: 1 })`.
+This creates an infinite loop. The effect builds a new object and sets it as state. Even if the fields are identical, `Object.is` sees a different reference, so React re-renders. The dependency `filters` has changed, so the effect runs again, and it keeps going until React hits the maximum update depth.
+
+The best fix is to remove the effect, because the change handler can already reset `page` to `1`.
+
+If you must keep it, depend on `[filters.q]` and return the previous state if `page` is already `1`.
 
 **Code:**
 
@@ -210,7 +250,7 @@ useEffect(() => {
 
 Deps stay `[filters]` but body uses the bailout updater. Does mount still loop?
 
-Answer: No—same reference → skip render → effect doesn’t re-run. Still better owned by the click handler.
+Answer: No. The updater returns the same reference, so React skips the render and the effect does not run again. It is still better to do this in the event handler.
 
 ### REACT-059 — The in-flight request has to be dropped
 
@@ -224,7 +264,11 @@ Answer: No—same reference → skip render → effect doesn’t re-run. Still b
 
 **Answer:**
 
-Screen can show user A under id B—React doesn’t cancel fetch. Cleanup aborts or sets an ignore flag before `"b"` setup. Abort prefers when the API accepts a signal. Strict Mode aborts the first mount request when cleanup exists. Put POSTs in handlers, not effects.
+React does not cancel a fetch when the dependency changes. If the response for `"a"` arrives last, it overwrites the state, and the screen shows user A while the page is on user B. This is a race condition.
+
+A cleanup function fixes it. It runs before the next effect and can abort the old request or set an ignore flag so the old response is dropped. Aborting is better when the API supports a signal.
+
+In development, Strict Mode runs the first mount's cleanup, so the first request is aborted too. Do POSTs in handlers, not effects.
 
 **Code:**
 
@@ -246,7 +290,7 @@ useEffect(() => {
 
 Ignore-flag cleanup: can `"a"`’s `then` still run after `"b"` wrote state?
 
-Answer: Yes—it must return without `setUser`/`setError`. Abort+Ignore AbortError is cleaner when the API honors the signal.
+Answer: Yes, the callback still runs, so it must check the flag and return without calling `setUser` or `setError`. Aborting and ignoring `AbortError` is cleaner when the API supports the signal.
 
 ### REACT-060 — A reducer returns the next state for one slot
 
@@ -260,7 +304,11 @@ Answer: Yes—it must return without `setUser`/`setError`. Abort+Ignore AbortErr
 
 **Answer:**
 
-One action returns both fields together—two updaters can’t share pending values safely. `dispatch` is stable. React uses the reducer from the render processing the update. `init(initialArg)` runs only when the slot is created. Strict Mode may double-call init/reducer; keep them pure.
+With `useReducer`, one action produces the whole next state, so `count` and `history` always change together. With two separate setters, each updater only sees its own slot's pending value, so they can easily drift apart.
+
+`dispatch` has a stable identity. React runs the reducer from the render that processes the update. The optional `init(initialArg)` function runs only when the state is first created.
+
+In Strict Mode, React may call `init` and the reducer twice in development, so both must be pure.
 
 **Code:**
 
@@ -275,7 +323,7 @@ case "saved": {
 
 Reducer inside the component reads `props.step`. Effect with `[]` dispatches once. Which `step` applies if the parent already passed a new step?
 
-Answer: The step from the render that processes the dispatch—not frozen in the empty effect. Pass step on the action when the event means “step at click time.”
+Answer: The `step` from the render that processes the dispatch, not the one from the effect's closure. If the action should use the step at the moment of the click, put it in the action itself.
 
 ### REACT-061 — Mutating and returning the same state skips the render
 
@@ -289,7 +337,13 @@ Reducer does `state.items.push(item); return state`. User dispatches once with `
 
 **Answer:**
 
-Same reference → `Object.is` bailout → no re-render; button stays empty while the array was mutated. Strict Mode double-invokes → `"a"` twice in the mutated array, still no render. Return `{ items: [...state.items, item] }`. Returning `state` unchanged on purpose is the correct “no-op” bailout.
+The reducer returns the same state reference, so React's `Object.is` check says nothing changed and skips the re-render. The array was mutated, but the screen still shows no items.
+
+In development, Strict Mode calls the reducer twice, so `"a"` is pushed twice into the mutated array, and still nothing renders.
+
+A reducer should return a new object, such as `{ items: [...state.items, item] }`.
+
+Returning the same state on purpose is fine when nothing should change. That is a correct way to skip an update.
 
 **Code:**
 
@@ -303,7 +357,7 @@ function reducer(state: State, item: string): State {
 
 Pure reducer returns `state` when item exists. Parent re-renders with a new `title`. Does this component run, and does the list reset?
 
-Answer: It runs because the parent rendered it. Bailout only skips the dispatch update. List doesn’t reset; `memo` is what can skip on props.
+Answer: The component runs, because its parent rendered it. The bailout only skips the update from the dispatch. The list does not reset. Use `memo` if you want to skip renders caused by the parent.
 
 ### REACT-062 — The ref object is stable and writes do not render
 
@@ -317,13 +371,19 @@ Answer: It runs because the parent rendered it. Bailout only skips the dispatch 
 
 **Answer:**
 
-Same object for the slot’s life; initial arg only on create. Mutating `current` doesn’t schedule a render; a later state-driven render sees the new value. With `<div ref={ref}>`, React assigns the node (then `null`) during commit—still no render. Don’t branch JSX on `ref.current` during render.
+`useRef` returns the same object for the whole life of the component. The initial value is only used when it is first created.
+
+Changing `ref.current` does not cause a re-render, so the screen does not update. A later render, triggered by something else, will see the new value.
+
+When you attach a ref to an element like `<div ref={ref}>`, React sets `current` to the DOM node during commit, and back to `null` on unmount. This also does not cause a render.
+
+Don't use `ref.current` to decide what to render.
 
 **Follow-up:**
 
 Inline `ref={(node) => { nodeRef.current = node }}` while parent re-renders. Does React clear the node?
 
-Answer: Yes—new callback identity → previous called with `null`, then new with the node. Prefer `ref={nodeRef}` or a stable `useCallback`.
+Answer: Yes. Each render creates a new callback, so React calls the old one with `null` and the new one with the node. Prefer `ref={nodeRef}` or a stable `useCallback`.
 
 ### REACT-063 — A ref keeps the latest value for a later callback
 
@@ -337,7 +397,13 @@ Socket effect depends on `[roomId]`. Parent passes a new `onMessage` often. How 
 
 **Answer:**
 
-Depend on `[roomId]`; store `onMessage` in a ref updated every commit (or during render / layout effect for a tighter gap). Listing `onMessage` reconnects every parent render. `[]` ref write freezes the mount handler. React 18 uses this ref pattern; `useEffectEvent` isn’t a stable 18 export.
+Keep the socket effect depending only on `[roomId]`, and store the latest `onMessage` in a ref. Update that ref on every commit. The socket's listener calls `onMessageRef.current`, so it always uses the newest handler without reconnecting.
+
+If you put `onMessage` in the dependency list, the socket reconnects whenever the parent passes a new function.
+
+If you update the ref in an effect with `[]`, it stays frozen at the first handler.
+
+React 18 has no stable `useEffectEvent`, so this ref pattern is the usual approach.
 
 **Code:**
 
@@ -355,7 +421,7 @@ useEffect(() => {
 
 `memo(ChatRoom)` gets inline `onMessage`, same `roomId`. Does the ref update?
 
-Answer: Yes—new function fails `memo`, so it renders and the ref effect writes. A stale parent `useCallback([])` can skip `ChatRoom` and leave a stale ref.
+Answer: Yes. A new function fails the `memo` comparison, so the component renders and the ref gets updated. But if the parent wraps the handler in `useCallback([])`, `ChatRoom` can skip rendering and keep a stale handler.
 
 ### REACT-064 — useMemo caches a result while dependencies compare equal
 
@@ -369,13 +435,19 @@ When does `useMemo(() => filter(items, query), [items, query])` recompute vs reu
 
 **Answer:**
 
-Recomputes when deps fail `Object.is`; else returns the same reference. Doesn’t skip children—only stabilizes the value. Add it for expensive work (profiled), a hook dep, `memo` child prop, or context value. Missing a dep → stale UI. A new `items` array every render defeats the cache. Keep the factory pure (Strict Mode may double-call).
+`useMemo` remembers the result of a calculation. It recomputes only when a dependency changes by `Object.is`. Otherwise it returns the same value, with the same reference.
+
+It does not stop children from rendering. It only keeps the value stable.
+
+Use it for work you have measured to be expensive, or when you need a stable reference for a hook dependency, a `memo` child's prop, or a context value.
+
+It can't help if `items` is a new array every render. If you forget a dependency, the UI goes stale. Keep the function pure.
 
 **Follow-up:**
 
 Memoized `visible` is an effect dep. `query` changes every keystroke. How often does the effect run vs without `useMemo`?
 
-Answer: Once per keystroke either way when query changes. Without memo, unrelated re-renders also allocate a new array and resubscribe.
+Answer: Once per keystroke in both cases, because `query` really changes. Without `useMemo`, unrelated re-renders would also create a new array and re-run the effect.
 
 ### REACT-065 — useCallback preserves the closure from the render that created it
 
@@ -389,7 +461,13 @@ Answer: Once per keystroke either way when query changes. Without memo, unrelate
 
 **Answer:**
 
-Empty deps keep the mount closure → saves `"a"`. `[docId]` recreates when the prop changes so the click sends `"b"`. It doesn’t defer, batch, or deep-compare bodies—it’s `useMemo` for a function. Prefer an inline handler when nothing needs stable identity.
+With an empty dependency list, the callback is created once and keeps the `docId` from mount, so it saves `"a"`.
+
+With `[docId]`, React makes a new callback when `docId` changes, so the click sends `"b"`.
+
+`useCallback` doesn't make the function faster, delay it, batch it, or look inside it. It just returns the same function reference while the dependencies stay the same. It is like `useMemo` for functions.
+
+If nothing needs a stable function identity, a plain inline handler is simpler.
 
 **Code:**
 
@@ -403,7 +481,7 @@ const onClick = useCallback(() => {
 
 List is `[docId]`; handler uses closed-over `saved` omitted from deps. After first save, second click—what does it see?
 
-Answer: Still `saved === false` from the render that created the callback (if `docId` unchanged). Use `setSaved(true)`, include `saved`, or a functional update.
+Answer: It still sees `saved` as `false`, because it uses the value from the render that created the callback. Fix it by including `saved` in the dependencies, or by using a functional update.
 
 ### REACT-066 — The memoized child still sees a new callback
 
@@ -417,7 +495,13 @@ Answer: Still `saved === false` from the render that created the callback (if `d
 
 **Answer:**
 
-Same `ids` → same callback → `memo` skips Rows. New `ids` reference (unused by the callback) mints a new `onSelect` → every Row renders. Without `useCallback`, every `List` render creates a new function → all Rows render. Honest deps: `[]` (`setSelected` is stable). Pair `memo` + `useCallback`.
+If `ids` has the same reference, `useCallback` returns the same `onSelect`, so `memo` lets every Row skip rendering.
+
+If the parent creates a new `ids` array, `useCallback` makes a new `onSelect`, even if the callback does not actually use `ids`, and every Row re-renders.
+
+Without `useCallback`, the list creates a new function on every render, so all Rows render every time.
+
+The honest dependency list here is `[]`, because `setSelected` is stable. `memo` and `useCallback` only work well together.
 
 **Code:**
 
@@ -429,7 +513,7 @@ const onSelect = useCallback((id: string) => setSelected(id), []);
 
 Functional toggle `setSelected(curr => curr === id ? null : id)` with `[]`. Why no `selected` dep?
 
-Answer: Updater reads pending state; callback doesn’t close over `selected`. Reading `selected` with `[]` would stick on the first value.
+Answer: The updater gets the latest state as an argument, so the callback never needs to close over `selected`. If you read `selected` directly with `[]`, it would be stuck on its first value.
 
 ### REACT-067 — useContext reads the nearest value by identity
 
@@ -443,13 +527,17 @@ Provider passes `value={theme}` (`"dark"`). `Title` calls `useContext(ThemeConte
 
 **Answer:**
 
-Returns nearest provider value (`"dark"`); default only with no provider. Re-renders when value fails `Object.is`. React 18 has no selector—new `{ theme, user }` wakes Title even if `theme` is unchanged. `memo` compares props, not context fields.
+`useContext` returns the value of the nearest provider above, which is `"dark"` here. The default value is only used when there is no provider.
+
+The component re-renders when the provider's value changes according to `Object.is`.
+
+In React 18, there is no way to subscribe to only part of a context. If the value is a new `{ theme, user }` object, `Title` re-renders even when `theme` is the same. `memo` doesn't help, because it only compares props.
 
 **Follow-up:**
 
 `memo(Title)`, stable props, same string `"dark"` vs `value={{ theme: "dark" }}` each render?
 
-Answer: Same string → no context notify. New object every provider render → Title runs.
+Answer: The same string does not notify consumers. A new object on every provider render makes `Title` re-render each time.
 
 ### REACT-068 — Values that change at different rates need different providers
 
@@ -463,7 +551,13 @@ One value `{ theme, cursor }`. Theme rare; cursor every move. `ThemeLabel` and `
 
 **Answer:**
 
-Every consumer re-renders on a new object. Split `ThemeContext` / `CursorContext`. Hold state in a component that renders both providers and receives the heavy tree as `children` so a cursor update doesn’t recreate the page element. Stable identities still matter per context.
+Every component that reads that context re-renders whenever the object changes. When the cursor moves, `ThemeLabel` re-renders too, even though theme is unchanged.
+
+Split the data into two contexts, one for `theme` and one for `cursor`, so each consumer subscribes only to what it needs.
+
+Keep the state in a component that renders both providers and receives the rest of the page as `children`. Then a cursor update does not recreate the page's elements.
+
+Each context's value still needs a stable identity.
 
 **Code:**
 
@@ -477,7 +571,7 @@ Every consumer re-renders on a new object. Split `ThemeContext` / `CursorContext
 
 `{ state, dispatch }` in one context; toolbar only needs `dispatch`. Does it re-render on keystrokes?
 
-Answer: Yes—new state object. Put stable `dispatch` in its own context (or pass as a prop).
+Answer: Yes, because the context value is a new object whenever state changes. Put the stable `dispatch` in its own context, or pass it as a prop.
 
 ### REACT-069 — Each custom hook call has its own state
 
@@ -491,13 +585,19 @@ Answer: Yes—new state object. Put stable `dispatch` in its own context (or pas
 
 **Answer:**
 
-`a` flips; `b` stays. Each call owns its own `useState`/`useCallback` slots in the caller’s list—hooks share logic, not state. Conditional calls change hook count/order → rules-of-hooks failure. Unmount a child that owns the hook instead.
+Toggling `a` doesn't affect `b`. A custom hook is just a function that calls other hooks. Each call adds its own `useState` and other slots to the component's hook list, so each call has its own state.
+
+Hooks share logic, not data.
+
+Calling a hook conditionally changes how many hooks run and their order between renders, which breaks the rules of hooks.
+
+If the toggle should only exist sometimes, move it into a child component and render or unmount that child.
 
 **Follow-up:**
 
 Module `Map` keyed by string plus `useState` for first value. Two Panels call `useToggle("power")`. Do they share?
 
-Answer: Map can share data, but each `useState` is separate and Map writes don’t re-render the other. Need context/store subscription—or don’t share.
+Answer: The Map can hold shared data, but each `useState` is separate, and writing to the Map does not re-render the other panel. For real sharing, you need context or a subscribed store.
 
 ### REACT-070 — The hook's effect belongs to the caller
 
@@ -511,7 +611,13 @@ Answer: Map can share data, but each `useState` is separate and Map writes don�
 
 **Answer:**
 
-Each caller has its own effect; last setup in tree order wins the single browser title. Parent effects run after child. Cleanup restores that setup’s previous title—can overwrite another owner. Hook gives slot lifecycle + lint; not a title stack. Depend on `[title]`. Document one owner or build an explicit stack.
+Each caller has its own effect, and there is only one browser title. The effect that runs last wins. Parent effects run after child effects, so the parent usually wins.
+
+Cleanup restores whatever title existed when that effect started, which can overwrite another component's title.
+
+The hook gives you a proper lifecycle and lint support, but it doesn't manage multiple owners. It is not a title stack.
+
+Use `[title]` as the dependency. Either document that there should be only one owner, or build an explicit stack.
 
 **Code:**
 
@@ -527,7 +633,7 @@ useEffect(() => {
 
 Also takes inline `onChange`. How avoid fighting callback identity?
 
-Answer: Effect depends on `[title]`; keep `onChange` in a ref. Listing `onChange` rewrites the title every parent render.
+Answer: Keep `onChange` in a ref and depend only on `[title]`. If you list `onChange`, the effect re-runs and rewrites the title on every parent render.
 
 ### REACT-071 — Derived data is computed during render
 
@@ -541,7 +647,11 @@ Answer: Effect depends on `[title]`; keep `onChange` in a ref. Listing `onChange
 
 **Answer:**
 
-First paint can show unfiltered `items`; effect filters after paint—one frame late every query change. Derive during render: `items.filter(...)`. `useMemo` only if profiled expensive or identity needed for deps/`memo`—still during render, so no flash.
+The first paint can show the unfiltered `items`. The effect only runs after paint and then updates state, so each change to `query` shows a wrong frame first.
+
+Anything you can calculate from props and state should be calculated during render, like `items.filter(...)`. That is always in sync.
+
+Only add `useMemo` if the calculation is expensive and measured, or if you need a stable reference. It also runs during render, so there is no flash.
 
 **Code:**
 
@@ -553,7 +663,7 @@ const visible = items.filter((item) => item.name.includes(query));
 
 “Hide row” removes an id without changing `items`/`query`. What’s state vs derived?
 
-Answer: Hidden ids are state. `visible` stays derived: filter by query, then exclude hidden ids—don’t patch a stored filtered array.
+Answer: The set of hidden ids is state. `visible` stays derived: filter by query, then remove hidden ids. Don't patch a stored filtered array.
 
 ### REACT-072 — Reset the draft when the entity changes, without an effect
 
@@ -567,7 +677,11 @@ Answer: Hidden ids are state. `visible` stays derived: filter by query, then exc
 
 **Answer:**
 
-Effect overwrites typed drafts after paint and won’t reset on `userId` change if email string matches. Controlled parent owns every keystroke. `key={userId}` remounts for a new entity. Or during render: if `userId !== prevUserId`, set both before returning—no stale paint. Effects for syncing props→state are usually wrong for inputs.
+The effect runs after paint, so it can overwrite what the user is typing, and it only runs when `email` changes. If the user changes but two users have the same email string, nothing resets.
+
+There are three better options. A controlled parent owns every keystroke. `key={userId}` remounts the form when the entity changes. Or adjust during render: if `userId` changed, set both the previous id and the draft before returning, so no stale frame appears.
+
+Syncing props into state with effects is usually the wrong tool for inputs.
 
 **Code:**
 
@@ -582,7 +696,7 @@ if (userId !== prevUserId) {
 
 `key={userId}` remounts; form effect fetches avatar the parent already has. What repeated?
 
-Answer: Remount re-fetches. Render avatar from the prop; keep effects for data only this form loads.
+Answer: The remount re-runs the effect, so the avatar is fetched again. Pass the avatar from the parent as a prop, and keep effects for data that only this form loads.
 
 ### REACT-073 — State sits at the lowest common owner
 
@@ -596,13 +710,17 @@ Canvas + word count need the draft; modal open is local; theme is rare and dista
 
 **Answer:**
 
-Draft: lowest parent of both readers (props). Modal flag: beside button/menu until a second reader. Theme: context (stable string, rare). Pointer: local to the decoration. One mega-context makes every write wake every reader—pointer moves re-render themed trees. Placement first; memoization after.
+State should live as low as possible, but high enough for everyone who needs it.
+
+The draft goes in the lowest common parent of the canvas and word count, passed down as props. The modal flag stays next to the button or menu until another component needs it. Theme is rare and widely used, so context fits. The pointer position stays inside the one decoration that uses it.
+
+One context for everything would wake every reader on any change, so pointer moves would re-render themed trees. Place state first, then memoize.
 
 **Follow-up:**
 
 Word count is slow, canvas cheap, both need draft. Cut render without duplicating draft?
 
-Answer: One draft in the parent. `memo(WordCount)` if parent renders for other reasons; or debounce a derived preview. Don’t duplicate the source of truth.
+Answer: Keep one draft in the parent. Wrap `WordCount` in `memo` if the parent re-renders for other reasons, or debounce a derived preview. Don't keep two copies of the same data.
 
 ### REACT-074 — A fetched user and a draft are different facts
 
@@ -616,13 +734,17 @@ Detail and list each `useState` a fetched user; list stays stale after detail sa
 
 **Answer:**
 
-Server user: one cache keyed by id (`useSyncExternalStore`); PUT writes once, both screens subscribe. Draft: editor-owned, init/reset by `key` or during-render—don’t always sync from fetch. Context covering both routes still fans out on every field; prefer per-id store snapshots. `getSnapshot` must return a stable reference until data changes.
+The fetched user is a server fact, so it needs one source of truth, such as a cache keyed by user id. Detail and list both subscribe to it, for example with `useSyncExternalStore`, so a save updates both.
+
+The draft is a different fact. It belongs to the editor, starts from the server data, and resets with a `key` or a render-time adjustment, not by always copying from the fetch.
+
+One context holding the whole response re-renders every reader on any field change. Per-id store snapshots are more precise, and `getSnapshot` must return a stable reference until the data changes.
 
 **Follow-up:**
 
 PUT body omits `displayName` the cache had. What if you store the body as the whole record?
 
-Answer: List loses `displayName`. Merge fields per API contract in one `writeUser`, not per screen.
+Answer: The list loses `displayName`. Merge the response into the existing record in one shared `writeUser` function, following the API contract, instead of handling it per screen.
 
 ### REACT-075 — The handler ref was frozen on mount
 
@@ -636,7 +758,11 @@ Answer: List loses `displayName`. Merge fields per API contract in one `writeUse
 
 **Answer:**
 
-Mount handler stays in the ref—stale draft. Remove the assignment effect’s deps so it runs every commit (declare above subscription); keep `[type]` on the listener. Or assign `handlerRef.current = handler` during render / layout effect for a tighter gap. Don’t list `handler` on the subscription.
+The handler from the first render keeps running. The ref was updated only once on mount because its effect has `[]`, so later handlers from the parent are never stored.
+
+The smallest fix is to remove the dependency list on that assignment effect, so it runs after every commit and updates the ref. Keep `[type]` on the listener effect, so the listener is only attached again if the event type changes.
+
+Do not add `handler` to the subscription's dependencies, or you would re-subscribe on every render.
 
 **Code:**
 
@@ -653,7 +779,7 @@ useEffect(() => {
 
 Subscription deps `[type, handlerRef]`—rebind every render? Does the linter want `handler`?
 
-Answer: No—`handlerRef` is stable. Linter wants `type`, not `handler`, if the effect only reads `handlerRef.current` later.
+Answer: No. `handlerRef` is stable, so it doesn't cause re-binding. If the effect only reads `handlerRef.current` later, the linter asks for `type`, not `handler`.
 
 ### REACT-076 — One save action returns the status and the error together
 
@@ -667,13 +793,17 @@ Separate `status` / `error` slots. Handler sets `"saving"`, on success `"saved"`
 
 **Answer:**
 
-Can paint `"saving"` with an old error, or `"saving"` forever after catch, or `"saved"` with a leftover message. Reducer returns complete pairs: `saveRequested` → `{ saving, null }`, success/fail clear or set error together. Keep draft in separate state. Await between dispatches is fine for showing saving.
+With separate slots, you can end up in states that should not exist. The screen can show "saving" with an old error. After a failure, it can stay on "saving" forever because only the error was set. Or it can show "saved" with a leftover error message.
+
+A reducer fixes this by always returning a complete pair. `saveRequested` returns `{ status: "saving", error: null }`, and success or failure sets or clears the error together with the status.
+
+Keep the draft in separate state. Awaiting between dispatches is fine.
 
 **Follow-up:**
 
 After `saveSucceeded`, user typed during the request. What about the draft?
 
-Answer: Leave the keystroke draft alone. Freeze sent text at `saveRequested` if you need that snapshot.
+Answer: Leave the newer draft alone. If you need to know what was sent, store a copy of the text when `saveRequested` happens.
 
 ### REACT-077 — The second dispatch is applied to the pending state
 
@@ -687,13 +817,17 @@ Answer: Leave the keystroke draft alone. Freeze sent text at `saveRequested` if 
 
 **Answer:**
 
-One batch → `["a", "first"]`. Second reducer sees pending `["a"]`, but the action already chose `"first"` from this render’s empty `state`. `dispatch` returns void—handler’s `state` binding is unchanged. Decide from pending state inside the reducer, or use one action with both items.
+Both dispatches are batched, and the result is `["a", "first"]`. The second reducer call does receive the pending state `["a"]`. But the handler chose the item `"first"` from `state`, which is this render's empty array.
+
+`dispatch` returns nothing, and the handler's `state` variable never changes during the handler.
+
+If the decision depends on the latest state, make it inside the reducer, or combine both items into one action.
 
 **Follow-up:**
 
 `await save()` between the two dispatches. What does the second reducer receive?
 
-Answer: First batch can commit `["a"]`; after await, reducer sees that state. Handler’s `state` binding is still the old render—don’t build payloads from it after await.
+Answer: The first batch may already be committed as `["a"]`, so the second reducer sees that. But the handler's `state` variable is still from the old render, so don't build payloads from it after an `await`.
 
 ### REACT-078 — useId is stable for one mount and matches hydration
 
@@ -707,13 +841,19 @@ Answer: First batch can commit `["a"]`; after await, reducer sees that state. Ha
 
 **Answer:**
 
-Same string for this slot while mounted; unique per position/slot. Server and client walk the same tree → matching ids. Random ids mismatch hydration and can break labels. Not a DB key or cross-visit stable id. Call unconditionally so slot counts match.
+`useId` gives a string that stays the same while the component is mounted, and each component instance gets a different one.
+
+It also matches between the server and the client, because both walk the same component tree. That is why hydration works.
+
+`Math.random()` would give different values on the server and the client, which causes a hydration mismatch and can break label connections.
+
+`useId` is not a database key and is not stable across page visits. Call it unconditionally, like any hook.
 
 **Follow-up:**
 
 Two React roots both call `useId`. How avoid collisions?
 
-Answer: Distinct `identifierPrefix` on each `createRoot`/`hydrateRoot`, matching the server output for hydrated roots.
+Answer: Give each root a different `identifierPrefix` in `createRoot` or `hydrateRoot`. For hydrated roots, it must match what the server used.
 
 ### REACT-079 — useId is not a list key
 
@@ -727,7 +867,13 @@ Contacts have stable `contact.id`. Teammate wants React `key`, checkbox `id`, an
 
 **Answer:**
 
-Checkbox/label id in the row component is valid. List `key` must be `contact.id`—`useId` tracks instance position, not data identity. `querySelector` breaks on colons; use `getElementById` or `CSS.escape`, prefer a ref. Never call `useId` inside the parent’s `map`.
+Only the checkbox and label id is a good use. Inside the row component, `useId` gives a unique id for that instance.
+
+The list `key` must be `contact.id`. A key represents the identity of the data, while `useId` represents the identity of a component instance.
+
+`querySelector` is risky because `useId` values contain colons, which need escaping. Use `getElementById` or `CSS.escape`, or better, use a ref.
+
+Never call `useId` inside the parent's `map`. Call it inside the row component.
 
 **Code:**
 
@@ -747,7 +893,7 @@ function ContactRow({ contact }: { contact: { id: string; name: string } }) {
 
 Error message needs `aria-describedby`. Second `useId`?
 
-Answer: One call + suffix `` `${labelId}-error` `` is enough.
+Answer: Not needed. Call `useId` once and add a suffix, like `` `${labelId}-error` ``.
 
 ### REACT-080 — useImperativeHandle assigns the handle before paint
 
@@ -761,7 +907,11 @@ Parent holds `inputRef` for `forwardRef` `FancyInput`. When is `inputRef.current
 
 **Answer:**
 
-`useImperativeHandle` assigns in a layout effect (after DOM, before paint); cleanup sets `null`. During parent render on mount it’s still `null`—read in click/layout effect. `[]` freezes `getValue`’s closure; list `value` to replace the handle, or read `value` from a ref inside `create` with `[]` for stable handle identity.
+`useImperativeHandle` lets a child decide what the parent's ref exposes. React assigns it in a layout effect, after the DOM is updated and before paint, and clears it to `null` on cleanup.
+
+During the parent's first render, `inputRef.current` is still `null`. Read it in a click handler or a layout effect instead.
+
+With `[]` as dependencies, the handle's `getValue` keeps the closure from mount and becomes stale. Either list `value` so the handle is replaced, or read from a ref inside the handle and keep `[]`.
 
 **Code:**
 
@@ -777,7 +927,7 @@ useImperativeHandle(ref, () => ({
 
 Parent sometimes passes `ref={null}`. What does the child do?
 
-Answer: Handle isn’t assigned; child still renders. Methods are optional parent access.
+Answer: The handle is not assigned, but the child still renders normally. The methods are only for optional parent access.
 
 ### REACT-081 — The menu's open flag stays in the menu
 
@@ -791,7 +941,11 @@ Answer: Handle isn’t assigned; child still renders. Methods are optional paren
 
 **Answer:**
 
-Colocate in `MenuWidget` that owns button+menu so `Page`/`Editor` don’t re-render. Lift only when a second reader (shortcut) appears; pass `Editor` as `children` from a parent that doesn’t hold `open` so the owner’s toggle doesn’t recreate the editor element. `memo` is a patch, not placement.
+Keep `open` in a `MenuWidget` component that owns both the button and the menu. Then toggling it only re-renders the menu, not `Page` or `Editor`.
+
+Lift the state up only when a second component needs it, like the distant shortcut. Even then, make sure the expensive editor is passed in as `children` from a parent that doesn't hold `open`, so the editor element isn't recreated on each toggle.
+
+`memo` can patch the problem, but good state placement removes it.
 
 **Code:**
 
@@ -805,7 +959,7 @@ function Page() {
 
 Panel is in a portal; button is a sibling of `Editor`. Does the portal force `open` to `Page`?
 
-Answer: No—state can stay in the component that renders button and portaled panel. Shortcuts lift state; portals don’t.
+Answer: No. State can stay in the component that renders both the button and the portaled panel. A portal changes where DOM nodes go, not where state lives. Only a shortcut forces lifting.
 
 ### REACT-082 — The shared query is lifted to the parent
 
@@ -819,7 +973,11 @@ Answer: No—state can stay in the component that renders button and portaled pa
 
 **Answer:**
 
-Results still shows everything—two slots. Lift `query` to `Page`; pass `query`/`setQuery` down; Results derives `items.filter(...)` while rendering. One controlled query, same commit.
+The list still shows everything. `SearchBox` and `Results` each have their own state slot, so typing in one does not change the other.
+
+The smallest fix is to move `query` to their common parent, `Page`. Pass `query` and `setQuery` down to `SearchBox`, and pass `query` to `Results`.
+
+`Results` then filters during render with `items.filter(...)`. There is now one controlled query, and both components update in the same commit.
 
 **Code:**
 
@@ -839,7 +997,7 @@ function Page({ items }: { items: Item[] }) {
 
 `Results` is slow; `Page` also has a timer-driven `banner`. Cut Results renders without a second query?
 
-Answer: Keep one query; `memo(Results)` so equal `items`/`query` skip while banner changes—or move banner out of `Page`.
+Answer: Keep a single query. Wrap `Results` in `memo`, so it skips renders when `items` and `query` are the same while the banner changes. Or move the banner out of `Page`.
 
 ### REACT-083 — A new key mounts a new copy of the state
 
@@ -853,13 +1011,17 @@ Answer: Keep one query; `memo(Results)` so equal `items`/`query` skip while bann
 
 **Answer:**
 
-New key → unmount old instance (cleanup + drop slots) and mount new (fresh `useState`, new effect). Parent `NoteScreen` state stays. Key on textarea remounts the host node only—editor state/effects survive. Key resets the component it sits on.
+When the key changes, React unmounts the old `NoteEditor`, runs its effect cleanups, and discards its state. It then mounts a new one with fresh state and new effects. State in the parent, `NoteScreen`, is unchanged.
+
+If the key is only on the inner `<textarea>`, only that DOM element is replaced. The editor's own state and effects are kept.
+
+A key resets the component it is placed on, and everything below it.
 
 **Follow-up:**
 
 Draft lifted to `NoteScreen`; editor still keyed. After navigate, what does the preview show?
 
-Answer: Previous draft—parent slot wasn’t reset. Reset parent draft on `noteId` change, or keep draft under the keyed child.
+Answer: The previous draft, because the parent's state was not reset. Either reset the parent draft when `noteId` changes, or keep the draft inside the keyed child.
 
 ### REACT-084 — An async effect cannot return a cleanup
 
@@ -873,7 +1035,11 @@ Answer: Previous draft—parent slot wasn’t reset. Reset parent draft on `note
 
 **Answer:**
 
-`async` effect returns a Promise—React doesn’t treat it as cleanup (warns). The abort function is the Promise’s resolution, never registered. Previous fetch keeps going. Use a sync effect that starts an inner async function and returns abort synchronously.
+An `async` function always returns a Promise. React expects an effect to return either nothing or a cleanup function, so it ignores the Promise and warns you.
+
+The abort function you wrote ends up as the Promise's resolved value, and React never registers it. When `userId` changes, nothing aborts, and the old fetch keeps running.
+
+Make the effect function synchronous. Start an inner async function inside it, and return the cleanup right away.
 
 **Code:**
 
@@ -895,7 +1061,7 @@ useEffect(() => {
 
 Cleanup aborts but `fetchUser` ignores the signal. Can `setUser` still run?
 
-Answer: Yes—use an ignore flag in the same setup’s closure, or make the API honor the signal.
+Answer: Yes, the request is not actually cancelled. Add an ignore flag in the same effect closure and check it before setting state, or make the API honor the signal.
 
 ### REACT-085 — Cleanup must remove the listener it added
 
@@ -909,7 +1075,11 @@ Answer: Yes—use an ignore flag in the same setup’s closure, or make the API 
 
 **Answer:**
 
-Two listeners—cleanup removed a different function. Both `"a"` and `"b"` still call `run`. Correct: `removeEventListener("keydown", onKey)` with the same `onKey` this setup added (closes over old shortcut). That’s intentional.
+The cleanup passes a brand new empty function, which was never added, so nothing is removed. After the shortcut changes, two listeners remain, and both `"a"` and `"b"` still call `run`.
+
+`removeEventListener` only works when you pass the exact same function that was added.
+
+The fix is to create `onKey` in the effect, use it in `addEventListener`, and return a cleanup that removes that same `onKey`. It closes over the old shortcut on purpose, so it removes the right listener.
 
 **Code:**
 
@@ -921,7 +1091,7 @@ return () => window.removeEventListener("keydown", onKey);
 
 Two effects both register `keydown` correctly. Order when `shortcut` changes?
 
-Answer: Cleanups in declaration order, then setups in declaration order. Each removes only its own previous function.
+Answer: React runs all cleanups first, in declaration order, and then all setups, in declaration order. Each cleanup removes only its own previous listener.
 
 ### REACT-086 — The aborted request's finally clears the next loading flag
 
@@ -935,13 +1105,19 @@ Answer: Cleanups in declaration order, then setups in declaration order. Each re
 
 **Answer:**
 
-`loading` is `false` while `"b"` is in flight: `"b"` set `true`, then `"a"`’s aborted promise `finally` set `false`. AbortError catch doesn’t skip `finally`. Skip clearing when `controller.signal.aborted`, or derive `loading` from `snapshot?.userId !== userId` so aborted requests have no flag to clear. Don’t reuse one AbortController across setups.
+`loading` ends up as `false` while request `"b"` is still running. When `"b"` started, it set loading to `true`. Then the aborted request for `"a"` finished, and its `finally` block set loading to `false`.
+
+Catching `AbortError` does not skip `finally`.
+
+Fix it by skipping the update in `finally` when `controller.signal.aborted` is true. Or derive loading from the data, such as `snapshot?.userId !== userId`, so there is no flag to clear.
+
+Also create a new `AbortController` for each effect run.
 
 **Follow-up:**
 
 `useRef(new AbortController())` aborted on every cleanup. What does `"b"` fetch do?
 
-Answer: Starts already aborted—`abort()` doesn’t reset. Create a new controller each setup.
+Answer: It starts already aborted, because an `AbortController` cannot be reset after `abort()`. Create a new controller inside each effect run.
 
 ### REACT-087 — A missing selection is cleared during render
 
@@ -955,7 +1131,11 @@ Answer: Starts already aborted—`abort()` doesn’t reset. Create a new control
 
 **Answer:**
 
-Effect runs after paint—user can see an invalid id. During render: if `selectedId` isn’t in `items`, `setSelectedId(null)`; React restarts before paint. Condition must become false next pass. Don’t store `items` in state.
+An effect runs after paint, so the user may briefly see a screen where the selected id points to an item that no longer exists.
+
+Instead, check during render. If `selectedId` is not in `items`, call `setSelectedId(null)` in the render body. React discards that render and restarts before painting, so the invalid state never appears.
+
+The condition must become false on the restarted render, or it will loop. Don't copy `items` into state to solve this.
 
 **Code:**
 
@@ -969,7 +1149,7 @@ if (selectedId !== null && !items.some((i) => i.id === selectedId)) {
 
 Product wants first remaining item when current disappears—without an effect?
 
-Answer: Compute `nextId`; if `nextId !== selectedId`, `setSelectedId(nextId)` during render.
+Answer: Compute the id of the next item during render. If it differs from `selectedId`, call `setSelectedId(nextId)` right there.
 
 ### REACT-088 — The total is derived during render
 
@@ -983,7 +1163,13 @@ Answer: Compute `nextId`; if `nextId !== selectedId`, `setSelectedId(nextId)` du
 
 **Answer:**
 
-Can paint `0` then the real sum after paint—stale every change. Compute `lines.reduce(...)` during render. Cache (`useMemo`) only if profiled expensive; a number doesn’t need identity stabilization. Don’t put pure sums in effects.
+The screen can paint `0`, or an old total, first, and then show the right sum after the effect runs. That makes the total one step behind on every change.
+
+A total is derived data, so compute it during render with `lines.reduce(...)`. It is always correct and needs no extra state.
+
+Only use `useMemo` if you have measured that the calculation is expensive. A plain number does not need a stable identity.
+
+Don't put pure calculations in effects.
 
 **Code:**
 
@@ -995,7 +1181,7 @@ const total = lines.reduce((sum, line) => sum + line.price, 0);
 
 User types a tip percent. What’s state?
 
-Answer: Tip percent is state. Merchandise total and payable amount are derived during render from `lines` and that percent.
+Answer: The tip percent is state. The merchandise total and the final amount are derived during render from `lines` and that percent.
 
 ### REACT-089 — Context consumers re-render without a selector
 
@@ -1009,13 +1195,17 @@ Provider value `{ user, notifications }` allocated each render. Notifications up
 
 **Answer:**
 
-It runs—context identity changed; `memo` doesn’t filter context. Inner `useMemo` only skips recomputing the string after the function already ran. Split contexts or use a store snapshot. React 18 `useContext` has no selector.
+Yes, `AccountName` runs. The provider's value is a new object, so every consumer is told to update. `memo` only compares props and cannot filter context changes.
+
+The inner `useMemo` only saves recomputing the name string, and that happens after the function has already run. It does not prevent the render.
+
+To avoid this, split the data into separate contexts, or use a store with a snapshot of just the name. React 18's `useContext` has no selector.
 
 **Follow-up:**
 
 Provider memoizes `{ user, notifications }` and notifications array is unchanged. Does AccountName run from context?
 
-Answer: No—same object identity. Still runs if its parent rendered it.
+Answer: No, because the value has the same identity, so the context doesn't notify. It can still run if its parent rendered it.
 
 ### REACT-090 — Hooks stay above any early return
 
@@ -1029,7 +1219,13 @@ First render has `user`; later `user={null}` returns before `useState`. What’s
 
 **Answer:**
 
-Hook count changes → React throws. Call hooks unconditionally before branches, or render a child that owns the hooks and omit the child when signed out. Hooks in event handlers have no dispatcher—illegal. Initializer doesn’t re-seed on later `user` while the parent stays mounted.
+The number of hooks changes between renders, so React throws an error.
+
+Call hooks unconditionally at the top, before any early return. Or move the hooks into a child component and only render that child when the user exists.
+
+Hooks cannot be called inside event handlers like `onEdit`, because React is not rendering at that point and cannot track them.
+
+Also, `useState(user)` only uses the first value. If `user` changes while the parent stays mounted, the state does not update.
 
 **Code:**
 
@@ -1042,7 +1238,7 @@ return <SignedInEditor user={user} />;
 
 `useDraft(user)` only in the signed-in branch—does the `use` name make it legal?
 
-Answer: No—still a conditional hook count. Call it every render or only inside the mounted child.
+Answer: No. The name does not change anything. A conditional call still changes the hook count. Call it on every render, or only inside the child that is mounted when signed in.
 
 ### REACT-091 — A custom hook does not share state across rows
 
@@ -1056,13 +1252,19 @@ Answer: No—still a conditional hook count. Call it every render or only inside
 
 **Answer:**
 
-Variable-length hook calls break order/count. Put `useToggle` in `TaskRow`; map renders rows. Each mounted row/component has its own slots—same hook function ≠ shared state. Module `let` is one mutable binding that doesn’t re-render anyone. Share via parent state/context/store only when the product needs it.
+Calling `useToggle` inside a `map` breaks the rules of hooks, because the number of hook calls depends on the length of the list.
+
+Move `useToggle` into a `TaskRow` component, and let the map render the rows. Each mounted row has its own state, even though the hook function is the same. Hooks share logic, not state.
+
+A module-level `let on` does not help. It is a single variable that React does not watch, so nothing re-renders when it changes.
+
+Share state through a parent, context, or a store only if the product needs it.
 
 **Follow-up:**
 
 Hook takes `task` and returns the same `on` across checklists. What React feature is that?
 
-Answer: None—you’re hiding a store/map + subscription (or shared context). Per-call `useState` stays separate.
+Answer: There is none. You would be building your own store or map with subscriptions, or using shared context. Plain `useState` inside the hook stays separate for each call.
 
 ### REACT-092 — Setters in one effect body commit together
 
@@ -1076,13 +1278,19 @@ On mount: sync `setCount`/`setReady` in the effect, then a `fetch` `then` with `
 
 **Answer:**
 
-Sync pair: one render (batched in effects since 17 too)—after the mount paint. Promise pair: one render on 18 `createRoot`; two on React 17 / legacy `ReactDOM.render`. Await/`flushSync` splits batches. Mount render itself doesn’t include effect updates.
+The two setters called directly in the effect are batched into one extra render, after the first paint. That was true in React 17 too.
+
+The two setters in the `fetch().then` callback run later. On React 18 with `createRoot`, they are batched into one render. On React 17 or legacy `ReactDOM.render`, each setter renders separately, so you get two.
+
+An `await` or `flushSync` splits batches.
+
+The mount render itself does not include the updates made in the effect.
 
 **Follow-up:**
 
 `then` does `setBoot`, `await log`, then `setReady`. How many renders on 18?
 
-Answer: Two—`await` starts a new task/batch. Keep setters on the same side of await when they should paint together.
+Answer: Two. The `await` makes the second setter run in a new task, so it is a new batch. Keep setters on the same side of an `await` if they should appear together.
 
 ### REACT-093 — useDeferredValue compares its argument with Object.is
 
@@ -1096,7 +1304,11 @@ Answer: Two—`await` starts a new task/batch. Keep setters on the same side of 
 
 **Answer:**
 
-Compares with `Object.is`. Fresh `{ text }` looks new even when the string didn’t—banner re-render schedules deferred work again. Pass `useDeferredValue(text)` (the primitive). Build objects in the child from the deferred string. Pending hint: `text !== deferredText` on strings.
+`useDeferredValue` compares the value you pass with `Object.is`. If you pass `{ text }`, that object is new on every render, so React thinks the value changed. Even a banner re-render with unchanged text schedules deferred work again.
+
+Pass the primitive instead: `useDeferredValue(text)`. A string is equal when it has the same content, so React only defers when it really changes.
+
+Let the slow child build any objects it needs from that deferred string. To show a pending hint, compare `text !== deferredText`.
 
 **Code:**
 
@@ -1109,7 +1321,7 @@ return <SlowList text={deferredText} />;
 
 Parent does `useDeferredValue(items.filter(...))` every render. Banner re-render—what reaches the child?
 
-Answer: A new array → deferral sees a change. Defer the text; filter from the deferred string.
+Answer: A new array every time, so the deferral sees a change. Defer the text, and filter from the deferred string.
 
 ### REACT-094 — getSnapshot returns a cached snapshot
 
@@ -1123,7 +1335,11 @@ Answer: A new array → deferral sees a change. Defer the text; filter from the 
 
 **Answer:**
 
-New object every read → React thinks the store always changed (warn/loop). Return a boolean or a cached object until the value changes. Store hook reads during render for concurrent consistency; effects subscribe after paint and can tear. Pass `getServerSnapshot` for SSR/hydration.
+`useSyncExternalStore` calls `getSnapshot` several times and compares results with `Object.is`. If it returns a new object every time, React believes the store always changed, which causes warnings and render loops. Return a boolean, or a cached object that only changes when the value does.
+
+Subscribing in `useEffect` happens after paint, and during concurrent rendering components can read different values, which is called tearing. `useSyncExternalStore` reads during render to keep them consistent.
+
+For server rendering and hydration, pass `getServerSnapshot`.
 
 **Code:**
 
@@ -1137,7 +1353,7 @@ return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
 Cached object mutated in place (`snapshot.online = ...`) then notify. What does the next render see?
 
-Answer: Same reference → may skip update while data changed. Allocate a new object when the value changes.
+Answer: The same reference, so React may skip the update even though the data changed. Create a new object whenever the value changes.
 
 ### REACT-095 — startTransition does not follow an await
 
@@ -1151,7 +1367,13 @@ Answer: Same reference → may skip update while data changed. Allocate a new ob
 
 **Answer:**
 
-Only sync updates inside the callback are transitions—`setQuery` is; after `await`, `setRows` is urgent. `isPending` tracks unfinished transition renders, not network time—can go false while search still runs. Use status state for a request spinner; wrap `setRows` in another `startTransition` after await if the list render should be interruptible. Set urgent query outside the transition if the input must update immediately.
+Only state updates made synchronously inside the callback are part of the transition. `setQuery` is. After the `await`, `setRows` runs outside the callback, so it is a normal urgent update.
+
+`isPending` only tracks the transition render, not network time, so it can become false while the search is still running.
+
+For a loading spinner, use a separate status state. If the list update should be interruptible, wrap `setRows` in another `startTransition` after the await.
+
+If the input must respond immediately, set the query outside the transition.
 
 **Code:**
 
@@ -1167,7 +1389,7 @@ setStatus("ready");
 
 `setStatus("ready")` urgent, `setRows` in transition, slow list—what can the user see?
 
-Answer: Ready while previous rows still show until the transition commits. Put status with `setRows` in the same transition when that pairing matters.
+Answer: The status says "ready" while the previous rows are still showing, until the transition commits. If those should change together, put both updates in the same transition.
 
 ### REACT-096 — The reducer init function runs when the slot is created
 
@@ -1181,13 +1403,19 @@ Answer: Ready while previous rows still show until the transition commits. Put s
 
 **Answer:**
 
-Still `"a"`—`init` only on create; no dispatch → reducer doesn’t run; draft untouched. Reset with `key={userId}` (new slot) or a during-render `reset` dispatch comparing prop to `state.userId`. Effect reset paints the old draft first. Strict Mode may double-call `init` on mount only.
+`state.userId` is still `"a"`. The `init` function runs only when the state is first created. A prop change does not run the reducer unless you dispatch, and it does not reset the draft either.
+
+To reset, use `key={userId}`, which creates a fresh state slot. Or dispatch a `reset` during render when the prop differs from `state.userId`.
+
+Resetting in an effect is worse, because the old draft is painted first.
+
+In Strict Mode, React may call `init` twice, but only on mount.
 
 **Follow-up:**
 
 `init` reads `localStorage` for that userId. Strict Mode vs later `userId` change?
 
-Answer: Strict Mode double-calls on mount—must be pure reads. Later prop change does not call `init`; restore via reset/key remount.
+Answer: Strict Mode calls it twice on mount, so it must be a pure read. A later `userId` change does not call `init`. Use a reset or a key remount to load the new user's data.
 
 ### REACT-097 — Two useState calls in one component share its render
 
@@ -1201,13 +1429,19 @@ One component holds rare `theme` and high-frequency `cursor` in one reducer. Tea
 
 **Answer:**
 
-Any state update re-renders that component—splitting hooks isn’t a boundary. Move `cursor` into a child that owns it (or `memo` a theme child with a stable theme prop if the parent must keep cursor). Don’t pass the whole reducer state object into a memoized label.
+Splitting into two `useState` calls does not help. Any state update re-renders the whole component that owns it, and its children with it.
+
+What separates renders is component boundaries. Move `cursor` into a child component that owns it, so cursor updates don't touch the theme label.
+
+If the parent must hold the cursor, make the theme label a `memo` child with a stable theme prop.
+
+Don't pass the whole reducer state object into a memoized label, because it would change on every update.
 
 **Follow-up:**
 
 `Frame` must read `cursor` to disable a button. Where does cursor go?
 
-Answer: Lifts to `Frame`; Decoration takes it as a prop. Theme label then needs `memo`/context/`children` so it isn’t forced by cursor updates.
+Answer: Move it up to `Frame` and pass it to `Decoration` as a prop. Then keep the theme label from re-rendering using `memo`, context, or by passing it as `children`.
 
 ### REACT-098 — useInsertionEffect runs before layout effects
 
@@ -1221,7 +1455,11 @@ CSS-in-JS must inject rules before a product `useLayoutEffect` measures. Why `us
 
 **Answer:**
 
-Runs synchronously before any layout effect so measurements see the new CSS. Passive is after paint (wrong styles). Same-phase layout effects can run before your insertion depending on tree order. Forbidden: scheduling updates / using it for fetch or subscriptions. Doesn’t run on the server—libraries collect styles during SSR separately.
+`useInsertionEffect` is made for CSS-in-JS libraries. It runs synchronously before any layout effect, so when a layout effect measures the DOM, the new CSS rules are already there.
+
+A passive effect would be too late, because it runs after paint and the styles would be wrong at first. A layout effect might run before your style insertion, depending on the order in the tree.
+
+You should not schedule state updates in it, and you should not use it for fetching or subscriptions. It does not run on the server, so libraries collect styles separately during server rendering.
 
 **Code:**
 
@@ -1238,7 +1476,7 @@ useInsertionEffect(() => {
 
 `rules` is a new string every render though declarations didn’t change. What happens?
 
-Answer: Remove/insert style every commit. Memoize the rule string when content is unchanged.
+Answer: The style element is removed and inserted again on every commit. Memoize the rule string so it only changes when its content changes.
 
 ### REACT-099 — A hook around useContext does not select
 
@@ -1252,13 +1490,17 @@ Answer: Remove/insert style every commit. Memoize the rule string when content i
 
 **Answer:**
 
-Both render—custom hooks don’t intercept subscriptions; each caller is a full-value consumer. Returning the name filters JS, not updates. Real select: split context, or `useSyncExternalStore` whose snapshot is the cached name string.
+Both Header and Sidebar re-render. A custom hook is just a function. It cannot change how `useContext` subscribes, so each caller is still a consumer of the whole context value.
+
+Returning only the name filters what the component reads, but it does not stop the update.
+
+A real selector would need a different design: split the data into separate contexts, or use `useSyncExternalStore` with a snapshot that is only the name string, cached so it stays equal when the name is unchanged.
 
 **Follow-up:**
 
 Hook also `useState`s the last name and effects copy from context. Does Header skip notification updates?
 
-Answer: No—context still renders Header; effect may bail the state update after the fact. Split/subscribe to a name snapshot.
+Answer: No. The context change still re-renders Header. The effect might skip the state update afterward, but the render already happened. Split the context or subscribe to a name snapshot.
 
 ### REACT-100 — A null draft leaves the prop on screen
 
@@ -1272,7 +1514,9 @@ Show `email` until the user types; later props should appear while untouched; ke
 
 **Answer:**
 
-Initializer ignores later props; effect overwrites typed drafts after paint and can’t distinguish “typed same as prop” from “untouched.” Store `string | null`; `null` = no override; display `draft ?? email`. `onChange` stores the string (even if equal to email). Reset sets `null`.
+`useState(email)` only reads the prop once, so later props are ignored. Adding an effect to sync it overwrites what the user typed, after paint, and can't tell the difference between "typed the same as the prop" and "never typed."
+
+Use `string | null` for the draft. `null` means "no override," and the input shows `draft ?? email`. When the user types, `onChange` stores the string, even if it equals the email. Reset by setting it back to `null`.
 
 **Code:**
 
@@ -1285,4 +1529,4 @@ const value = draft ?? email;
 
 `userId` changes while `draft` is `"hello"`. What shows, and how reset for a new entity?
 
-Answer: Still `"hello"` over the new email. Remount with `key={userId}`, or set `draft` to `null` during render when the id changes.
+Answer: It still shows `"hello"` over the new user's email. Remount with `key={userId}`, or set `draft` to `null` during render when the id changes.

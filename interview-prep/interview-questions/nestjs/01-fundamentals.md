@@ -17,17 +17,17 @@ A Nest 10 process calls `NestFactory.create(AppModule)` then `app.listen(3000)` 
 
 **Answer:**
 
-`create()` builds the DI container, scans the module graph from `AppModule`, and constructs providers. Constructor injection is done; `app.get()` works. Lifecycle hooks have not run, routes are unbound, and the port is closed. `listen()` sees `isInitialized === false`, awaits `init()` (options, adapter, middleware, route binding, `onModuleInit`, exception handlers, `onApplicationBootstrap`), then binds the TCP port. Decorators only wrote metadata at class evaluation; the scanner and route resolver turn that into a server.
+When `create()` resolves, Nest has built the dependency injection container, scanned the module graph starting from `AppModule`, and constructed every provider. So constructor injection is done and `app.get()` already works. What has not happened yet is initialization: lifecycle hooks have not run, routes are not bound, and the port is closed. When you call `listen()`, Nest sees the app is not initialized, awaits `init()`, which sets up middleware, binds routes, and runs `onModuleInit` and `onApplicationBootstrap`, and only then opens the TCP port.
 
 **Trade-offs:**
 
-Call `app.init()` yourself when something must see a fully initialized graph before the port opens; `listen()` then skips a second init. Use `createApplicationContext()` when you need the container without HTTP (NEST-019).
+Call `app.init()` yourself when something needs a fully initialized app before the port opens; `listen()` then skips a second init. Use `createApplicationContext()` when you need the container without HTTP (see NEST-019).
 
 **Follow-up:**
 
-If a provider constructor throws during `NestFactory.create()`, what does the default `abortOnError` path do?
+If a provider constructor throws during `NestFactory.create()`, what does the default `abortOnError` setting do?
 
-Answer: With `abortOnError: true` (default), the init error handler calls `process.abort()`. The `create()` promise is not the failure channel. Pass `{ abortOnError: false }` so tests or a supervisor get a thrown error instead of `SIGABRT`.
+Answer: With `abortOnError: true`, which is the default, Nest calls `process.abort()` on the startup error, so the `create()` promise is not where the failure shows up. Pass `{ abortOnError: false }` so tests or a supervisor get a thrown error instead of a `SIGABRT`.
 
 ### NEST-002 — The four @Module arrays
 
@@ -41,7 +41,7 @@ In NestJS 10, `@Module()` takes `imports`, `controllers`, `providers`, and `expo
 
 **Answer:**
 
-`imports` lists modules whose exports become visible here and pulls those modules into the graph. `controllers` lists classes whose route metadata is bound in this module. `providers` registers this module's injectables (a class is `{ provide: Class, useClass: Class }`), visible only inside the module. `exports` is the public surface: a provided or imported token, or a re-exported module. Encapsulation is `providers` creates the instance; `exports` grants other modules the right to inject it.
+The four arrays describe what a module owns and what it shares. `imports` lists other modules whose exported providers this module can use. `controllers` lists the classes whose routes are registered for this module. `providers` lists the injectable classes and values the module creates, and they are private to the module by default. `exports` is the public surface: only tokens listed there, or modules re-exported there, can be injected by modules that import this one. So `exports` is the array that crosses a module boundary.
 
 **Code:**
 
@@ -57,13 +57,13 @@ export class OrdersModule {}
 
 **Trade-offs:**
 
-Wide exports ease reuse but widen the contract. Narrow exports keep the module replaceable. Re-exporting an imported module fits a composition root better than a feature module.
+Wide exports make reuse easy but widen the contract other modules depend on. Narrow exports keep the module easy to replace. Re-exporting an imported module suits a composition-root module better than an ordinary feature module.
 
 **Follow-up:**
 
 Can `exports` name a provider the module neither provides nor imports?
 
-Answer: No. Nest rejects that export while building the module. The token must already be in this module's context via `providers` or `imports`.
+Answer: No. Nest rejects the export while building the module, because the token must already be available in that module, either through its own `providers` or through an import.
 
 ### NEST-003 — Why a class must be registered
 
@@ -77,7 +77,7 @@ Answer: No. Nest rejects that export while building the module. The token must a
 
 **Answer:**
 
-`@Injectable()` triggers `design:paramtypes` emit; the file import gives the controller a runtime token. Neither registers the class in the container. Registration is a `providers` entry (or an export from an imported module). The instance loader looks up `OrdersService` in the controller's module context; a miss fails startup. Discovery of every `@Injectable()` file would erase ownership, export boundaries, and test doubles.
+Importing the file and adding `@Injectable()` are not the same as registering the class. The import only gives the controller a runtime class reference to use as a token, and `@Injectable()` only makes TypeScript emit the constructor parameter types. The container learns about a class only when it appears in a `providers` array, or when an imported module exports it. When the controller asks for `OrdersService`, Nest looks in that module's context, finds nothing, and fails at startup. Automatic discovery of every injectable file would erase module ownership, export boundaries, and easy test doubles.
 
 **Code:**
 
@@ -91,13 +91,13 @@ export class OrdersModule {}
 
 **Trade-offs:**
 
-`@Optional()` injects `undefined` on a miss—useful for plugins, not for a required service. `new OrdersService()` leaves the container: no further DI and no lifecycle hooks.
+`@Optional()` would inject `undefined` instead of failing, which suits plugins but not a required service. Calling `new OrdersService()` yourself bypasses the container, so you lose injection and lifecycle hooks.
 
 **Follow-up:**
 
 The class is listed in `providers` and the controller still fails. What do you check next?
 
-Answer: Confirm the controller's module provides the class or imports a module that exports it. Confirm a runtime value import (not `import type`) and that `reflect-metadata` loaded before the module was evaluated—import `NestFactory` before `AppModule`.
+Answer: Check that the controller's module provides the class, or imports a module that exports it. Also make sure the import is a real value import, not `import type`, and that `reflect-metadata` loads before the modules are evaluated, for example by importing `NestFactory` before `AppModule`.
 
 ### NEST-004 — How constructor injection chooses a token
 
@@ -111,7 +111,7 @@ With Nest 10's legacy decorator emit (`experimentalDecorators` + `emitDecoratorM
 
 **Answer:**
 
-A decorated class emits `design:paramtypes`: runtime values Nest treats as tokens (the class constructor for a class parameter). Lookup is local providers, then imported exports. The parameter name is irrelevant. `@Injectable()` / `@Controller()` drive that emit; a plain class often has none. `@Inject(Token)` stores an explicit Nest token and wins—required for strings/symbols and interfaces (interfaces erase to `Object`). Factories use an `inject` array, not `design:paramtypes`.
+For a decorated class, TypeScript emits a `design:paramtypes` list, and Nest reads that list as the injection tokens. So a parameter typed as a class uses that class as its token. Nest looks in the module's own providers first, then in the exports of imported modules. The parameter name does not matter. Use `@Inject(Token)` when there is no usable runtime type: string or symbol tokens, and interfaces, which erase to `Object`. An explicit `@Inject()` always wins over the emitted type. Factory providers do not use this metadata; they list their dependencies in `inject`.
 
 **Code:**
 
@@ -125,13 +125,13 @@ constructor(
 
 **Trade-offs:**
 
-Type-based injection is short but breaks on `import type`, interfaces, unions, or missing decorator metadata. Explicit `@Inject()` survives those cases. Plain JS uses `@Dependencies(...)`.
+Type-based injection is short, but it breaks with `import type`, interfaces, unions, or missing decorator metadata. An explicit `@Inject()` works in all of those cases. Plain JavaScript projects use `@Dependencies(...)` instead.
 
 **Follow-up:**
 
 Both `OrdersService` and `{ provide: OrdersService, useClass: CachedOrdersService }` exist. Which class is constructed?
 
-Answer: The constructor token is `OrdersService`. The registration's `useClass` is `CachedOrdersService`, so that class is constructed. The TypeScript type is a compile-time claim; runtime is the token binding.
+Answer: `CachedOrdersService` is constructed. The constructor asks for the token `OrdersService`, and the registration binds that token to `useClass: CachedOrdersService`. The TypeScript type is only a compile-time label; what runs is the token binding.
 
 ### NEST-005 — What the default scope actually guarantees
 
@@ -145,17 +145,17 @@ Nest's default provider scope is singleton (`Scope.DEFAULT`). For one `providers
 
 **Answer:**
 
-One registration yields one eagerly constructed instance during `create()`, cached and returned to every legal injector of that token until the container closes—even with no HTTP traffic. "Singleton" means one instance per registration, not one per realm across duplicate registrations, and not per request. A second `providers: [OrdersService]` elsewhere is a second registration; sharing requires one provide/export and imports. `REQUEST` and `TRANSIENT` change instance count and are covered later.
+The default scope means one instance per registration. Nest builds it during `create()`, even if no HTTP request ever arrives, caches it, and gives that same object to every injector that can see the token until the container closes. Singleton here does not mean one per application, and it does not mean one per request. A second `providers: [OrdersService]` in another module is a separate registration with its own instance, so sharing requires one module that provides and exports it. `REQUEST` and `TRANSIENT` scopes change this and are covered later.
 
 **Trade-offs:**
 
-Eager singletons pay construction at startup and share mutable state with every caller—right for shared clients, wrong for per-request data. Prefer method arguments over stuffing request data into default-scope fields.
+Eager singletons pay their construction cost at startup and share mutable state with every caller. That is right for shared clients and wrong for per-request data, which is better passed as method arguments.
 
 **Follow-up:**
 
-Two controllers in different modules inject `OrdersService`. When same object vs two?
+Two controllers in different modules inject `OrdersService`. When do they get the same object, and when two?
 
-Answer: Same object when both reach one registration (one module provides/exports; the other imports it). Two objects when each module lists `OrdersService` in its own `providers`. Default scope does not deduplicate.
+Answer: They get the same object when both modules reach one registration, meaning one module provides and exports it and the other imports it. They get two objects when each module lists `OrdersService` in its own `providers`, because the default scope does not deduplicate.
 
 ### NEST-006 — What belongs on a controller, and what belongs on a service
 
@@ -169,7 +169,7 @@ Someone puts order-total calculation, a database call, and response-header logic
 
 **Answer:**
 
-A controller is the HTTP adapter: route metadata is bound during `init()`, params come from decorators, and the return value is serialized (unless `@Res()` takes over). A service is a container provider with no routes—the place for calculation and persistence. The controller should translate HTTP ↔ service. Nest does not enforce the split; a fat controller still binds. The cost appears when a non-HTTP caller needs the same rule: controllers are tied to the HTTP pipeline; services inject cleanly into an application context.
+A controller is the HTTP adapter. Nest binds its route metadata during `init()`, reads parameters through decorators, and serializes the return value unless you take over with `@Res()`. A service is an ordinary provider with no routes, so it is the right home for calculations and database access. The controller should translate between HTTP and the service. Nest does not enforce this split, so a fat controller still works. The cost shows up when a job or CLI command needs the same rule: controllers are tied to HTTP, while services can be injected anywhere.
 
 **Code:**
 
@@ -182,13 +182,13 @@ create(@Body() body: CreateOrderDto) {
 
 **Trade-offs:**
 
-Logic in the controller is fewer classes but unusable from CLI/jobs without HTTP. Throwing `HttpException` from the service couples domain to HTTP types—prefer domain results and map status at the boundary.
+Keeping logic in the controller means fewer classes, but a CLI or background job cannot reuse it without HTTP. Throwing `HttpException` from a service also ties domain code to HTTP; prefer returning domain results and mapping them to a status at the boundary.
 
 **Follow-up:**
 
 The service needs the authenticated user id. Where is that value read?
 
-Answer: At the HTTP boundary: a param decorator or guard produces the id; the controller passes it as an argument. The service stays a function of its arguments and injected providers.
+Answer: At the HTTP boundary. A param decorator or guard produces the id, and the controller passes it to the service as an argument. The service then depends only on its arguments and its injected providers.
 
 ### NEST-007 — Decorators are metadata, not the behavior
 
@@ -202,7 +202,7 @@ Answer: At the HTTP boundary: a param decorator or guard produces the id; the co
 
 **Answer:**
 
-Decorators run at file evaluation and only write `reflect-metadata`. `@Module` / `@Controller` / `@Get` store module and route metadata; `@Injectable()` marks the provider and drives `design:paramtypes`. `@Roles` is `SetMetadata(ROLES_KEY, ...)`. None open ports or check roles. The scanner and route resolver read framework metadata during `create()`/`init()`. Application metadata matters only when something (e.g. a guard via `Reflector`) reads it—without a reader, `@Roles` is inert.
+Decorators run when the file is evaluated, and all they do is write metadata with `reflect-metadata`. `@Module`, `@Controller`, and `@Get` store module and route information. `@Injectable()` marks a provider and lets TypeScript emit constructor types. `@Roles('admin')`, built with `SetMetadata`, just stores a value under a key. None of them open ports or check roles. Nest's scanner and route resolver read the framework metadata during `create()` and `init()`. Your own metadata does something only when a reader, such as a guard using `Reflector`, looks it up; otherwise `@Roles` is inert.
 
 **Code:**
 
@@ -213,13 +213,13 @@ export const Roles = (...roles: string[]) => SetMetadata(ROLES_KEY, roles);
 
 **Trade-offs:**
 
-Metadata keeps cross-cutting marks next to handlers but is easy to assume "works" because the annotation is present. Use decorators when a shared reader must discover the mark; use ordinary code for local behavior.
+Metadata keeps cross-cutting marks next to the handler, but it is easy to assume the annotation alone enforces something. Use a decorator when a shared reader will discover the mark, and plain code for behavior that is local.
 
 **Follow-up:**
 
 How do you confirm `@Roles()` is recorded without an HTTP request?
 
-Answer: Read with `Reflector` or `Reflect.getMetadata(ROLES_KEY, …)` in a unit test after `reflect-metadata` loads. A recorded decorator without a guard is still a product bug—different from "wrote nothing."
+Answer: In a unit test, read it with `Reflector` or `Reflect.getMetadata(ROLES_KEY, ...)` after `reflect-metadata` has loaded. Remember that metadata which is recorded but never read by a guard is still a product bug; it is just a different problem from metadata that was never written.
 
 ### NEST-008 — onModuleInit versus onApplicationBootstrap
 
@@ -233,17 +233,17 @@ Answer: Read with `Reflector` or `Reflect.getMetadata(ROLES_KEY, …)` in a unit
 
 **Answer:**
 
-`onModuleInit` runs during `init()` after the host module's deps resolve; Nest awaits promises. Walk is by import distance (dependents after dependencies; root last). Use it on `OrdersService` to open its client—imported modules' `onModuleInit` finished; sibling modules may not have. `onApplicationBootstrap` is a second pass after every `onModuleInit`; put the scheduler there for "all features ready." Port is still closed. Hooks are detected by method presence; interfaces are TypeScript-only. `NestModule.configure()` registers middleware earlier and is not "module ready."
+`onModuleInit` runs during `init()` once the module's dependencies are resolved, and Nest awaits any promise it returns. Modules are visited so that dependencies initialize before their dependents, with the root last. So open the client in `OrdersService.onModuleInit`: imported modules have finished theirs, though sibling modules may not have. `onApplicationBootstrap` is a second pass that starts after every `onModuleInit` has finished, so the scheduler belongs there. The port is still closed in both. Nest detects hooks by method name; the interfaces are TypeScript only.
 
 **Trade-offs:**
 
-`onModuleInit` keeps setup with the owning module. `onApplicationBootstrap` is the graph-ready gate but becomes hidden coupling if everything dumps there. Post-accept work belongs after `listen()` resolves.
+`onModuleInit` keeps setup next to the module that owns it. `onApplicationBootstrap` is the gate for when the whole graph is ready, but it can become hidden coupling if everything is dumped there. Work that should start after connections are accepted belongs after `listen()` resolves.
 
 **Follow-up:**
 
 Your `onModuleInit` promise rejects. Does `listen()` bind the port?
 
-Answer: No. Nest awaits the hook; rejection fails `init()`, so `listen()` rejects before bind. The port is not left half-open.
+Answer: No. Nest awaits the hook, so the rejection fails `init()`, and `listen()` rejects before it binds. The port is never left half-open.
 
 ### NEST-009 — Shutdown hooks and enableShutdownHooks()
 
@@ -257,17 +257,17 @@ The process receives `SIGTERM`. `OrdersService` must stop taking work and close 
 
 **Answer:**
 
-Call `app.enableShutdownHooks()` so Nest listens for process signals (off by default). Shutdown order is `onModuleDestroy`, then `beforeApplicationShutdown(signal)`, then adapter disposal, then `onApplicationShutdown(signal)`—promises awaited. `app.close()` always runs that sequence without exiting the process. On a signal after hooks are enabled, Nest runs the same phases, then re-sends the signal so the process can terminate. Without `enableShutdownHooks()`, signals do not drive Nest lifecycle hooks.
+Call `app.enableShutdownHooks()` at bootstrap. It is off by default, and without it Nest does not react to process signals. Shutdown then runs in order: `onModuleDestroy`, `beforeApplicationShutdown(signal)`, closing the HTTP adapter, and finally `onApplicationShutdown(signal)`, with promises awaited. Calling `app.close()` runs the same sequence but does not exit the process. When a signal arrives and hooks are enabled, Nest runs those phases and then re-sends the signal so the process can end. A bare signal handler would skip all of these hooks.
 
 **Trade-offs:**
 
-Hooks give orderly teardown; a hanging hook blocks exit—use supervisor timeouts. Several Nest apps in one process can trip Node's listener warning if each enables hooks.
+Hooks give orderly teardown, but a hook that hangs blocks exit, so pair them with supervisor timeouts. Several Nest apps in one process can trigger Node's listener warning if each one enables hooks.
 
 **Follow-up:**
 
-Where do you close a connection pool if in-flight HTTP handlers must finish queries first?
+Where do you close a connection pool if in-flight HTTP handlers must finish their queries first?
 
-Answer: Close it in `onApplicationShutdown`, after adapter disposal between `beforeApplicationShutdown` and `onApplicationShutdown`. Stop intake earlier (`onModuleDestroy` or `beforeApplicationShutdown`).
+Answer: In `onApplicationShutdown`, because it runs after the HTTP adapter has been closed. Stop taking new work earlier, in `onModuleDestroy` or `beforeApplicationShutdown`.
 
 ### NEST-010 — Why a global module hides a dependency
 
@@ -281,17 +281,17 @@ Answer: Close it in `onApplicationShutdown`, after adapter disposal between `bef
 
 **Answer:**
 
-`@Global()` makes the module's exports visible to every module without each importing it. Injection still uses the same container; only the import requirement is waived. What disappears from feature `imports` arrays is the explicit edge: readers of the module graph cannot see that features depend on `ConfigService`. Startup still fails if the global was never imported at the root. Globals are a convenience, not a second container.
+`@Global()` makes a module's exports visible to every module without each one importing it. The container is the same; only the requirement to list the module in `imports` is waived. The module must still be imported once, usually at the root, or startup fails. What gets hidden is the dependency edge: when you read a feature module's `imports`, you cannot tell that it relies on `ConfigService`. So a global module is a convenience for the import list, not a second container, and it makes the dependency graph harder to read.
 
 **Trade-offs:**
 
-Globals reduce boilerplate for ubiquitous services (config, logging) and hide the dependency graph. Prefer explicit imports for feature-to-feature coupling; reserve `@Global()` for true cross-cutting kernels.
+Globals reduce boilerplate for services used everywhere, like config and logging, but they hide the dependency graph. Prefer explicit imports for coupling between features, and keep `@Global()` for true cross-cutting infrastructure.
 
 **Follow-up:**
 
 A feature provides its own `ConfigService` while a global one exists. Which wins?
 
-Answer: The local registration in that module's context wins for injectors in that module. Global visibility does not override a local provider of the same token.
+Answer: The local registration wins for injectors inside that module. Global visibility does not override a provider of the same token that the module declares itself.
 
 ### NEST-011 — Circular module imports
 
@@ -305,7 +305,7 @@ Answer: The local registration in that module's context wins for injectors in th
 
 **Answer:**
 
-Two cycles exist: ES module evaluation (one file gets `undefined` for the other class) and Nest's module graph. Wrap the import with `forwardRef(() => OtherModule)` (and often `forwardRef` on the provider side too) so Nest delays resolving the token until both classes exist. That fixes bootstrap; it does not fix the design—bidirectional module coupling still means unclear ownership. Prefer extracting a shared module or inverting one dependency.
+There are two separate cycles. One is at the JavaScript level: when two files import each other, one of them sees `undefined` instead of the class. The other is in Nest's module graph. Wrapping the import as `forwardRef(() => OtherModule)` delays reading the class until both exist, and you often need it on both sides, including on providers. That fixes bootstrap but not the design: two modules that depend on each other still have unclear ownership. A better fix is to extract a shared module or invert one dependency.
 
 **Code:**
 
@@ -318,13 +318,13 @@ export class OrdersModule {}
 
 **Trade-offs:**
 
-`forwardRef` unblocks boot; extracting a third module or events/API boundary removes the cycle. Prefer fixing the graph over proliferating `forwardRef`.
+`forwardRef` gets the app booting, while extracting a third module or using an event or API boundary removes the cycle itself. Prefer fixing the graph over adding more `forwardRef` calls.
 
 **Follow-up:**
 
 Is `forwardRef` on modules enough when services also inject each other?
 
-Answer: No. Provider constructors need `forwardRef(() => OtherService)` with `@Inject` as well, or the injector still sees an unresolved circular provider dependency.
+Answer: No. The service constructors also need `@Inject(forwardRef(() => OtherService))`. Otherwise the injector still sees an unresolved circular provider dependency.
 
 ### NEST-012 — A file on disk is not in the application
 
@@ -338,13 +338,13 @@ Answer: No. Provider constructors need `forwardRef(() => OtherService)` with `@I
 
 **Answer:**
 
-Nest only loads modules reachable from the root via `imports`. A file on disk is irrelevant until some loaded module imports it. `ShippingModule` was never imported, so its controllers were never scanned or bound—hence 404, not a Nest "unknown module" for an unused file. Add `ShippingModule` to `AppModule` (or another loaded module's) `imports`.
+Nest only loads modules that are reachable from the root module through `imports`. A file sitting on disk does nothing until some loaded module imports it. Since nothing imports `ShippingModule`, Nest never scans its controller or binds its routes, so `GET /shipping` returns 404. Nest does not complain about the unused file because it never looks at it. The fix is to add `ShippingModule` to the `imports` of `AppModule`, or of another module that is already loaded.
 
 **Follow-up:**
 
 The module is imported but the route still 404s. What next?
 
-Answer: Confirm the controller is in that module's `controllers` array (not only `providers`), the path metadata matches, and no global prefix/versioning changed the URL.
+Answer: Check that the controller is listed in that module's `controllers` array, not only in `providers`. Then check that the path in the decorators is what you expect, and that a global prefix or versioning has not changed the URL.
 
 ### NEST-013 — Sharing one instance across modules
 
@@ -358,7 +358,7 @@ Answer: Confirm the controller is in that module's `controllers` array (not only
 
 **Answer:**
 
-Provide `TaxService` once in a dedicated module (e.g. `TaxModule`), export it, and import `TaxModule` from both features. Default scope then yields one instance for that registration. Do not list `TaxService` in both features' `providers`—that creates two registrations and two instances. `@Global()` on `TaxModule` can omit repeated imports but still must be imported once at the root.
+Register `TaxService` once, in a dedicated module such as `TaxModule`, and export it. Then import `TaxModule` from both `OrdersModule` and `BillingModule`. With the default scope, one registration produces one instance, so both features share the same cache and config. Do not list `TaxService` in both features' `providers`, because that creates two registrations and two instances. You can mark `TaxModule` as `@Global()` to skip repeated imports, but it still has to be imported once at the root.
 
 **Code:**
 
@@ -369,13 +369,13 @@ export class TaxModule {}
 
 **Trade-offs:**
 
-A shared module makes ownership clear. Duplicating providers "for convenience" silently forks state. Globals hide the import edge.
+A shared module makes ownership clear. Duplicating providers for convenience quietly splits state into separate copies. Globals hide the import edge.
 
 **Follow-up:**
 
 Both modules already provide `TaxService` locally. How do you merge to one instance without breaking injectors?
 
-Answer: Remove local `providers` entries, export from one module, import that module (or re-export) everywhere that injects the token.
+Answer: Remove the local `providers` entries, provide and export the class from one module, and import that module, or a module that re-exports it, wherever the token is injected.
 
 ### NEST-014 — useClass, useValue, useFactory, and useExisting
 
@@ -389,7 +389,7 @@ When do you write `useClass`, `useValue`, `useFactory`, and `useExisting` instea
 
 **Answer:**
 
-`useClass` binds a token to a different constructible class. `useValue` binds a ready instance/constant (no construction). `useFactory` runs a function (sync/async) whose `inject` array supplies args—best for conditional wiring. `useExisting` aliases a token to another already-registered token (same instance). Shorthand `providers: [TaxService]` is only `provide`+`useClass` of the same class.
+All four tell Nest what a token should resolve to. `useClass` binds a token to a class that Nest will construct, often a different implementation. `useValue` binds a ready-made value, such as a constant or a mock; Nest does not construct it. `useFactory` runs a function, sync or async, and passes it the providers listed in `inject`, which is good for conditional wiring. `useExisting` makes an alias that resolves to an already registered provider's instance. The shorthand `providers: [TaxService]` is just `provide` and `useClass` with the same class.
 
 **Code:**
 
@@ -402,13 +402,13 @@ When do you write `useClass`, `useValue`, `useFactory`, and `useExisting` instea
 
 **Trade-offs:**
 
-`useValue` is simplest but starts work at module evaluation if you pass a live Promise/IO. Factories delay until instantiation and can be async. Aliases avoid duplicate instances.
+`useValue` is the simplest, but if you pass something that already started I/O, that work begins when the module is evaluated. Factories wait until Nest instantiates them and can be async. Aliases avoid creating duplicate instances.
 
 **Follow-up:**
 
 Does `useExisting` create a second object?
 
-Answer: No. It publishes another token that resolves to the existing provider's instance.
+Answer: No. It adds another token that resolves to the existing provider's instance.
 
 ### NEST-015 — Interfaces, abstract classes, and tokens
 
@@ -422,7 +422,7 @@ Answer: No. It publishes another token that resolves to the existing provider's 
 
 **Answer:**
 
-Interfaces erase at compile time—no runtime value for `design:paramtypes` (often `Object`). Use a string/symbol/class token: `@Inject(LOGGER)` with `{ provide: LOGGER, useClass: ConsoleLogger }`. Abstract classes exist at runtime and can be tokens, but interfaces cannot. The service depends on the token; tests rebind the same token to a fake.
+TypeScript interfaces are erased at compile time, so at runtime there is nothing for Nest to use as a token; the emitted parameter type is usually just `Object`. Instead, define a token that exists at runtime, such as a string, a symbol, or an abstract class. For example, register `{ provide: LOGGER, useClass: ConsoleLogger }` and inject it with `@Inject(LOGGER)`. The service depends on the token, and a test rebinds the same token to a fake. Abstract classes work as tokens because they exist at runtime, but interfaces never can.
 
 **Code:**
 
@@ -433,13 +433,13 @@ constructor(@Inject(LOGGER) private readonly log: LoggerPort) {}
 
 **Trade-offs:**
 
-Symbol/string tokens decouple from implementations. Abstract-class tokens give type+runtime value but couple to a class hierarchy.
+Symbol or string tokens decouple the consumer from any implementation. Abstract-class tokens give you both a type and a runtime value, but they tie you to a class hierarchy.
 
 **Follow-up:**
 
 What goes wrong if you type the param as `LoggerPort` without `@Inject`?
 
-Answer: Emitted metadata is useless (`Object`/empty). Nest cannot resolve the intended provider; startup fails or injects the wrong thing.
+Answer: The emitted metadata is useless, usually `Object`, so Nest cannot find the provider you intended. Startup fails or the wrong thing is injected.
 
 ### NEST-016 — What a dynamic module returns
 
@@ -453,7 +453,7 @@ Answer: Emitted metadata is useless (`Object`/empty). Nest cannot resolve the in
 
 **Answer:**
 
-`forRoot` returns a dynamic module object: `{ module: FeatureFlagsModule, providers, exports, imports? }`. Nest merges that with the class's `@Module()` metadata for this import edge. Providers registered only in the dynamic object are what callers get. The class must still be a module Nest can load; exporting the tokens you need remains required for other modules to inject them.
+`forRoot` returns a plain object that describes a dynamic module: a `module` property pointing at the class, plus optional `providers`, `exports`, and `imports`. For that particular import, Nest merges the object with whatever `@Module()` already declares on the class. So the providers a caller receives are the ones in the dynamic object plus any static ones. Two things still apply: the class must be a module Nest can load, and the tokens other modules need to inject must be exported, because exports are still how visibility works.
 
 **Code:**
 
@@ -469,13 +469,13 @@ static forRoot(flags: Flags): DynamicModule {
 
 **Trade-offs:**
 
-Dynamic modules configure at the composition root without editing the feature class. Overusing `forRoot` from every feature duplicates registrations (see NEST-017).
+Dynamic modules let the composition root configure a feature without editing the class. Calling `forRoot` from many features duplicates registrations; see NEST-017.
 
 **Follow-up:**
 
 Is the `@Module()` on the class ignored when `forRoot` returns providers?
 
-Answer: No. Nest merges both. Static `@Module` providers still register unless you keep the class empty and put everything in `forRoot`.
+Answer: No. Nest merges both, so providers declared in the static `@Module()` still register. Only if you leave the decorator empty does everything come from `forRoot`.
 
 ### NEST-017 — When a dynamic module is the wrong seam
 
@@ -489,17 +489,17 @@ A reviewer sees `DatabaseModule.forRoot(options)` imported from `OrdersModule`, 
 
 **Answer:**
 
-Each `forRoot` import can register another copy of the "root" providers—multiple clients, pools, or configs—instead of one shared connection. `forRoot` belongs once at the composition root (`AppModule`). Features should import a thin `forFeature` (or the already-configured module) that adds feature-local providers without re-running root registration. Different options per feature usually mean you wanted named connections or feature config, not three roots.
+Each import of `DatabaseModule.forRoot(options)` can register its own copy of the root providers, so you may end up with several clients or connection pools instead of one shared connection. `forRoot` belongs once, in the composition root, which is `AppModule`. Feature modules should import a lighter `forFeature`, or the already configured module, which adds only feature-specific providers. If the options really differ per feature, you usually want named connections or per-feature config, not three separate roots.
 
 **Trade-offs:**
 
-One `forRoot` + many `forFeature` keeps a single shared client. Multiple `forRoot` calls are only justified for truly separate connections with distinct tokens.
+One `forRoot` with many `forFeature` calls keeps a single shared client. Multiple `forRoot` calls are justified only when you truly need separate connections with distinct tokens.
 
 **Follow-up:**
 
 How do you spot accidental double registration at runtime?
 
-Answer: Log/construct counters in the provider factory, or inspect duplicate custom tokens. Two pools for one DB usually means `forRoot` was imported twice.
+Answer: Add a log line or a construction counter in the provider factory, or look for duplicate custom tokens. Two pools for one database usually mean `forRoot` was imported twice.
 
 ### NEST-018 — main.ts and the composition root
 
@@ -513,17 +513,17 @@ What belongs in `main.ts`, what belongs in `AppModule`, and which HTTP settings 
 
 **Answer:**
 
-`main.ts` is the composition root for process wiring: `NestFactory.create`, global prefix/pipes/filters/CORS/`enableShutdownHooks`, then `listen`. `AppModule` owns the module graph—imports, root providers, not HTTP server options. Settings like `setGlobalPrefix` must run before routes are registered inside `init()`; calling them after `listen()` resolves is too late for that bind. Keep business modules out of `main.ts`.
+`main.ts` is where you wire up the process: create the app, set the global prefix, pipes, filters, and CORS, enable shutdown hooks, and finally call `listen`. `AppModule` owns the module graph, meaning imports and root providers, not HTTP server options. Settings such as `setGlobalPrefix` must run before `init()` registers the routes, because routes are bound with the prefix at that point. Calling them after `listen()` resolves is too late. Keep business modules and logic out of `main.ts`.
 
 **Trade-offs:**
 
-Fat `main.ts` hides the graph; fat `AppModule` with Express calls breaks non-HTTP entry points. Split process bootstrap vs module composition.
+A fat `main.ts` hides the module graph, and a fat `AppModule` full of Express calls breaks non-HTTP entry points. Keep process bootstrap and module composition separate.
 
 **Follow-up:**
 
 Why can `app.use(middleware)` after `await app.listen()` miss routes?
 
-Answer: Route registration already happened in `init()` during `listen()`. Late middleware may not wrap already-bound handlers as you expect—configure before listen/init completes.
+Answer: Routes were already registered during `init()` inside `listen()`. Middleware added later may not wrap those handlers the way you expect, so configure it before `listen`.
 
 ### NEST-019 — create() versus createApplicationContext()
 
@@ -537,17 +537,17 @@ A worker should run `OrdersService.rebuild()` once and exit with no port. Compar
 
 **Answer:**
 
-`create()` builds an HTTP application; `listen()` runs `init()` and binds a port—unnecessary for a one-shot worker. `createApplicationContext()` builds the same DI module graph without an HTTP adapter/listener. You still get provider construction and can `init()`/lifecycle hooks as applicable, call the service, then `close()`. Prefer application context for CLI/workers; use `create()` when you need HTTP.
+`create()` builds an HTTP application, and `listen()` initializes it and opens a port, which a one-shot worker does not need. `createApplicationContext()` builds the same module graph and providers but with no HTTP adapter and no listener. Nest 10 initializes that context for you, so lifecycle hooks such as `onModuleInit` still run. You then call `OrdersService.rebuild()` and finish with `close()`. Prefer the application context for CLI tools and workers, and use `create()` when you actually serve HTTP.
 
 **Trade-offs:**
 
-HTTP `create`+`listen` unifies codepaths but opens a port and adapter overhead. Application context is leaner for jobs.
+Using `create` and `listen` everywhere keeps one code path but opens a port and loads the HTTP adapter. An application context is leaner for jobs.
 
 **Follow-up:**
 
 Do you need `listen()` for `onModuleInit` to run in a worker?
 
-Answer: No. Initialize the context (`init` if required by your Nest version/path) without listening; then run work and `close()`.
+Answer: No. Creating the application context initializes it, so the hooks run without opening a port. Run the work and then call `close()`.
 
 ### NEST-020 — What the HTTP adapter owns
 
@@ -561,17 +561,17 @@ The service runs on Express. A proposal passes `new FastifyAdapter()` into `Nest
 
 **Answer:**
 
-Module graph, DI, controllers, pipes/guards/interceptors at the Nest layer stay the same. The HTTP adapter owns request/response types, raw middleware, body parser, and platform plugins. Express-specific `req`/`res` usage, Express middleware, and libraries assuming Node Server Response must be revalidated for Fastify. Nest's portable surface is decorators + DI; the adapter is the platform boundary.
+The module graph, dependency injection, controllers, and the Nest-level guards, pipes, and interceptors all stay the same. The HTTP adapter owns the platform details: request and response objects, raw middleware, body parsing, and platform plugins. So anything that touches Express specifics, such as `req` and `res` methods, Express middleware, or libraries that assume Node's `ServerResponse`, must be revalidated on Fastify. Nest's portable surface is its decorators and DI, and the adapter is the platform boundary.
 
 **Trade-offs:**
 
-Fastify can win throughput; Express ecosystem middleware may not port. Choose adapters for platform needs, not only benchmarks.
+Fastify can improve throughput, but some Express middleware will not port. Choose an adapter for platform needs, and measure instead of relying only on benchmarks.
 
 **Follow-up:**
 
 Does switching adapters change provider scopes?
 
-Answer: No. Scopes and the module graph are container concerns. Only HTTP integration details change.
+Answer: No. Scopes and the module graph belong to the container; only the HTTP integration details change.
 
 ### NEST-021 — What is unsafe in a constructor
 
@@ -585,17 +585,17 @@ Answer: No. Scopes and the module graph are container concerns. Only HTTP integr
 
 **Answer:**
 
-Constructors run during `create()`, before `init()` runs lifecycle hooks. Injected dependencies exist as objects, but their `onModuleInit` has not run. Calling `ping()` in the constructor races unfinished setup. Open sockets and "ready" logic belong in `onModuleInit`/`onApplicationBootstrap`, or lazy on first use after hooks. Constructors should only assign dependencies.
+Constructors run during `create()`, which is before `init()` runs the lifecycle hooks. When `PaymentsService` is constructed, `ClientsService` exists as an object, but its `onModuleInit` has not run yet, so the socket is not open. Calling `ping()` in the constructor therefore races unfinished setup. Move the work to `onModuleInit` or `onApplicationBootstrap`, or do it lazily on first use after the hooks have run. A constructor should only store its dependencies.
 
 **Trade-offs:**
 
-Constructor work fails fast but cannot rely on hooks. Hooks preserve order at the cost of deferred readiness.
+Constructor work fails fast but cannot rely on hooks. Hooks give you ordering, at the cost of readiness being deferred.
 
 **Follow-up:**
 
 Is it safe if `ClientsService` opens the socket in its own constructor instead?
 
-Answer: Safer for ordering vs dependents' constructors, but still hides async failures and slows `create()`. Prefer hooks for async connect; keep constructors sync and light.
+Answer: The ordering gets better, but async failures are hidden and `create()` becomes slower. Prefer hooks for async connections, and keep constructors synchronous and light.
 
 ### NEST-022 — Exports, re-exports, and the boundary
 
@@ -609,7 +609,7 @@ Answer: Safer for ordering vs dependents' constructors, but still hides async fa
 
 **Answer:**
 
-Importing `TaxModule` into `CommerceModule` does not automatically re-export `TaxService`. `CommerceModule` must list `TaxService` or `TaxModule` in its `exports`. Re-exporting `TaxModule` publishes that module's exports to importers of `CommerceModule`. `ReportsModule` then imports `CommerceModule` only. Encapsulation is deliberate: visibility is export lists, not transitive imports.
+Importing `TaxModule` into `CommerceModule` does not automatically pass `TaxService` along. `CommerceModule` must list either `TaxService` or the whole `TaxModule` in its own `exports`. Re-exporting `TaxModule` publishes whatever that module exports to anyone who imports `CommerceModule`, so `ReportsModule` can import just `CommerceModule`. This is deliberate encapsulation: visibility comes from explicit export lists, not from transitive imports.
 
 **Code:**
 
@@ -623,13 +623,13 @@ export class CommerceModule {}
 
 **Trade-offs:**
 
-Façade re-exports simplify importers and couple them to commerce's public surface. Direct `TaxModule` imports keep the edge explicit.
+A façade with re-exports simplifies importers but couples them to commerce's public surface. Importing `TaxModule` directly keeps the dependency explicit.
 
 **Follow-up:**
 
 Does exporting `TaxService` from `CommerceModule` require providing it there?
 
-Answer: Commerce must either provide it or import a module that exports it—then re-export the token or module. You cannot export a token unknown to the module.
+Answer: The module must either provide it or import a module that exports it, and only then can it export that token or module. You cannot export a token the module does not know.
 
 ### NEST-023 — Barrel files and undefined modules
 
@@ -643,17 +643,17 @@ Answer: Commerce must either provide it or import a module that exports it—the
 
 **Answer:**
 
-Barrel re-exports often create circular evaluation: `orders/index` loads module → module loads billing → billing loads `orders/index` while `OrdersModule` is still uninitialized → `undefined` in `imports`. Nest then fails validating modules. Import module classes from concrete files (`orders.module.ts`), not barrels that pull the whole folder. Keep barrels for public leaf APIs if needed, not for Nest module graphs.
+Barrel files can create circular file imports. `orders/index.ts` loads the module, the module loads billing, and billing imports `orders/index` while `OrdersModule` is still being defined. At that moment the import is `undefined`, so Nest sees an undefined entry in `imports` and rejects it. To avoid this, import module classes from their concrete files, such as `orders.module.ts`, rather than from barrels that pull in the whole folder. Barrels are fine for public leaf APIs, but not for wiring Nest modules.
 
 **Trade-offs:**
 
-Barrels shorten import paths but risk cycles with Nest's class decorators. Direct file imports are verbose and cycle-safe.
+Barrels shorten import paths but risk cycles with decorator-evaluated classes. Direct file imports are longer but safe from those cycles.
 
 **Follow-up:**
 
 How do you confirm the undefined import is a cycle?
 
-Answer: Log the imported binding at module evaluation, or break the barrel path to a direct import. If the direct path fixes it, the barrel cycle was the cause.
+Answer: Log the imported binding when the module file evaluates, or switch to a direct file import. If the direct import fixes it, the barrel cycle was the cause.
 
 ### NEST-024 — The module graph is the dependency manifest
 
@@ -667,17 +667,17 @@ You review a Nest 10 service with ~forty modules. Teams want more `@Global()` mo
 
 **Answer:**
 
-Treat the module graph as the dependency manifest: who provides, who exports, who imports. Mass `@Global()` removes compile/startup friction by hiding edges—features no longer declare what they need, ownership blurs, and test modules must recreate hidden globals. Prefer fixing missing exports/imports, shared kernels with explicit imports, and narrow exports. Globals only for true process-wide singletons imported once at the root. Ask which token each feature needs and which module owns it.
+I treat the module graph as the application's dependency manifest: who provides what, who exports it, and who imports it. Making modules global removes the startup friction by hiding those edges. Features stop declaring what they need, ownership blurs, and test setups must recreate the hidden globals. I would push back and fix the missing imports and exports instead, use shared kernel modules with explicit imports, and keep exports narrow. Globals should be limited to true process-wide singletons that are imported once at the root.
 
 **Trade-offs:**
 
-Globals scale boilerplate down and architecture clarity down. Explicit imports scale verbosity up and make boundaries reviewable.
+Globals reduce boilerplate but also reduce architectural clarity. Explicit imports cost some verbosity but keep boundaries reviewable.
 
 **Follow-up:**
 
 What is a healthier alternative to "make it global" when many features need `TaxService`?
 
-Answer: One `TaxModule` that exports `TaxService`, imported by each feature (or a small shared façade that re-exports it)—still explicit, still one instance.
+Answer: One `TaxModule` that exports `TaxService`, imported by each feature or by a small shared façade that re-exports it. It stays explicit and still gives you one instance.
 
 ### NEST-025 — How a multi-feature codebase should be laid out
 
@@ -691,17 +691,17 @@ Propose source layout and composition root for a Nest 10 product with orders, bi
 
 **Answer:**
 
-Layout by feature: `orders/`, `billing/`, `shared/` (or `kernel/`) each with module, controllers/providers as appropriate. `AppModule` imports feature modules and shared config—composition root for HTTP. Shared kernel holds cross-feature tokens without depending on features. For a worker, add another entrypoint (`main.worker.ts`) that imports a `WorkerModule` composing the same feature/domain modules via `createApplicationContext()`, without HTTP controllers. Share libraries/modules; do not share `main.ts`.
+I would organize by feature: `orders/`, `billing/`, and a small `shared/` kernel, each with its own module, controllers, and providers. `AppModule` imports the feature modules and shared config, and it is the composition root for HTTP. The shared kernel holds cross-feature tokens and must not depend on features. For a worker, add a second entry point, such as `main.worker.ts`, that builds a `WorkerModule` composing the same domain modules through `createApplicationContext()`, with no HTTP controllers. Share modules between entry points, not `main.ts`.
 
 **Trade-offs:**
 
-Feature folders clarify ownership. A shared "utils" dumping ground recreates globals. Multiple entrypoints share modules, not one mega-AppModule with unused HTTP.
+Feature folders clarify ownership. A shared utils dumping ground recreates the problems of globals. Multiple entry points should share modules rather than use one giant `AppModule` with unused HTTP parts.
 
 **Follow-up:**
 
 Should the worker import `OrdersController`?
 
-Answer: No. Import the module that exports domain providers, or a worker-specific module that lists providers without controllers.
+Answer: No. Import the module that exports the domain providers, or a worker-specific module that lists the providers without the controllers.
 
 ### NEST-026 — Why @Injectable() exists
 
@@ -715,13 +715,13 @@ Answer: No. Import the module that exports domain providers, or a worker-specifi
 
 **Answer:**
 
-Registration puts the token in the container; `@Injectable()` (with `emitDecoratorMetadata`) is what causes TypeScript to emit `design:paramtypes` for that class. Without it, Nest often has no parameter tokens to resolve—unknown dependencies. `@Controller()` plays the same role for controllers. The decorator is not discovery; it is metadata emission (and Nest's injectable marker).
+Registration and metadata are separate jobs. Putting the class in `providers` tells the container that the token exists. `@Injectable()`, together with `emitDecoratorMetadata`, makes TypeScript emit the constructor parameter types for that class. Without it, Nest often has no parameter tokens to resolve, so it reports unknown dependencies. `@Controller()` plays the same role for controllers. So the decorator is not discovery; it is what makes the constructor types available, and it is also Nest's marker for injectable classes.
 
 **Follow-up:**
 
 Could `@Inject()` on each parameter replace `@Injectable()`?
 
-Answer: Explicit `@Inject()` supplies tokens per param, but you still need a decorator context that Nest/TS treat correctly; Nest docs still expect `@Injectable()` on providers. Prefer keeping `@Injectable()`.
+Answer: Explicit `@Inject()` gives Nest the tokens, but the Nest docs still expect `@Injectable()` on providers. Keep it as standard practice.
 
 ### NEST-027 — What @Optional() changes, and what it leaves alone
 
@@ -735,7 +735,7 @@ A payments module should use an audit sink when another module exports one, and 
 
 **Answer:**
 
-On a constructor: `@Optional() @Inject(AUDIT) private readonly audit?: AuditTrail`. A missing token injects `undefined` instead of failing startup; the class must handle that. On a factory: put `{ token: AUDIT, optional: true }` in `inject`—same semantics for that argument. `@Optional()` does not register a provider or change exports; it only softens resolution.
+On a constructor, combine `@Optional()` with `@Inject(AUDIT)` and mark the parameter optional, so a missing token gives `undefined` instead of failing startup. Your class must then handle that `undefined`. On a factory provider, write the entry in `inject` as `{ token: AUDIT, optional: true }`, which has the same meaning for that argument. `@Optional()` does not register a provider or change any exports; it only relaxes how the dependency is resolved.
 
 **Code:**
 
@@ -746,13 +746,13 @@ constructor(@Optional() @Inject(AUDIT) private readonly audit?: AuditTrail) {}
 
 **Trade-offs:**
 
-Optional deps enable plugins; they also hide missing wiring as silent `undefined`. Use for truly optional collaborators, not forgotten exports.
+Optional dependencies enable plugin-style designs, but they also turn missing wiring into a silent `undefined`. Use them for truly optional collaborators, not for forgotten exports.
 
 **Follow-up:**
 
 Does `@Optional()` fix a circular dependency?
 
-Answer: No. It only allows a missing token. Cycles need `forwardRef` or a graph redesign.
+Answer: No. It only tolerates a missing token. Cycles need `forwardRef` or a redesign of the graph.
 
 ### NEST-028 — What forwardRef delays
 
@@ -766,7 +766,7 @@ Answer: No. It only allows a missing token. Cycles need `forwardRef` or a graph 
 
 **Answer:**
 
-`forwardRef(() => Token)` postpones reading the class value until Nest resolves dependencies—after both modules/classes have finished evaluating—so ES circular imports do not leave `undefined` tokens. Use it on module `imports` and on `@Inject(forwardRef(() => OtherService))` for providers. It does not create proxies that magically break infinite construction loops if both constructors immediately call each other; keep constructors light.
+`forwardRef(() => Token)` wraps the class in a function, so Nest reads the real class later, during dependency resolution, after both files have finished evaluating. That avoids the problem where circular ES imports leave an `undefined` token. Use it in module `imports` and with `@Inject(forwardRef(() => OtherService))` in provider constructors. It does not magically break a real construction loop: if both constructors immediately call each other, you still have a problem, so keep constructors light.
 
 **Code:**
 
@@ -779,13 +779,13 @@ constructor(
 
 **Trade-offs:**
 
-`forwardRef` unblocks boot; extracting a mediator module removes the cycle. Prefer redesign when calls need both directions at construct time.
+`forwardRef` lets the app boot, but extracting a mediator module removes the cycle. Prefer a redesign when both sides need each other at construction time.
 
 **Follow-up:**
 
 Module `forwardRef` only—services still fail. Why?
 
-Answer: Provider tokens still resolved to `undefined` at decorator time. Add `forwardRef` on the injected services too.
+Answer: The injected service tokens can still be `undefined` when the decorators run, so the service parameters need `forwardRef` as well.
 
 ### NEST-029 — How a list of providers is registered
 
@@ -799,7 +799,7 @@ Orders pricing needs every tax rule the process implements (VAT, duty, regional)
 
 **Answer:**
 
-A module's provider map is keyed by token—two `provide: TAX_RULES` entries collapse to the last wrapper; there is no `multi: true` collector. Build the list with a factory: each rule is its own provider, then `{ provide: TAX_RULES, useFactory: (vat, duty, regional) => [vat, duty, regional], inject: [VatRule, DutyRule, RegionalRule] }`. Rules from other modules must be exported and imported. Array order is `inject` order. `APP_GUARD` and friends are a special scanner gather, not a pattern for domain lists.
+A module's providers are stored in a map keyed by token, so two entries with `provide: TAX_RULES` collapse into the last one. Nest has no `multi: true` option to collect them. Instead, register each rule as its own provider, then build the list with a factory: `useFactory` receives the rules and returns an array, and `inject` lists them. Rules from other modules must be exported and imported. The array order is the `inject` order. `APP_GUARD` and similar tokens are special cases that Nest gathers itself, not a pattern for your domain lists.
 
 **Code:**
 
@@ -813,13 +813,13 @@ A module's provider map is keyed by token—two `provide: TAX_RULES` entries col
 
 **Trade-offs:**
 
-An explicit factory makes order and ownership visible. A factory that `new`s rules hides DI (NEST-050). Do not copy `APP_GUARD` aggregation for domain tokens.
+An explicit factory makes order and ownership visible. A factory that creates the rules with `new` hides them from DI (see NEST-050). Do not copy the `APP_GUARD` aggregation behavior for domain tokens.
 
 **Follow-up:**
 
-VAT must run before duty, and a future rule should declare “after VAT.” What does this factory give you?
+VAT must run before duty, and a future rule should declare "after VAT." What does this factory give you?
 
-Answer: Only the order of the `inject` array. There is no priority field. Keep order explicit there, or sort inside the factory from a property each rule exposes.
+Answer: Only the order of the `inject` array. There is no priority field, so keep the order explicit there, or sort inside the factory using a property that each rule exposes.
 
 ### NEST-030 — When property injection runs
 
@@ -833,17 +833,17 @@ A class sets `@Inject(TaxService) private tax: TaxService` on a field and reads 
 
 **Answer:**
 
-Nest resolves constructor params, runs `new`, then assigns `@Inject()` properties. The constructor body runs in that gap, so `this.tax` is still `undefined`. After the instance is fully wired, methods including `onModuleInit` see the assigned value. Prefer constructor injection for required deps; property injection is for awkward signatures, not a fix for circular constructors.
+Nest first resolves the constructor parameters and calls `new`, and only afterwards assigns the properties decorated with `@Inject()`. The constructor body runs in that gap, so `this.tax` is still `undefined` there. Once the instance is fully wired, methods and hooks such as `onModuleInit` see the assigned value. For required dependencies, prefer constructor injection. Property injection is meant for awkward cases like subclass signatures, not as a fix for circular constructors.
 
 **Trade-offs:**
 
-Constructor params are visible in the signature and present for the whole constructor. Properties are shorter but invisible to a hand-rolled `new` in a unit test that bypasses the container.
+Constructor parameters are visible in the signature and available for the whole constructor. Properties are shorter, but a hand-written `new` in a unit test that bypasses the container will not set them.
 
 **Follow-up:**
 
 The property is `@Optional() @Inject(AUDIT_SINK)`, the sink is unregistered, and the constructor logs `undefined`. After `onModuleInit`, what is the field?
 
-Answer: Still `undefined`. Optional absence is the value, not a delay. `onModuleInit` does not re-lookup a provider registered later—registration finished before constructors ran.
+Answer: Still `undefined`. The absence is the result, not a delay. Nest does not look up a provider registered later, because registration finished before any constructor ran.
 
 ### NEST-031 — Why the module class can take constructor arguments
 
@@ -857,17 +857,17 @@ Answer: Still `undefined`. Optional absence is the value, not a delay. `onModule
 
 **Answer:**
 
-Yes. Nest can construct the module class and inject providers visible in that module's context into its constructor, like any provider. The module instance is created with the container graph. Prefer lifecycle hooks on providers for async startup work; the module constructor still runs at construction time (before hooks), so keep it light. Listing the service only for the module constructor still requires it in `providers`/`imports`.
+Yes. Nest constructs a module class just like a provider, and it can inject any provider that is visible in that module's context. The module instance is created as part of building the container graph, before lifecycle hooks run, so its constructor should stay light. For async startup checks, prefer a lifecycle hook on a provider. If you inject `OrdersService` into the module constructor, it still has to be available through `providers` or `imports`, as with any other injector.
 
 **Trade-offs:**
 
-Module constructor injection couples bootstrap to the module class. `onModuleInit` on a provider is usually clearer for async checks.
+Injecting into the module class couples bootstrap logic to the module. `onModuleInit` on a provider is usually clearer for async checks.
 
 **Follow-up:**
 
 Can the module constructor inject a token only exported by a module it did not import?
 
-Answer: No. Same visibility rules as any injector in that module.
+Answer: No. The same visibility rules apply as for any injector in that module.
 
 ### NEST-032 — What ModuleRef.get guarantees inside a feature
 
@@ -881,17 +881,17 @@ Answer: No. Same visibility rules as any injector in that module.
 
 **Answer:**
 
-Without options, `ModuleRef.get` resolves from the calling module's context—not the whole app. If `OrdersModule` cannot see `TaxService` through its imports/exports, `get` fails even if another module registered it. Pass `{ strict: false }` only when you intentionally search beyond strict module scope (know the coupling cost). Prefer injecting `TaxService` normally after importing `TaxModule`.
+With no options, `ModuleRef.get` searches only from the calling module's context, not the whole app. Here `OrdersModule` does not import `TaxModule`, so it cannot see `TaxService`, and `get` fails even though `AppModule` imports both. Pass `{ strict: false }` only when you intentionally want to search the whole application, and accept the coupling that brings. Normally you should import `TaxModule` and inject `TaxService` directly in the constructor.
 
 **Trade-offs:**
 
-`ModuleRef` enables lazy/lookup patterns and bypasses clear constructor deps—useful sparingly, harmful as a service locator.
+`ModuleRef` is useful for lazy lookups, but it bypasses clear constructor dependencies. Use it sparingly; as a general service locator it makes the code harder to follow.
 
 **Follow-up:**
 
 Does `app.get(TaxService)` from `main.ts` use the same rules?
 
-Answer: `app.get` uses the application/root context and can retrieve exported providers more broadly than a feature module's strict `ModuleRef.get`.
+Answer: It uses the application's root context and is not strict by default, so it can retrieve providers more broadly than a feature module's strict `ModuleRef.get`.
 
 ### NEST-033 — What order sibling providers actually have
 
@@ -905,13 +905,13 @@ Answer: `app.get` uses the application/root context and can retrieve exported pr
 
 **Answer:**
 
-Do not rely on array order for constructor completion among independent siblings. Nest instantiates based on the dependency graph. Without an injection edge, order is undefined for your purposes. If Warmup needs Cache ready, inject `CacheService` (or use `onModuleInit` ordering with an explicit dependency). Provider array order is not a supported lifecycle contract.
+You should not rely on array order for independent siblings. Nest creates providers according to the dependency graph, and when there is no injection edge between `CacheService` and `WarmupService`, their relative order is not something you can depend on. The order of the `providers` array is not a supported lifecycle contract. If Warmup needs Cache to be ready, inject `CacheService` into it so that a real dependency edge exists, or use `onModuleInit` together with that explicit dependency.
 
 **Follow-up:**
 
 Will putting `CacheService` first in the array fix it?
 
-Answer: Not as a guarantee. Introduce a real DI edge or a lifecycle hook that awaits the dependency.
+Answer: Not as a guarantee. Add a real dependency injection edge, or use a lifecycle hook that waits for the dependency.
 
 ### NEST-034 — How far a re-export chain carries a token
 
@@ -925,17 +925,17 @@ Answer: Not as a guarantee. Introduce a real DI edge or a lifecycle hook that aw
 
 **Answer:**
 
-Importers of `TaxModule` can inject `TaxService`, not `TaxRepository` (not exported). Importing `TaxModule` into `BillingModule` does not re-export `TaxService` to `CommerceModule` unless `BillingModule` exports the token or `TaxModule`. Chains do not transitive-export automatically. Each hop must re-export for the next importer to see the token. Encapsulation is intentional at every boundary.
+Modules that import `TaxModule` can inject `TaxService`, but not `TaxRepository`, because it is not exported. Importing `TaxModule` into `BillingModule` does not pass `TaxService` on to `CommerceModule`, unless `BillingModule` exports that token or `TaxModule`. Exports do not chain automatically: every hop must re-export for the next importer to see the token. So `CommerceModule` and `ReportsModule` cannot inject `TaxService` unless each previous module re-exports it. Encapsulation is intentional at every boundary.
 
 **Trade-offs:**
 
-Re-export chains build façades; they also obscure the owning module. Prefer short export paths.
+Re-export chains build façades but obscure which module owns the provider. Prefer short export paths.
 
 **Follow-up:**
 
-Billing injects `TaxRepository` successfully after importing `TaxModule`. Can Commerce inject it by importing Billing only?
+Suppose `TaxModule` also exports `TaxRepository`, and Billing injects it after importing `TaxModule`. Can Commerce inject it by importing Billing only?
 
-Answer: Only if Billing re-exports `TaxRepository` (or TaxModule). Otherwise Commerce must import TaxModule (or another exporter).
+Answer: Only if Billing re-exports `TaxRepository` or `TaxModule`. Otherwise Commerce must import `TaxModule`, or another module that exports it, itself.
 
 ### NEST-035 — When forRoot is enough, and when the factory has to be async
 
@@ -949,17 +949,17 @@ Answer: Only if Billing re-exports `TaxRepository` (or TaxModule). Otherwise Com
 
 **Answer:**
 
-Sync `forRoot(options)` / `useValue` is enough when values are already known at module evaluation. When values come from async sources (async config load, secrets manager), use `forRootAsync` with `useFactory` returning a Promise and `inject: [ConfigService]` (and `imports` for ConfigModule). Async factories run during provider instantiation and Nest awaits them. Don't block module files with top-level await IO.
+Sync `forRoot(options)` or `useValue` is enough when the values are known as soon as the module file is evaluated, such as literals. When values come from something async, like a config service, a secrets manager, or a file load, use `forRootAsync` with a `useFactory` that returns a Promise, plus `inject: [ConfigService]` and `imports` for the config module. Nest awaits async factories while instantiating providers. Do not do I/O with top-level await in module files to work around this.
 
 **Trade-offs:**
 
-Sync root is simple and testable. Async root couples boot to config availability—fail fast on missing secrets.
+A sync root is simple and easy to test. An async root ties startup to config availability, so fail fast when a secret is missing.
 
 **Follow-up:**
 
 Can `useFactory` be async without `forRootAsync`?
 
-Answer: A provider `useFactory` may return a Promise; Nest resolves it. `forRootAsync` is the dynamic-module helper that wires that pattern cleanly with imports/inject.
+Answer: Yes. A plain provider's `useFactory` may return a Promise, and Nest awaits it. `forRootAsync` is just the dynamic-module helper that wires that pattern together with `imports` and `inject`.
 
 ### NEST-036 — What forFeature is allowed to add
 
@@ -973,17 +973,17 @@ Answer: A provider `useFactory` may return a Promise; Nest resolves it. `forRoot
 
 **Answer:**
 
-`forFeature` should register feature-local providers (named tokens, repositories, merchant-scoped wrappers) that depend on the root client—without calling `forRoot` again or creating a second client. Import `forRoot` once at the composition root; features import `forFeature(...)` or the configured module's exports. Feature modules add to the graph; they must not re-bind the singleton root with different options.
+`forFeature` should register feature-local providers, such as named tokens, repositories, or merchant-bound wrappers, that build on the root client. It should not call `forRoot` again or create a second client. The root is imported once at the composition root, and each feature imports `forFeature(...)`, or simply uses the exports of the configured module. Features add to the graph; they should never re-bind the singleton root with different options.
 
 **Trade-offs:**
 
-forFeature scales multi-tenant handles; stuffing everything in forRoot forces one shape for all callers.
+`forFeature` scales to many merchant-bound handles. Putting everything in `forRoot` would force one shape on every caller.
 
 **Follow-up:**
 
 What happens if a feature calls `forRoot` with different options?
 
-Answer: You risk a second root registration/client. Keep `forRoot` unique; pass feature options into `forFeature`.
+Answer: You risk a second root registration and a second client. Keep `forRoot` unique, and pass feature-specific options through `forFeature`.
 
 ### NEST-037 — Why configuration is a provider
 
@@ -997,17 +997,17 @@ Feature services read `process.env.PAYMENTS_MERCHANT_ID` directly. The team adds
 
 **Answer:**
 
-Inject `ConfigService` (from a module that imports `ConfigModule`, or after global config setup) and call `config.get('PAYMENTS_MERCHANT_ID')` (or typed/namespaced getters). `forRoot` loads env files / process env into the config pipeline and registers `ConfigService` once. Features stop touching `process.env` so tests can override providers and validation can centralize. Direct `process.env` bypasses that pipeline.
+Features should inject `ConfigService` and call `config.get('PAYMENTS_MERCHANT_ID')`, or use typed or namespaced getters. `ConfigModule.forRoot()` loads the `.env` files and the process environment into Nest's config system and registers `ConfigService` once. Reading through the service means tests can override the provider and validation can be centralized. Reading `process.env` directly bypasses all of that. A feature module needs to import `ConfigModule`, unless config was registered as global.
 
 **Trade-offs:**
 
-ConfigService enables testing and validation; it adds indirection versus raw env. Worth it once multiple modules share settings.
+`ConfigService` makes testing and validation easier but adds indirection compared to raw environment variables. It is worth it once several modules share settings.
 
 **Follow-up:**
 
 Is `ConfigModule.forRoot()` required in every feature module?
 
-Answer: No. Once at the root (often `isGlobal: true`). Features import ConfigModule only if not global, or rely on the global export.
+Answer: No. Call it once at the root, often with `isGlobal: true`. Features import `ConfigModule` only if it is not global.
 
 ### NEST-038 — How a namespaced config object is injected
 
@@ -1021,7 +1021,7 @@ Database settings are host, port, and name. You do not want `config.get('DATABAS
 
 **Answer:**
 
-Use `registerAs('database', () => ({ host, port, name }))` and load that partial in `ConfigModule`. Inject with `@Inject(databaseConfig.KEY)` or `ConfigService.get('database')` typed to the factory's return type. The namespace is a single object token/key rather than scattered env strings. Validate the object shape in `validate` or Joi/Zod schemas as configured.
+Use `registerAs('database', () => ({ host, port, name }))` to create a namespaced config factory, and list it in the `load` option of `ConfigModule`. Then inject the object with `@Inject(databaseConfig.KEY)`, or read it with `ConfigService.get('database')`. The namespace becomes one typed object instead of many scattered string keys. You can validate its shape with a `validate` function, or with a Joi or Zod schema, in the config setup.
 
 **Code:**
 
@@ -1034,13 +1034,13 @@ export default registerAs('database', () => ({
 
 **Trade-offs:**
 
-Namespaces group settings and improve typing; over-fragmenting namespaces recreates stringly keys.
+Namespaces group related settings and improve typing. Splitting config into too many namespaces brings back the string-key problem.
 
 **Follow-up:**
 
 Does `registerAs` read the file automatically?
 
-Answer: Only if that config is listed in `load`/`forRoot` configuration. Defining `registerAs` alone does not register it.
+Answer: No. The config only takes effect if it is listed in `load` in the `forRoot` options. Defining `registerAs` alone does not register it.
 
 ### NEST-039 — When the .env file is read relative to your service file
 
@@ -1054,13 +1054,13 @@ Answer: Only if that config is listed in `load`/`forRoot` configuration. Definin
 
 **Answer:**
 
-Top-level `process.env` reads run when the service file is first evaluated—often before `ConfigModule.forRoot()` loads `.env` into `process.env`. `ConfigService` reads through the config module's loaded store after forRoot runs. Move reads into constructors/`onModuleInit` via `ConfigService`, or ensure env is loaded before any feature file evaluates (e.g. preloaded env). File-relative mental models are wrong: evaluation order vs forRoot timing matters.
+A top-level read of `process.env` runs when the service file is first evaluated, which is often before `ConfigModule.forRoot()` has loaded `.env` into the environment. So the value is still undefined at that moment. `ConfigService` reads from the store that `forRoot` filled, so it sees the value later. The fix is to read configuration inside the constructor or `onModuleInit` through `ConfigService`, or to make sure the environment is loaded before any feature file is evaluated. What matters is evaluation order versus when `forRoot` runs, not file location.
 
 **Follow-up:**
 
-Will importing ConfigModule at the top of the service file fix the top-level read?
+Will importing `ConfigModule` at the top of the service file fix the top-level read?
 
-Answer: No. Importing the class does not run `forRoot`. Only the dynamic `forRoot` import in a loaded Nest module loads the env pipeline.
+Answer: No. Importing the class does not call `forRoot`. Only the `forRoot` import inside a loaded Nest module starts loading the environment.
 
 ### NEST-040 — Where a failing config validate() throws
 
@@ -1074,13 +1074,13 @@ Answer: No. Importing the class does not run `forRoot`. Only the dynamic `forRoo
 
 **Answer:**
 
-Validation runs while the dynamic config module is being initialized as part of building the application—during `create()`'s module/provider init path for ConfigModule—not inside a later HTTP `listen` failure. The error surfaces as provider/module initialization failure. With default `abortOnError`, you may get `process.abort()` rather than a clean rejected promise. It is not an `onModuleInit` business hook failure after a healthy create.
+The validation runs while Nest builds the application, as the dynamic config module is initialized during `create()`. It is not a later failure at `listen`, and it is not a business failure inside an `onModuleInit` hook of an otherwise healthy app. It surfaces as a module or provider initialization failure. With the default `abortOnError`, that can end in `process.abort()` rather than a neat rejected promise, which surprises people who expect a normal exception.
 
 **Follow-up:**
 
-How do you make the failure a thrown/rejected error for tests?
+How do you make the failure a thrown or rejected error for tests?
 
-Answer: Pass `{ abortOnError: false }` to `NestFactory.create` so initialization errors reject/throw instead of aborting the process.
+Answer: Pass `{ abortOnError: false }` to `NestFactory.create`, so initialization errors reject instead of aborting the process.
 
 ### NEST-041 — Read the startup error: the provider is not exported
 
@@ -1094,7 +1094,7 @@ Startup fails resolving a dependency in `OrdersModule` context. `TaxModule` prov
 
 **Answer:**
 
-The missing `exports: [TaxService]` (or exporting the module's public tokens) on `TaxModule`. Importing a module only exposes what it exports. Providing `TaxService` without exporting keeps it private to `TaxModule`. Add `TaxService` to `exports`, or move the provider. The controller/service files are fine if they simply inject the token.
+The problem is the missing `exports: [TaxService]` in `TaxModule`. Importing a module only exposes what that module exports. Because `TaxModule` provides `TaxService` without exporting it, the provider stays private to `TaxModule`, and `OrdersModule` cannot see it. Add `TaxService` to `exports`, or move the provider into the consuming module. The controller and service code are fine, since they simply inject the token.
 
 **Code:**
 
@@ -1110,7 +1110,7 @@ export class TaxModule {}
 
 The error says the argument is unavailable in `OrdersModule` context. Why not `TaxModule`?
 
-Answer: Resolution is from the consuming module's context. Nest names where the injector looked, not where you forgot the export.
+Answer: Resolution always happens from the consuming module's context. Nest names the place where the lookup failed, not the place where you forgot the export.
 
 ### NEST-042 — Which token exports actually publish
 
@@ -1124,7 +1124,7 @@ Answer: Resolution is from the consuming module's context. Nest names where the 
 
 **Answer:**
 
-Exports publish tokens, not class identities you wish were equivalent. Exporting `VatRule` does not export `TAX_RULES`. Consumers injecting `TAX_RULES` need `exports: [TAX_RULES]`. The provide token and the export token must match what injectors ask for.
+Exports publish tokens, not classes that you consider equivalent. `TaxModule` registered the provider under the token `TAX_RULES` but exported `VatRule`, which is a different token. So `OrdersModule` could inject `VatRule`, but it cannot resolve `TAX_RULES`. The fix is to export `TAX_RULES`. The token you provide and the token you export must match what injectors actually ask for.
 
 **Code:**
 
@@ -1137,7 +1137,7 @@ exports: [TAX_RULES],
 
 Would exporting both `TAX_RULES` and `VatRule` change the injected instance for `TAX_RULES`?
 
-Answer: Exporting `VatRule` only helps injectors of `VatRule`. `TAX_RULES` still needs to be exported for that token to resolve.
+Answer: No. Exporting `VatRule` only helps code that injects `VatRule`. `TAX_RULES` must be exported on its own for that token to resolve.
 
 ### NEST-043 — What a request uses from the module that owns the controller
 
@@ -1151,13 +1151,13 @@ Answer: Exporting `VatRule` only helps injectors of `VatRule`. `TAX_RULES` still
 
 **Answer:**
 
-The handler runs on the controller instance from `OrdersModule`'s context. It injects providers visible there: local providers plus exports of imported modules (e.g. `TaxService`). `BillingModule` is irrelevant unless imported into that chain. HTTP does not "enter" every module—routing picked a controller owned by one module; DI visibility is that module's. Global modules also visible if registered.
+The request is handled by the controller instance that belongs to `OrdersModule`. That controller can inject whatever is visible in that module's context: the module's own providers, the exports of the modules it imports, such as `TaxService`, and any global providers. `BillingModule` is irrelevant unless something in that import chain brings it in. HTTP does not walk through every module; routing selects one controller, and dependency injection visibility is decided by that controller's module.
 
 **Follow-up:**
 
 Can the controller inject a provider that only `BillingModule` provides and exports?
 
-Answer: Only if `OrdersModule` imports `BillingModule` (or another module that re-exports it), or the provider is global.
+Answer: Only if `OrdersModule` imports `BillingModule`, or another module that re-exports it, or if the provider is global.
 
 ### NEST-044 — What Test.createTestingModule compiles
 
@@ -1171,7 +1171,7 @@ You want a test that constructs `OrdersService` with a fake `TaxService`, runs `
 
 **Answer:**
 
-`Test.createTestingModule({...}).compile()` builds an isolated testing module/container with your declared imports/providers/overrides—not the full HTTP server. `module.get(OrdersService)` retrieves instances. Call `module.init()` to run lifecycle hooks like `onModuleInit`. Do not `listen`. Use `overrideProvider` for fakes. Close with `module.close()` for destroy hooks.
+`Test.createTestingModule({...}).compile()` builds an isolated container from the imports, providers, and overrides you declare. It is not the full HTTP server. Use `module.get(OrdersService)` to fetch instances, and `overrideProvider` to substitute fakes. Compiling alone does not run lifecycle hooks, so call `module.init()` to trigger `onModuleInit`. Never call `listen`. When you are finished, call `module.close()` so the destroy hooks run.
 
 **Code:**
 
@@ -1184,13 +1184,13 @@ await module.init();
 
 **Trade-offs:**
 
-Unit testing modules are fast and narrow; e2e `create`+supertest is heavier and closer to production HTTP.
+Unit-style testing modules are fast and narrow. End-to-end tests with `create` and supertest are heavier but closer to production HTTP.
 
 **Follow-up:**
 
 Does `compile()` alone run `onModuleInit`?
 
-Answer: No. You need `init()` (or a helper that initializes) for those hooks.
+Answer: No. You need to call `init()`, or use a helper that initializes the app, for those hooks to run.
 
 ### NEST-045 — When a useValue promise starts, versus a factory
 
@@ -1204,17 +1204,17 @@ Both snippets provide `MERCHANT_ID` from an async source. One starts work while 
 
 **Answer:**
 
-`useValue: fetchId()` calls `fetchId` when the module file evaluates—Nest later marks a Promise `useValue` async and awaits that same promise during `create()`, but the network call already started at import time (and can become an unhandled rejection in the gap). `useFactory` is not called at evaluation; the loader invokes it during instantiation (awaiting its promise) in `inject` order. Prefer the factory for I/O.
+`useValue: fetchId()` calls `fetchId` immediately, when the module file is evaluated, because that is plain JavaScript. Nest later notices the Promise and awaits it during `create()`, but the network call has already started, and a rejection in the gap can become an unhandled rejection. `useFactory: () => fetchId()` is only a function reference, so Nest calls it later, when the loader instantiates the provider, awaits its promise, and respects `inject` order. Prefer the factory for I/O.
 
 **Trade-offs:**
 
-`useValue` suits a value you already hold. A factory participates in instantiation order, can `inject` config, and does not start work merely because a test imported the file.
+`useValue` suits a value you already hold. A factory takes part in instantiation order, can inject config, and does not start work just because a test imported the file.
 
 **Follow-up:**
 
 The async factory `inject`s `ConfigService` from a non-global `ConfigModule`. `AppModule` imports both modules, but the factory fails. Why?
 
-Answer: The factory resolves in the module that registered it, not via `AppModule` sibling imports. Import `ConfigModule` into the payments module, or make config global.
+Answer: The factory resolves in the module that registered it, not through `AppModule`'s other imports. Import `ConfigModule` into the payments module, or make config global.
 
 ### NEST-046 — What LazyModuleLoader.load adds to the graph
 
@@ -1228,17 +1228,17 @@ Answer: The factory resolves in the module that registered it, not via `AppModul
 
 **Answer:**
 
-`load(() => import(...).then(m => m.ReportsModule))` delays evaluating the file, then scans the module, links deps, and instantiates providers, returning that module's `ModuleRef`. If the module is already in the container, load does not rebuild it. It does not run the HTTP routes resolver—controllers are not mounted by `load`—and it does not call `onModuleInit`. For HTTP surfaces, import at the root so `init()` binds routes. Lazy load is deferred provider instantiation, not first-use routing.
+`LazyModuleLoader.load` takes a function that imports the module, such as `() => import(...).then(m => m.ReportsModule)`, which delays evaluating the file. When called, Nest scans the module, links its dependencies, instantiates its providers, and returns that module's `ModuleRef`. If the module is already in the container, nothing is rebuilt. It does not mount HTTP routes, so controllers do not become reachable, and it does not call `onModuleInit`. So lazy loading is deferred provider instantiation, not on-demand routing; import HTTP modules at the root.
 
 **Trade-offs:**
 
-Deferring evaluation can shrink startup; first `load` pays scan/construct cost, and hooks/routes need a separate plan. Prefer eager import when the feature is an HTTP surface.
+Deferring evaluation can shrink startup, but the first load pays the scan and construction cost, and hooks or routes need a separate plan. Prefer an eager import for a feature that serves HTTP.
 
 **Follow-up:**
 
 `ReportsModule` is also in `AppModule.imports`, and a request calls `load(() => ReportsModule)`. What does `get(ReportsService)` return?
 
-Answer: The instance from startup. `load` sees the module already present and returns a ref to it—you gained nothing. Remove one of the two paths.
+Answer: The instance created at startup. `load` sees that the module is already present and returns a reference to it, so you gained nothing. Remove one of the two paths.
 
 ### NEST-047 — How a custom logger sees bootstrap logs
 
@@ -1252,17 +1252,17 @@ Answer: The instance from startup. `load` sees the module already present and re
 
 **Answer:**
 
-Pass `{ logger: instance }` into `create` for an immediate logger outside DI, or use `{ bufferLogs: true }`, then after `create` resolves call `app.useLogger(app.get(AppLogger))` to install the DI instance and flush the buffer. Without buffering, create-time lines already went to the default logger before `useLogger`. Registering `AppLogger` only as a provider is too late for early bootstrap lines. Keep `AppLogger`'s constructor light—it is constructed during the graph being logged.
+There are two ways. Pass `{ logger: instance }` to `create` to give Nest a logger immediately, outside dependency injection. Or use `{ bufferLogs: true }`, and after `create` resolves call `app.useLogger(app.get(AppLogger))`, which installs the injected logger and flushes the buffered messages to it. Without buffering, lines logged during `create` have already gone to the default logger. Registering `AppLogger` only as a provider is too late for early messages. Keep its constructor light, since it is built while the graph it logs about is being built.
 
 **Trade-offs:**
 
-`logger: new AppLogger()` sees early lines but skips DI. `bufferLogs` + `useLogger(app.get(...))` keeps one DI logger. `logger: false` silences Nest; buffering will not invent those lines later.
+`logger: new AppLogger()` sees early lines but skips DI. `bufferLogs` plus `useLogger(app.get(...))` keeps a single injected logger. `logger: false` silences Nest, and buffering cannot recreate those lines later.
 
 **Follow-up:**
 
 `create` uses `{ logger: false, bufferLogs: true }`, then `useLogger(app.get(AppLogger))`. Which messages does `AppLogger` still miss?
 
-Answer: Ones Nest never recorded because `logger: false` turned logging off. Buffering does not recreate unrecorded messages. Omit `logger: false` when the goal is to flush bootstrap into `AppLogger`.
+Answer: Messages that Nest never recorded, because `logger: false` turned logging off. Buffering cannot recreate them, so drop `logger: false` if you want bootstrap logs to reach `AppLogger`.
 
 ### NEST-048 — What INQUIRER refers to
 
@@ -1276,17 +1276,17 @@ A factory wants the name of the class it is being injected into so a logger can 
 
 **Answer:**
 
-`INQUIRER` is a transient injection token resolving to the class/instance that requested the current provider—the parent dependent being constructed. A factory `inject: [INQUIRER]` receives that host type/instance to customize per consumer (e.g. child logger categories). It is not the HTTP request and not the module class unless that module is the dependent. Transient scope of the provided logger is typically required so each host gets its own instance.
+`INQUIRER` is a token that resolves to the class, or instance, that is asking for the current provider, meaning the parent that is being constructed. A factory with `inject: [INQUIRER]` can use it to customize the result for each consumer, for example to give a logger the right category name. It is not the HTTP request, and it is not the module. Because each consumer needs its own result, the provider that uses it should be transient, so every host gets a separate instance.
 
 **Trade-offs:**
 
-INQUIRER enables contextual factories; overuse recreates service-locator patterns. Prefer explicit constructor params when possible.
+`INQUIRER` enables contextual factories, but overusing it recreates the service locator pattern. Prefer plain constructor parameters when possible.
 
 **Follow-up:**
 
 If the factory provider is singleton-scoped, what goes wrong with INQUIRER?
 
-Answer: One shared instance is created for the first inquirer; later hosts reuse it. Use transient (or factory-per-inject) for per-host loggers.
+Answer: A singleton is built only once and then shared, so it cannot reflect each consumer. Later hosts just reuse that one instance. Use transient scope for per-host loggers.
 
 ### NEST-049 — How an undefined dependency differs from a missing provider
 
@@ -1300,13 +1300,13 @@ Boot A: Nest reports an undefined dependency (possibly circular import / missing
 
 **Answer:**
 
-Undefined dependency usually means the token value was `undefined` at decoration/scan time—often a circular file import, `import type`, or forward reference without `forwardRef`. The metadata literally holds undefined. Missing provider means the token was a real value but no registration/`export` made it visible in the consuming module's context. Fix cycles/metadata for A; fix `providers`/`exports`/`imports` for B. `NEST_DEBUG=true` helps trace resolution.
+They are different failures. An undefined dependency means the token value was literally `undefined` when the decorators or the scanner read it, usually because of circular file imports, `import type`, or a forward reference without `forwardRef`. The metadata holds `undefined`. A missing provider means the token is a real value, but nothing registered it or exported it into the consuming module's context. For the first, fix the cycles and metadata; for the second, fix `providers`, `exports`, and `imports`. Setting `NEST_DEBUG=true` helps trace resolution.
 
 **Follow-up:**
 
 Which failure does `forwardRef` address?
 
-Answer: Undefined tokens from circular evaluation—not a forgotten `exports` entry for a well-defined token.
+Answer: The undefined-token case caused by circular evaluation. It does not help when a well-defined token was simply never exported.
 
 ### NEST-050 — Why new inside a factory hides a dependency
 
@@ -1320,14 +1320,14 @@ Answer: Undefined tokens from circular evaluation—not a forgotten `exports` en
 
 **Answer:**
 
-The factory hides real dependencies: `VatRule`/`DutyRule` and env are invisible to the module graph, unswappable in tests without replacing the whole factory, and skip Nest DI (no injection into those classes, no lifecycle). The export looks like one token while ownership of rules lives in opaque code. Prefer registering rules as providers (optionally multi) Nest can inject, override, and graph. Factories should assemble injected deps, not silently `new` a dependency tree.
+A factory that builds rules with `new` hides the real dependencies. `VatRule`, `DutyRule`, and the environment variable are invisible to the module graph, cannot be swapped in tests without replacing the whole factory, and miss out on Nest DI, so they get no injection and no lifecycle hooks. The module looks like it exports one token, while the ownership of the rules lives in opaque code. It is better to register each rule as a provider that Nest can inject, override, and show in the graph. A factory should assemble injected dependencies, not quietly construct them.
 
 **Trade-offs:**
 
-Inline `new` is fast to write and opaque to operate. Provider graphs are verbose and testable/replaceable.
+Inline `new` is quick to write but opaque to operate. A provider graph is more verbose but testable and replaceable.
 
 **Follow-up:**
 
 What is the smallest refactor that surfaces `DutyRule`'s env dependency?
 
-Answer: Provide `DutyRule` with a factory/`useFactory` that injects `ConfigService`, and inject `DutyRule` into the `TAX_RULES` factory—or export multi providers Nest aggregates.
+Answer: Register `DutyRule` with its own factory that injects `ConfigService`, then inject `DutyRule` into the `TAX_RULES` factory. That makes the config dependency visible and replaceable.

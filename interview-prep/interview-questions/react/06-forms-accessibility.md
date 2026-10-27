@@ -8,16 +8,16 @@ React 18+ (React 19 form actions noted where relevant). Compact handbook format.
 **Difficulty:** Junior
 **Category:** Forms
 **Question:** What is the difference between a controlled and an uncontrolled input in React? When would you pick each?
-**Answer:** A controlled input's value lives in React state: `value` + `onChange` make React the single source of truth. An uncontrolled input keeps its value in the DOM; you read it via a ref, `FormData`, or on submit. Controlled suits live validation, masking, dependent fields, and instant UI feedback. Uncontrolled is simpler and cheaper for plain submit-only forms, and it's the only option for file inputs. Most real forms mix both.
+**Answer:** In a controlled input, the value lives in React state. You pass `value` and `onChange`, so React is the single source of truth. In an uncontrolled input, the DOM keeps the value, and you read it later through a ref, `FormData`, or on submit. I use controlled inputs for live validation, input masking, dependent fields, and instant feedback. Uncontrolled is simpler and cheaper for plain forms that only matter on submit, and it's the only option for file inputs. Real forms often mix both.
 **Follow-up:** Can an input switch between the two?
 
-Answer: It can, but React warns. Going from `undefined` to a defined `value` flips modes and causes bugs, so always initialise controlled values (e.g. `''`).
+Answer: It can, but React warns. If `value` goes from `undefined` to a real value, the mode flips and causes bugs. So always give controlled inputs a starting value, like an empty string.
 
 ### REACT-252 — `value` vs `defaultValue`
 **Difficulty:** Junior
 **Category:** Forms
 **Question:** What does `defaultValue` do, and how does it differ from `value`?
-**Answer:** `defaultValue` sets the initial DOM value of an uncontrolled input; React doesn't track later changes. `value` makes the input controlled and React overwrites the DOM on every render. Changing `defaultValue` after mount does nothing. To reset an uncontrolled form to new defaults, remount with a `key` or call `form.reset()`. Same idea applies to `defaultChecked` for checkboxes and radios.
+**Answer:** `defaultValue` sets the starting value of an uncontrolled input. After that, React doesn't track changes. `value` makes the input controlled, and React sets the DOM value on every render. Changing `defaultValue` after the input has mounted does nothing. To reset an uncontrolled form to new defaults, I remount it with a `key` or call `form.reset()`. The same idea applies to `defaultChecked` for checkboxes and radio buttons.
 **Code:**
 ```jsx
 <input name="email" defaultValue={user.email} />
@@ -25,31 +25,31 @@ Answer: It can, but React warns. Going from `undefined` to a defined `value` fli
 ```
 **Follow-up:** Why doesn't updating `defaultValue` update the field?
 
-Answer: It's only read on mount, mirroring the HTML `value` attribute vs property distinction. Use `key={user.id}` to remount when the source record changes.
+Answer: It's only read when the input mounts, like the HTML `value` attribute versus the live value. Use `key={user.id}` to remount when the source record changes.
 
 ### REACT-253 — "value without onChange" warning
 **Difficulty:** Junior
 **Category:** Forms
 **Question:** Why does React warn when you pass `value` without `onChange`, and how do you fix it?
-**Answer:** A controlled input with no handler becomes read-only: typing is ignored because React re-renders the same value. The warning flags a likely bug. Fix by adding `onChange` that updates state, using `defaultValue` for uncontrolled behaviour, or adding `readOnly` if it is intentionally non-editable. Don't silence it with a noop handler unless you really mean a locked field.
+**Answer:** A controlled input without a change handler becomes read-only. When you type, React re-renders with the same value, so your typing is ignored. The warning points out a likely bug. To fix it, I add an `onChange` that updates state, or I use `defaultValue` if I want an uncontrolled input, or I add `readOnly` if the field really shouldn't be editable. I wouldn't silence the warning with an empty handler unless I truly want a locked field.
 **Follow-up:** Difference between `readOnly` and `disabled`?
 
-Answer: `readOnly` is focusable and submitted with the form; `disabled` is not focusable and is excluded from submission.
+Answer: A `readOnly` field can be focused and is submitted with the form. A `disabled` field can't be focused and isn't submitted.
 
 ### REACT-254 — Cursor jumping in controlled inputs
 **Difficulty:** Intermediate
 **Category:** Forms
 **Question:** A controlled text input's caret jumps to the end while typing. What typically causes this?
-**Answer:** The rendered value differs from what the user typed — e.g. transforming input (formatting, trimming, uppercase) or updating state asynchronously (after `await` or a debounce). React resets the DOM value, which moves the caret. Fix by updating state synchronously with exactly what the DOM holds, then derive formatted display separately, or manually restore `selectionStart` in a layout effect. Debounce side effects, not the field state.
+**Answer:** It happens when the value React renders differs from what the user just typed. Two common causes are transforming the input, like formatting, trimming, or uppercasing it, and updating state asynchronously, such as after an `await` or a debounce. React then resets the DOM value, and the caret moves. The fix is to update state right away with exactly what the input contains, and compute the formatted display separately. Alternatively, restore `selectionStart` manually in a layout effect. Debounce side effects, not the field's own state.
 **Follow-up:** How do you debounce validation safely?
 
-Answer: Keep raw input state immediate and debounce a derived value or the validation call, never the `value` itself.
+Answer: Keep the raw input state updating immediately, and debounce a derived value or the validation call. Never debounce the `value` itself.
 
 ### REACT-255 — Reading uncontrolled inputs
 **Difficulty:** Junior
 **Category:** Forms
 **Question:** How can you read values from an uncontrolled form, and what are the options?
-**Answer:** Three approaches: refs per input (`ref.current.value`), `new FormData(form)` on submit (best for many fields keyed by `name`), or `event.currentTarget.elements`. `FormData` scales well and works with native validation. Refs suit imperative needs like focusing. Avoid `document.querySelector` inside React components.
+**Answer:** There are three main options. You can use a ref per input and read `ref.current.value`. You can use `new FormData(form)` on submit, which is best for many fields, since values are keyed by `name`. Or you can use `event.currentTarget.elements`. `FormData` scales well and works with native validation. Refs are better for imperative needs, like focusing a field. I avoid `document.querySelector` inside React components.
 **Code:**
 ```jsx
 function onSubmit(e) {
@@ -59,13 +59,13 @@ function onSubmit(e) {
 ```
 **Follow-up:** What does `FormData` skip?
 
-Answer: Disabled fields, unchecked checkboxes/radios, and inputs without a `name`.
+Answer: Disabled fields, unchecked checkboxes and radio buttons, and inputs that have no `name`.
 
 ### REACT-256 — Handling many fields
 **Difficulty:** Junior
 **Category:** Forms
 **Question:** How do you manage a form with many controlled fields without writing a handler per field?
-**Answer:** Store values in one object and use a shared `onChange` that reads `name` and `value` from the event, updating via computed key and functional state. Handle checkboxes via `checked`. For complex forms with arrays, nesting, or validation, move to a form library or `useReducer`. Beware that every keystroke re-renders the whole form in this pattern.
+**Answer:** I store all values in one object and use a shared `onChange` handler. It reads `name` and `value` from the event and updates that key using a functional state update. For checkboxes, it reads `checked` instead. If the form gets complex, with arrays, nesting, or heavy validation, I move to a form library or `useReducer`. One caveat is that with this pattern every keystroke re-renders the whole form.
 **Code:**
 ```jsx
 const onChange = e => {
@@ -75,51 +75,51 @@ const onChange = e => {
 ```
 **Follow-up:** What's the render-performance downside?
 
-Answer: Each keystroke re-renders the parent and all children; fix by splitting components, memoizing, or using an uncontrolled-based library like RHF.
+Answer: Each keystroke re-renders the parent and all its children. You can fix it by splitting components, memoizing, or using a library based on uncontrolled inputs, like React Hook Form.
 
 ### REACT-257 — Checkbox, radio, and select
 **Difficulty:** Junior
 **Category:** Forms
 **Question:** How do controlled checkboxes, radios, and selects differ from text inputs?
-**Answer:** Checkboxes use `checked` (not `value`) and read `e.target.checked`. Radios in a group share a `name`, and each has `checked={selected === option}`. `<select>` takes `value` on the `<select>` itself in React (not `selected` on options); `multiple` needs an array. Always render real `<label>`s so click targets and screen readers work.
+**Answer:** A checkbox uses `checked` instead of `value`, and you read `e.target.checked`. Radio buttons in a group share a `name`, and each one has `checked={selected === option}`. In React, a `<select>` takes `value` on the `<select>` itself, not `selected` on each option, and `multiple` needs an array. For all of them, I render real `<label>` elements, so the click target is larger and screen readers can announce each control properly.
 **Follow-up:** Why `value` on `<select>` instead of `selected` on `<option>`?
 
-Answer: React normalises it so all form controls share the same controlled API.
+Answer: React makes it consistent, so every form control uses the same controlled API.
 
 ### REACT-258 — Why use a form library
 **Difficulty:** Intermediate
 **Category:** Form libraries
 **Question:** When is hand-rolled state enough for forms, and when should you reach for a form library?
-**Answer:** Hand-rolled is fine for 1–5 fields with simple rules. Libraries pay off when you need: per-field touched/dirty/error state, schema validation, nested or dynamic arrays, async validation, performance on large forms, and consistent submit handling. The cost is a dependency, API learning curve, and sometimes awkward integration with custom UI components.
+**Answer:** Hand-written state is fine for a form with one to five fields and simple rules. A library pays off when you need per-field touched, dirty, and error state, schema validation, nested or dynamic arrays, async validation, good performance on large forms, or consistent submit handling. The costs are an extra dependency, a learning curve, and sometimes awkward integration with custom UI components.
 **Trade-offs:** Less boilerplate and better perf vs. abstraction, bundle size, and library lock-in.
 **Follow-up:** What's the third option besides library or manual state?
 
-Answer: Native `<form>` with `FormData`, server actions, and native constraint validation, which is often enough for simple flows.
+Answer: Use a native `<form>` with `FormData`, server actions, and the browser's built-in validation. For simple flows, that is often enough.
 
 ### REACT-259 — React Hook Form vs Formik
 **Difficulty:** Intermediate
 **Category:** Form libraries
 **Question:** At a high level, how do React Hook Form and Formik differ, and which would you choose?
-**Answer:** RHF is uncontrolled-first: it registers inputs via refs, so typing doesn't re-render the form, giving better performance and a small bundle. Formik is controlled-first, simpler mentally with state-driven rendering, but re-renders more and has seen slower maintenance. Both support schema validation (Zod/Yup). Default to RHF for new projects; Formik is acceptable in existing codebases.
+**Answer:** React Hook Form is uncontrolled-first. It registers inputs through refs, so typing doesn't re-render the whole form, which gives better performance and a small bundle. Formik is controlled-first. It's easy to reason about because everything is driven by state, but it re-renders more and has seen slower maintenance. Both support schema validation with Zod or Yup. I'd choose React Hook Form for new projects, and keep Formik where it's already used.
 **Trade-offs:** RHF: perf, ecosystem momentum; needs `Controller` for controlled UI libs. Formik: familiar API; more re-renders.
 **Follow-up:** When do you need RHF's `Controller`?
 
-Answer: When wrapping third-party controlled components (custom selects, date pickers) that don't expose a native input ref.
+Answer: When wrapping third-party controlled components, like custom selects or date pickers, that don't expose a native input ref.
 
 ### REACT-260 — Validation timing UX
 **Difficulty:** Intermediate
 **Category:** Validation UX
 **Question:** When should validation errors appear: onChange, onBlur, or onSubmit?
-**Answer:** Showing errors while the user is still typing ("invalid email" after one character) is hostile. Common pattern: validate on blur for first-time feedback, then revalidate on change once a field has errored ("reward early, punish late"). Always validate on submit and focus the first invalid field. Some checks (password strength, character count) are helpful live. Match timing to field cost and user intent.
+**Answer:** Showing an error while the user is still typing, like "invalid email" after one character, is frustrating. A common pattern is to validate on blur for first-time feedback, then re-validate on every change once the field has shown an error. People call this "reward early, punish late." I always validate on submit and focus the first invalid field. Some checks, like password strength or character count, are helpful live. I match the timing to the field and the user's intent.
 **Follow-up:** What's RHF's `mode` option?
 
-Answer: It sets when validation first triggers (`onSubmit`, `onBlur`, `onChange`, `onTouched`), and `reValidateMode` controls it after the first submit.
+Answer: It sets when validation first runs: `onSubmit`, `onBlur`, `onChange`, or `onTouched`. `reValidateMode` controls when it runs again after the first submit.
 
 ### REACT-261 — Schema validation with shared schemas
 **Difficulty:** Intermediate
 **Category:** Validation
 **Question:** Why use a schema library like Zod for form validation, and how does it fit client and server?
-**Answer:** A schema is a single declarative source of truth for shape and rules, giving type inference plus consistent error messages. The same schema can run in the browser for UX and on the server for enforcement, avoiding drift. Form libraries integrate through resolvers. Keep UI-specific messages mappable, and don't assume client validation is trustworthy.
+**Answer:** A schema describes the shape and rules of the data in one place. It gives you type inference and consistent error messages. The same schema can run in the browser for a better user experience and on the server for real enforcement, so the two never drift apart. Form libraries connect to it through resolvers. I keep UI-specific messages easy to map, and I never assume client-side validation is trustworthy.
 **Code:**
 ```ts
 const Schema = z.object({ email: z.string().email(), age: z.coerce.number().min(18) });
@@ -127,31 +127,31 @@ const result = Schema.safeParse(Object.fromEntries(formData));
 ```
 **Follow-up:** Why `z.coerce` for form values?
 
-Answer: Form values arrive as strings, so numbers and dates need coercion before validation.
+Answer: Form values arrive as strings, so numbers and dates must be converted before validation.
 
 ### REACT-262 — Never trust client validation
 **Difficulty:** Junior
 **Category:** Validation
 **Question:** If the client validates a form, why must the server validate again?
-**Answer:** Client checks are a UX convenience; anyone can bypass them with curl, devtools, or a modified client. The server must enforce authentication, authorization, types, ranges, and business rules, and return structured field errors the UI can render. Also handle uniqueness and race conditions that only the server can know (e.g. "email taken").
+**Answer:** Client checks only improve the user experience. Anyone can bypass them with curl, browser devtools, or a modified client. The server must enforce authentication, authorization, types, ranges, and business rules, and return structured field errors that the UI can display. Some checks can only be done on the server anyway, like whether an email is already taken, because they depend on current data and concurrent requests.
 **Follow-up:** How do you display server field errors?
 
-Answer: Return an error map keyed by field name and render it next to the inputs (or set it into the form library, e.g. RHF `setError`).
+Answer: Return an error map keyed by field name and render each message next to its input. With a form library, you can set them directly, for example with RHF's `setError`.
 
 ### REACT-263 — Native form + FormData
 **Difficulty:** Intermediate
 **Category:** Native forms
 **Question:** Why might you prefer a plain `<form>` and `FormData` over controlled state in React 18+?
-**Answer:** Native forms give you free behaviours: Enter-to-submit, constraint validation (`required`, `type`, `pattern`), autofill, `reset`, and progressive enhancement. With uncontrolled inputs you avoid re-renders per keystroke and heavy state wiring. Add React only where you need live UI (previews, conditional fields). It's less code and often more accessible.
+**Answer:** Native forms give you a lot for free: Enter to submit, built-in validation like `required`, `type`, and `pattern`, browser autofill, `reset`, and progressive enhancement. With uncontrolled inputs, you avoid a re-render on each keystroke and a lot of state wiring. I add React state only where I need live UI, such as previews or conditional fields. It's often less code, and often more accessible too.
 **Follow-up:** How do you trigger native validation UI manually?
 
-Answer: Call `form.reportValidity()` or `checkValidity()`, or just submit and let the browser block invalid submissions (don't add `noValidate` unless you handle errors yourself).
+Answer: Call `form.reportValidity()` or `checkValidity()`, or just submit and let the browser block invalid submissions. Don't add `noValidate` unless you handle errors yourself.
 
 ### REACT-264 — `<form action={fn}>` in React 19
 **Difficulty:** Intermediate
 **Category:** Actions
 **Question:** What does passing a function to `<form action>` do in React 19?
-**Answer:** React calls the function with `FormData` on submit, wraps it in a transition, and resets uncontrolled fields after a successful action. The function can be async (client) or a server function (frameworks with RSC). It enables pending state tracking and progressive enhancement when using server functions. You no longer need `preventDefault` or manual `FormData` construction.
+**Answer:** When the form is submitted, React calls your function with the form's `FormData`, runs it inside a transition, and resets uncontrolled fields after the action succeeds. The function can be async on the client, or a server function in frameworks that support Server Components. This gives you pending-state tracking and progressive enhancement with server functions. You no longer need `preventDefault` or to build `FormData` yourself.
 **Code:**
 ```jsx
 async function save(formData) { await api.save(formData.get('name')); }
@@ -159,13 +159,13 @@ async function save(formData) { await api.save(formData.get('name')); }
 ```
 **Follow-up:** What happens to inputs after the action?
 
-Answer: React resets uncontrolled form fields automatically; controlled inputs keep their state.
+Answer: React resets uncontrolled fields automatically. Controlled inputs keep their state.
 
 ### REACT-265 — `useActionState`
 **Difficulty:** Intermediate
 **Category:** Actions
 **Question:** What is `useActionState` and what problem does it solve?
-**Answer:** It returns `[state, formAction, isPending]`, wrapping an action `(prevState, formData) => newState`. It lets an action return validation errors or a result that you render, without separate `useState` plumbing, and gives a pending flag. It composes with `<form action={formAction}>`. It replaces the earlier `useFormState` name from canary/DOM.
+**Answer:** `useActionState` returns `[state, formAction, isPending]`. You give it an action with the shape `(prevState, formData) => newState`. The action can return validation errors or a result, and you render that state directly, without separate `useState` code. You also get a pending flag. You pass `formAction` to `<form action>`. It replaces the earlier name `useFormState`, which existed in canary builds and in `react-dom`.
 **Code:**
 ```jsx
 const [state, action, pending] = useActionState(submit, { errors: {} });
@@ -173,13 +173,13 @@ const [state, action, pending] = useActionState(submit, { errors: {} });
 ```
 **Follow-up:** Where does `prevState` come from?
 
-Answer: React passes the last returned state (or the initial state on first call), enabling sequential or accumulating results.
+Answer: React passes in the last state your action returned, or the initial state on the first call. That makes sequential or accumulating results possible.
 
 ### REACT-266 — `useFormStatus`
 **Difficulty:** Intermediate
 **Category:** Actions
 **Question:** What does `useFormStatus` provide and what is its main constraint?
-**Answer:** It returns `{ pending, data, method, action }` for the parent `<form>` submission, which is ideal for a reusable `SubmitButton` that disables itself while pending. Constraint: it must be called from a component rendered *inside* the form, not the component that renders the `<form>` itself. It's imported from `react-dom`.
+**Answer:** It returns `{ pending, data, method, action }` for the submission of the parent `<form>`. It's ideal for a reusable `SubmitButton` that disables itself while the form is submitting. The main constraint is that you must call it from a component rendered inside the form, not from the component that renders the `<form>` itself. It's imported from `react-dom`.
 **Code:**
 ```jsx
 function Submit() { const { pending } = useFormStatus();
@@ -187,44 +187,44 @@ function Submit() { const { pending } = useFormStatus();
 ```
 **Follow-up:** Why doesn't it work in the same component as `<form>`?
 
-Answer: It reads status from the nearest parent form context, so the component calling it must be a descendant.
+Answer: It reads the status of the nearest parent form, so the component calling it must be a descendant of that form.
 
 ### REACT-267 — Optimistic UI with forms
 **Difficulty:** Senior
 **Category:** Actions
 **Question:** How does `useOptimistic` fit with form actions, and what are the risks?
-**Answer:** `useOptimistic(state, reducer)` lets you show the expected result immediately while the action is pending; React reverts to real state when the action settles. Pair it with a form action to append a comment or toggle a like instantly. Risks: showing success for something that fails, so surface errors clearly, keep updates idempotent, and don't use it for irreversible or high-stakes operations like payments.
+**Answer:** `useOptimistic(state, reducer)` lets you show the expected result right away while the action is still pending. When the action finishes, React goes back to the real state. Combined with a form action, you can instantly add a comment or toggle a like. The risk is showing success for something that later fails. So I show errors clearly, keep updates safe to repeat, and avoid it for irreversible or high-stakes actions like payments.
 **Follow-up:** What happens on failure?
 
-Answer: The optimistic value is discarded when the transition ends and the UI falls back to authoritative state; you should show an error message.
+Answer: The optimistic value is dropped when the transition ends, and the UI falls back to the real state. You should also show an error message.
 
 ### REACT-268 — Preventing double submit
 **Difficulty:** Intermediate
 **Category:** Forms
 **Question:** How do you prevent users from submitting a form twice?
-**Answer:** Client side: track pending (`useFormStatus`, `isPending`, or `isSubmitting`) and disable or guard the submit handler. Disabling the button alone is brittle (Enter key, slow state updates), so also early-return in the handler. Server side: use idempotency keys or unique constraints, since retries, refreshes, and multiple tabs can still duplicate. Keep the button accessible while pending (see aria-disabled).
+**Answer:** On the client, I track the pending state, using `useFormStatus`, `isPending`, or `isSubmitting`, and disable the button. Disabling alone is fragile, because of the Enter key and slow state updates, so I also return early in the submit handler. On the server, I use idempotency keys or unique constraints, because retries, page refreshes, and multiple tabs can still create duplicates. I also keep the pending button accessible, for example with `aria-disabled`.
 **Follow-up:** Why isn't disabling the button enough?
 
-Answer: Enter-key submissions and fast double clicks can fire before the disabled state renders, and it does nothing against network retries.
+Answer: Pressing Enter or double-clicking quickly can fire before the disabled state renders. And it does nothing against network retries.
 
 ### REACT-269 — File inputs
 **Difficulty:** Intermediate
 **Category:** Forms
 **Question:** How do you handle `<input type="file">` in React, and why can't it be controlled?
-**Answer:** Browsers forbid setting a file input's value programmatically for security, so it's always uncontrolled. Read `e.target.files` (a `FileList`) in `onChange`, or use `FormData`. Validate type and size client-side for UX, but re-validate on the server. For uploads, consider direct-to-storage signed URLs, progress via XHR or fetch streams, and `accept`/`multiple` attributes.
+**Answer:** Browsers don't allow code to set a file input's value, for security reasons, so it's always uncontrolled. In `onChange`, I read `e.target.files`, which is a `FileList`, or I use `FormData`. I check file type and size on the client for a better experience, but I validate again on the server. For uploads, I'd consider signed URLs to upload directly to storage, progress tracking, and the `accept` and `multiple` attributes.
 **Code:**
 ```jsx
 <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] ?? null)} />
 ```
 **Follow-up:** How can you clear a file input?
 
-Answer: Set `ref.current.value = ''` (allowed for clearing) or remount it with a changed `key`.
+Answer: Set `ref.current.value = ''`, which is allowed for clearing, or remount the input by changing its `key`.
 
 ### REACT-270 — File previews and object URLs
 **Difficulty:** Intermediate
 **Category:** Forms
 **Question:** How do you show an image preview for a selected file and avoid memory leaks?
-**Answer:** Use `URL.createObjectURL(file)` for a preview `src` and revoke it with `URL.revokeObjectURL` when the file changes or the component unmounts, typically in an effect cleanup. `FileReader.readAsDataURL` works too but is heavier. Derive the URL from the `file` state rather than creating it during render, which would leak a new URL every render.
+**Answer:** I use `URL.createObjectURL(file)` to get a preview URL for the image's `src`. Then I release it with `URL.revokeObjectURL` when the file changes or the component unmounts, usually in an effect cleanup. `FileReader.readAsDataURL` also works, but it's heavier. I create the URL from the `file` state inside an effect, not during render, because creating it in render would leak a new URL on every render.
 **Code:**
 ```jsx
 useEffect(() => { if (!file) return;
@@ -233,45 +233,45 @@ useEffect(() => { if (!file) return;
 ```
 **Follow-up:** Why not create the URL in render?
 
-Answer: Render must be pure; it would allocate a new blob URL on every render and never free it.
+Answer: Render should be pure. It would create a new blob URL on every render and never free it.
 
 ### REACT-271 — Multi-step form state
 **Difficulty:** Senior
 **Category:** Multi-step forms
 **Question:** How would you design state for a multi-step (wizard) form?
-**Answer:** Keep one source of truth for all step data, either a parent component, a reducer/context, a form library `FormProvider`, or the URL/server draft. Each step validates its own slice before advancing, but final submit validates the whole schema. Persist progress (URL step param, sessionStorage, or server draft) so refresh and back-button work. Don't unmount-and-lose data: lift state above step components.
+**Answer:** I keep one source of truth for all steps' data. That can be a parent component, a reducer with context, a form library's `FormProvider`, or the URL or a server-side draft. Each step validates its own part before moving on, and the final submit validates the whole schema. I persist progress, using a URL step parameter, sessionStorage, or a server draft, so refresh and the back button work. The state must live above the step components, so it isn't lost when a step unmounts.
 **Trade-offs:** One big form = simple submit but heavy; per-step forms = isolated validation but more merge logic.
 **Follow-up:** Where should the current step live?
 
-Answer: In the URL (e.g. `?step=2`) when you want deep links and back/forward support; otherwise in local state.
+Answer: In the URL, such as `?step=2`, when you want deep links and back and forward support. Otherwise, local state is fine.
 
 ### REACT-272 — Resetting forms with `key`
 **Difficulty:** Intermediate
 **Category:** Forms
 **Question:** How do you reset a form's state when the record being edited changes?
-**Answer:** Give the form (or its container) a `key` equal to the record id so React remounts it with fresh state and `defaultValue`s. This avoids syncing props into state with effects, which is error-prone. For an explicit reset button, use `form.reset()` for uncontrolled forms or reinitialise state/library values (`reset(values)` in RHF).
+**Answer:** I give the form, or its container, a `key` equal to the record's id. When the key changes, React remounts the form with fresh state and fresh `defaultValue`s. That avoids copying props into state with effects, which is error-prone. For an explicit reset button, I call `form.reset()` on uncontrolled forms, or set the state or library values again, for example with `reset(values)` in React Hook Form.
 **Code:**
 ```jsx
 <EditForm key={user.id} initial={user} />
 ```
 **Follow-up:** Why avoid `useEffect` to copy props into state?
 
-Answer: It causes an extra render with stale values and subtle bugs; a key-driven remount is simpler and correct.
+Answer: It causes an extra render with stale values and subtle bugs. A remount driven by a key is simpler and correct.
 
 ### REACT-273 — Unsaved changes warning
 **Difficulty:** Senior
 **Category:** Forms
 **Question:** How do you warn users about losing unsaved form changes?
-**Answer:** Track a dirty flag (form library `isDirty`, or compare to initial values). Add a `beforeunload` listener for tab close/refresh while dirty, and use your router's blocker for in-app navigation (e.g. React Router `useBlocker`). Remove listeners when clean or after save. Browsers show generic text only. Prefer autosave/drafts where possible, since warnings are friction.
+**Answer:** First, I track whether the form is dirty, using the form library's `isDirty` or by comparing to the initial values. While it's dirty, I add a `beforeunload` listener to cover closing the tab or refreshing. For navigation inside the app, I use the router's blocker, like `useBlocker` in React Router. I remove the listeners when the form is clean or saved. Browsers only show a generic message. Where possible, I prefer autosave or drafts, since warnings add friction.
 **Follow-up:** Why not just always confirm?
 
-Answer: Constant prompts train users to dismiss them; only block when there is real unsaved data.
+Answer: Constant prompts teach users to dismiss them. Only block navigation when there is real unsaved data.
 
 ### REACT-274 — Labels and `useId`
 **Difficulty:** Junior
 **Category:** Accessibility
 **Question:** How do you correctly associate labels with inputs in React, and why use `useId`?
-**Answer:** Use `<label htmlFor={id}>` matching the input's `id`, or wrap the input inside the label. Labels give the control its accessible name and enlarge the click target. `useId` generates stable, SSR-safe unique ids so reusable components don't collide or cause hydration mismatches. Don't generate ids with `Math.random()`.
+**Answer:** I use `<label htmlFor={id}>` with a matching `id` on the input, or I wrap the input inside the label. The label gives the control its accessible name and makes the click target bigger. `useId` generates unique ids that are stable between server and client, so reusable components don't collide or cause hydration mismatches. I never generate ids with `Math.random()`.
 **Code:**
 ```jsx
 const id = useId();
@@ -279,31 +279,31 @@ const id = useId();
 ```
 **Follow-up:** Can I use `useId` output for CSS selectors?
 
-Answer: Not reliably, since it contains colons; use it for ids/ARIA references and use classes for styling.
+Answer: Not reliably, because it contains colons. Use it for ids and ARIA references, and use classes for styling.
 
 ### REACT-275 — Placeholder is not a label
 **Difficulty:** Junior
 **Category:** Accessibility
 **Question:** Why shouldn't a placeholder replace a visible label?
-**Answer:** Placeholders disappear when typing, lowering memory support; they usually have poor contrast; and they aren't reliably exposed as the accessible name across assistive tech. Users with cognitive disabilities are hit hardest. Use a persistent visible label; use placeholder only for an example format hint. If design insists on floating labels, keep a real `<label>` element.
+**Answer:** A placeholder disappears when the user starts typing, so they have to remember what the field was for. Placeholders usually have low contrast, and assistive technology doesn't reliably treat them as the field's name. People with cognitive disabilities are affected most. I use a persistent, visible label, and use the placeholder only for an example format. If the design uses floating labels, I still keep a real `<label>` element.
 **Follow-up:** When is a visually hidden label acceptable?
 
-Answer: When surrounding context makes purpose obvious (like a search box with a search button), but keep the label in the DOM for screen readers.
+Answer: When the surrounding context makes the purpose obvious, like a search box next to a search button. Keep the label in the DOM so screen readers can still announce it.
 
 ### REACT-276 — `aria-label`, `aria-labelledby`, `aria-describedby`
 **Difficulty:** Intermediate
 **Category:** Accessibility
 **Question:** What are the differences between `aria-label`, `aria-labelledby`, and `aria-describedby`?
-**Answer:** `aria-label` gives a string accessible name directly. `aria-labelledby` points to element ids whose text forms the name (preferred when visible text exists). `aria-describedby` references supplementary description (hints, errors) read after the name. Prefer native `<label>`/text first: ARIA is a fallback. A name says *what it is*; a description says *extra help*.
+**Answer:** `aria-label` gives an element a name directly as a text string. `aria-labelledby` points to the ids of other elements whose text becomes the name, which I prefer when visible text already exists. `aria-describedby` points to extra information, like hints or errors, that is read after the name. A name says what the control is, and a description gives extra help. I try native labels and visible text first, and treat ARIA as a fallback.
 **Follow-up:** Which wins if multiple naming sources exist?
 
-Answer: `aria-labelledby` takes precedence over `aria-label`, which takes precedence over native labels in the accessible name computation.
+Answer: `aria-labelledby` wins over `aria-label`, which wins over native labels, when the browser works out the accessible name.
 
 ### REACT-277 — Accessible field errors
 **Difficulty:** Intermediate
 **Category:** Accessibility
 **Question:** How do you make a field's validation error accessible?
-**Answer:** Render the error text adjacent to the field, link it with `aria-describedby`, and set `aria-invalid="true"` while invalid. Don't rely on color or an icon alone: include text such as "Email must include @". Keep messages specific and actionable. Also avoid hiding the error element when empty in a way that breaks the id reference.
+**Answer:** I show the error text next to the field, connect it with `aria-describedby`, and set `aria-invalid="true"` while the field is invalid. I don't rely on color or an icon alone. The message should say something specific, like "Email must include @". I also make sure that hiding the error element when there's no error doesn't break the id reference the input points to.
 **Code:**
 ```jsx
 <input id="e" aria-invalid={!!err} aria-describedby={err ? 'e-err' : undefined} />
@@ -311,81 +311,81 @@ Answer: `aria-labelledby` takes precedence over `aria-label`, which takes preced
 ```
 **Follow-up:** Does `aria-invalid` replace error text?
 
-Answer: No; it only signals state. The message text is what tells the user how to fix it.
+Answer: No. It only signals that something is wrong. The message text is what tells the user how to fix it.
 
 ### REACT-278 — Announcing errors
 **Difficulty:** Senior
 **Category:** Accessibility
 **Question:** How should form submit errors be announced to screen reader users?
-**Answer:** Move focus to the first invalid field (its description is read) or to an error summary heading with links to each field. Alternatively, use a live region (`role="alert"` or `aria-live`) for the summary. Avoid announcing every keystroke error. Don't both move focus and fire a duplicate alert unnecessarily. Test with a real screen reader, since behaviour varies.
+**Answer:** One option is to move focus to the first invalid field, so its error is read out. Another is to move focus to an error summary heading with links to each field. A third is to announce a summary through a live region, using `role="alert"` or `aria-live`. I avoid announcing an error on every keystroke, and I avoid moving focus and also firing a duplicate alert. Behavior varies between screen readers, so I test with real ones.
 **Trade-offs:** Focus move is reliable and navigable; live regions are non-disruptive but can be missed or double-read.
 **Follow-up:** Why an error summary with links?
 
-Answer: It lists all problems in one place and lets keyboard users jump to each failing field.
+Answer: It lists all the problems in one place, and lets keyboard users jump straight to each failing field.
 
 ### REACT-279 — Live regions: polite vs assertive
 **Difficulty:** Intermediate
 **Category:** Accessibility
 **Question:** How do `aria-live` regions work, and when use `polite` vs `assertive`?
-**Answer:** A live region announces content changes without moving focus. `polite` waits for the user to pause (status, "Saved", results count); `assertive` interrupts (critical errors); `role="status"` and `role="alert"` imply these. The region must exist in the DOM *before* its content changes, so render the container always and update its text. Overuse is noisy.
+**Answer:** A live region makes a screen reader announce content changes without moving focus. `polite` waits until the user pauses, which suits status messages like "Saved" or a results count. `assertive` interrupts, so it's for critical errors. The roles `status` and `alert` imply these two behaviors. The region has to exist in the DOM before its content changes, so I always render the container and only update its text. Overusing live regions gets noisy.
 **Code:**
 ```jsx
 <div role="status" aria-live="polite">{saved ? 'Changes saved' : ''}</div>
 ```
 **Follow-up:** Why might an announcement not be read?
 
-Answer: The live region was mounted at the same time as its text, so assistive tech never observed a change.
+Answer: The live region was added to the page at the same time as its text. Assistive technology never saw a change, so nothing was announced.
 
 ### REACT-280 — Focus first invalid field
 **Difficulty:** Intermediate
 **Category:** Accessibility
 **Question:** After a failed submit, why and how do you move focus to the first invalid field?
-**Answer:** Otherwise keyboard and screen reader users don't know the submit failed or where to fix it. Collect refs (or query `[aria-invalid="true"]`) and call `.focus()` after errors render, inside an effect or after state update. Form libraries do this (`shouldFocusError` in RHF). Pair with a visible error and consider scrolling it into view below sticky headers.
+**Answer:** Without it, keyboard and screen reader users may not realize the submit failed, or where to fix it. I collect refs, or query `[aria-invalid="true"]`, and call `.focus()` after the errors have rendered, in an effect. Form libraries do this too, for example `shouldFocusError` in React Hook Form. I also make sure the error is visible, and scroll it into view if a sticky header would cover it.
 **Follow-up:** Why call focus in an effect?
 
-Answer: The error markup and `aria-invalid` need to be committed to the DOM first; effects run after commit.
+Answer: The error markup and `aria-invalid` must be in the DOM first. Effects run after the DOM is updated.
 
 ### REACT-281 — Semantic HTML over div soup
 **Difficulty:** Junior
 **Category:** Semantic HTML
 **Question:** Why use semantic HTML elements instead of styled `div`s?
-**Answer:** Native elements ship roles, keyboard behaviour, focus handling, and form integration for free: `button`, `a`, `nav`, `main`, `ul`, `table`, `dialog`. Divs need ARIA, tabindex, and key handlers re-implemented, usually imperfectly. Semantics also help SEO, reader modes, and testability (`getByRole`). First rule of ARIA: don't use ARIA if a native element does the job.
+**Answer:** Native elements come with roles, keyboard behavior, focus handling, and form integration built in. Examples are `button`, `a`, `nav`, `main`, `ul`, `table`, and `dialog`. With a `div`, you have to rebuild all that with ARIA, `tabindex`, and key handlers, and it's usually not quite right. Semantic elements also help SEO, reader modes, and tests that use `getByRole`. The first rule of ARIA is: if a native element does the job, don't use ARIA.
 **Follow-up:** Can you give a quick example of the cost?
 
-Answer: A `div onClick` isn't focusable, ignores Enter/Space, and has no role; a `<button>` gives all three.
+Answer: A `div onClick` can't be focused, ignores Enter and Space, and has no role. A `<button>` gives you all three.
 
 ### REACT-282 — Button vs clickable div
 **Difficulty:** Junior
 **Category:** Semantic HTML
 **Question:** What do you lose with `<div onClick>` compared to `<button>`, and when is `<a>` correct?
-**Answer:** Lost: keyboard focus, Enter/Space activation, role announcement, disabled semantics, and form submit behaviour. Use `<button>` for actions (do something) and `<a href>` for navigation (go somewhere), so middle-click, "open in new tab", and link lists work. Set `type="button"` to avoid accidental form submits. If you must use a div, add `role`, `tabIndex=0`, and key handlers, which is rarely worth it.
+**Answer:** With a `div`, you lose keyboard focus, activation with Enter and Space, the role announcement, disabled behavior, and form submit behavior. I use `<button>` for actions, where something happens, and `<a href>` for navigation, where you go somewhere. Links also support middle-click and "open in new tab." I set `type="button"` to avoid accidental form submits. If I must use a div, I add a `role`, `tabIndex=0`, and key handlers, which is rarely worth it.
 **Follow-up:** Why `type="button"`?
 
-Answer: Buttons in a form default to `type="submit"`, which would trigger form submission unexpectedly.
+Answer: A button inside a form defaults to `type="submit"`, which would submit the form unexpectedly.
 
 ### REACT-283 — Heading hierarchy
 **Difficulty:** Junior
 **Category:** Semantic HTML
 **Question:** Why does heading order matter, and how do you keep it correct in a component-based app?
-**Answer:** Screen reader users navigate by headings, so levels (h1→h2→h3) should reflect document outline without skipping for styling reasons. One `h1` per page is the practical convention. In reusable components, don't hardcode levels: accept a `level` prop or derive from context, and style independently of semantics via CSS classes. Check it with an outline tool or axe.
+**Answer:** Screen reader users often navigate by headings, so the levels, h1 then h2 then h3, should reflect the page outline and not skip levels just for styling. One `h1` per page is the practical convention. In reusable components, I don't hardcode the level. I accept a `level` prop or derive it from context, and I control the visual size with CSS classes. I check the result with an outline tool or axe.
 **Follow-up:** Can headings be chosen by size?
 
-Answer: No; choose by structure and apply visual size with CSS.
+Answer: No. Choose the level by structure, and use CSS for the visual size.
 
 ### REACT-284 — Landmarks
 **Difficulty:** Junior
 **Category:** Semantic HTML
 **Question:** What are landmark regions and why use them?
-**Answer:** Landmarks (`header`, `nav`, `main`, `aside`, `footer`, `section` with a name, `form` with a name) let assistive tech users jump between page areas. Use one `main`; label multiple `nav`s with `aria-label` to distinguish ("Primary", "Footer"). Don't wrap everything in landmarks, as too many dilute navigation value.
+**Answer:** Landmarks, such as `header`, `nav`, `main`, `aside`, `footer`, and named `section` or `form` elements, let assistive technology users jump between areas of the page. I use one `main`, and I label multiple `nav` elements with `aria-label`, like "Primary" and "Footer," so they can be told apart. I don't wrap everything in landmarks, because too many make navigation less useful.
 **Follow-up:** When does `section` become a landmark?
 
-Answer: Only when it has an accessible name (e.g. `aria-labelledby`); otherwise it's a generic grouping.
+Answer: Only when it has an accessible name, for example through `aria-labelledby`. Otherwise it's just a generic grouping.
 
 ### REACT-285 — Skip links
 **Difficulty:** Junior
 **Category:** Keyboard
 **Question:** What is a skip link and how do you implement it in a React app?
-**Answer:** A skip link is the first focusable element, letting keyboard users bypass repeated navigation to `main`. Implement as `<a href="#main">Skip to content</a>` with a target `id="main"` (and `tabIndex={-1}` on it so focus actually lands). Visually hide until focused (not `display:none`). In SPAs, ensure client-side routing doesn't break the hash target.
+**Answer:** A skip link is the first focusable element on the page. It lets keyboard users jump past the repeated navigation straight to the `main` content. I implement it as `<a href="#main">Skip to content</a>`, with a target element that has `id="main"` and `tabIndex={-1}`, so focus actually moves there. I hide it visually until it receives focus, without using `display:none`. In a single-page app, I also make sure client-side routing doesn't break the hash target.
 **Code:**
 ```jsx
 <a className="skip" href="#main">Skip to content</a>
@@ -393,136 +393,136 @@ Answer: Only when it has an accessible name (e.g. `aria-labelledby`); otherwise 
 ```
 **Follow-up:** Why not `display:none`?
 
-Answer: Hidden elements aren't focusable or exposed; use an offscreen/clip technique that reveals it on `:focus`.
+Answer: Hidden elements can't be focused or exposed to assistive tech. Use an offscreen or clipping technique that reveals the link on `:focus`.
 
 ### REACT-286 — Keyboard navigation and `tabIndex`
 **Difficulty:** Intermediate
 **Category:** Keyboard
 **Question:** How should `tabIndex` be used, and what are the pitfalls of positive values?
-**Answer:** `tabIndex={0}` adds an element to natural tab order; `-1` makes it programmatically focusable only (for focus management targets). Positive values override DOM order, creating confusing, unmaintainable tab sequences, so avoid them. Prefer DOM order matching visual order and native interactive elements. Always keep a visible `:focus-visible` style and never remove outlines without a replacement.
+**Answer:** `tabIndex={0}` puts an element into the natural tab order. `tabIndex={-1}` makes it focusable only through code, which is useful for focus management targets. Positive values override the DOM order and create confusing, hard-to-maintain tab sequences, so I avoid them. I keep the DOM order matching the visual order and prefer native interactive elements. I also keep a visible `:focus-visible` style, and never remove outlines without a replacement.
 **Follow-up:** Why can CSS reordering hurt accessibility?
 
-Answer: Visual order can diverge from DOM/tab order, so focus jumps unpredictably.
+Answer: The visual order can differ from the DOM and tab order, so focus jumps around unpredictably.
 
 ### REACT-287 — Roving tabindex
 **Difficulty:** Senior
 **Category:** Keyboard
 **Question:** What is the roving tabindex pattern, and when do you use it in React?
-**Answer:** For composite widgets (tabs, toolbars, menus, radio-like lists), only one item has `tabIndex={0}` while others have `-1`; arrow keys move focus and update which item is "0". The whole widget is a single tab stop, matching WAI-ARIA conventions. Track the active index in state and focus via refs. Alternative is `aria-activedescendant`. Prefer headless libraries (Radix, React Aria) over hand-rolling.
+**Answer:** It's for widgets with several related items, like tabs, toolbars, menus, or radio-like lists. Only one item has `tabIndex={0}`, and the rest have `-1`. Arrow keys move focus and update which item is the "0" one. So the whole widget is a single tab stop, which matches WAI-ARIA guidance. I track the active index in state and move focus with refs. `aria-activedescendant` is an alternative. I'd rather use a headless library like Radix or React Aria than hand-roll it.
 **Follow-up:** Why only one tab stop?
 
-Answer: It keeps tabbing fast across a page; arrows handle movement inside the widget.
+Answer: It keeps tabbing through the page fast. The arrow keys handle movement inside the widget.
 
 ### REACT-288 — Focus on route change
 **Difficulty:** Senior
 **Category:** Focus management
 **Question:** What accessibility problem do SPAs have on navigation, and how do you address it?
-**Answer:** Client-side routing doesn't reload the page, so focus stays on the clicked link and screen readers get no cue that content changed. After navigation, move focus to the new page's `h1` or `main` (`tabIndex={-1}`), update `document.title`, and optionally announce via a live region. Many routers/frameworks offer helpers, but verify behaviour manually.
+**Answer:** Client-side routing doesn't reload the page, so focus stays on the link that was clicked, and screen readers get no signal that the content changed. After navigation, I move focus to the new page's `h1` or to `main` with `tabIndex={-1}`, update `document.title`, and optionally announce the change through a live region. Many routers and frameworks have helpers for this, but I still verify the behavior manually.
 **Follow-up:** Why update the document title?
 
-Answer: Screen readers announce the title on page load; in SPAs it's one of the main signals of navigation.
+Answer: Screen readers announce the title on a normal page load. In a single-page app, it's one of the main signals that navigation happened.
 
 ### REACT-289 — Accessible modals
 **Difficulty:** Senior
 **Category:** Focus management
 **Question:** What must an accessible modal dialog do?
-**Answer:** Move focus into the dialog on open, trap Tab within it, close on Escape, restore focus to the trigger on close, and make background content inert (`aria-modal="true"` plus `inert` or `aria-hidden` on siblings). Use `role="dialog"` with an accessible name. Prefer native `<dialog>` with `showModal()`, which handles much of this, or a vetted library. Render via a portal.
+**Answer:** It must move focus into the dialog when it opens, keep Tab inside it, close on Escape, and return focus to the trigger when it closes. The background content should be inert, using `aria-modal="true"` plus `inert` or `aria-hidden` on sibling content. The dialog needs `role="dialog"` and an accessible name. I'd prefer the native `<dialog>` element with `showModal()`, which handles much of this, or a well-tested library. I render it in a portal.
 **Trade-offs:** Native `<dialog>` = less code, good support; libraries = consistent styling/animation and edge-case handling.
 **Follow-up:** Why restore focus?
 
-Answer: Otherwise focus resets to the document start, forcing keyboard users to re-navigate from the top.
+Answer: Otherwise focus resets to the top of the document, and keyboard users have to navigate back from the start.
 
 ### REACT-290 — Dismissal: Escape and outside click
 **Difficulty:** Intermediate
 **Category:** Focus management
 **Question:** How do you correctly implement dismissal of popovers and dialogs for keyboard and pointer users?
-**Answer:** Support Escape via a `keydown` listener (cleaned up in an effect), and outside click via `pointerdown` on the document, checking `ref.contains(event.target)`. Don't make click-outside the only dismissal path: always include a visible close button. Ensure focus returns to the trigger. For nested layers, only the topmost should close on Escape.
+**Answer:** For Escape, I add a `keydown` listener and clean it up in an effect. For clicking outside, I listen for `pointerdown` on the document and check `ref.contains(event.target)`. Outside click shouldn't be the only way to close, so I always include a visible close button. Focus should return to the trigger when it closes. With nested layers, only the topmost one should close on Escape.
 **Follow-up:** Why `pointerdown` over `click`?
 
-Answer: It fires before focus/selection changes and avoids closing when a drag starts inside and ends outside.
+Answer: It fires before focus or selection changes. It also avoids closing when a drag starts inside the popover and ends outside.
 
 ### REACT-291 — `disabled` vs `aria-disabled`
 **Difficulty:** Intermediate
 **Category:** Accessibility
 **Question:** What's the difference between `disabled` and `aria-disabled`, and when use each?
-**Answer:** The `disabled` attribute removes the control from tab order, blocks events, and excludes it from form submission. `aria-disabled="true"` only conveys state to assistive tech; the element stays focusable and you must block activation yourself. Use `aria-disabled` when users need to discover why a button is unavailable (focusable with explanation); use `disabled` for truly inert controls and while pending submits.
+**Answer:** The `disabled` attribute removes the control from the tab order, blocks events, and excludes it from form submission. `aria-disabled="true"` only tells assistive technology about the state. The element stays focusable, and you must block the action yourself. I use `aria-disabled` when users need to discover why a button is unavailable, since they can still focus it and read an explanation. I use `disabled` for truly inactive controls, and while a submit is pending.
 **Follow-up:** Downside of `disabled` submit buttons for invalid forms?
 
-Answer: Users get no feedback on what's wrong; consider keeping it enabled and showing errors on submit.
+Answer: Users get no feedback about what's wrong. Consider keeping the button enabled and showing errors on submit.
 
 ### REACT-292 — Color contrast as a product concern
 **Difficulty:** Intermediate
 **Category:** Accessibility
 **Question:** Why is color contrast a product and design-system concern rather than just a dev detail?
-**Answer:** WCAG AA needs 4.5:1 for normal text, 3:1 for large text and UI components/focus indicators. Contrast affects low-vision users, glare conditions, and legal compliance. It's cheapest to enforce in design tokens and the design system (approved palette pairs, dark mode, disabled/placeholder states), plus CI checks. Fixing it per-component after launch causes rebrand-scale rework.
+**Answer:** WCAG AA requires a contrast ratio of 4.5 to 1 for normal text, and 3 to 1 for large text, UI components, and focus indicators. Contrast affects people with low vision, people in bright light, and legal compliance. It's cheapest to enforce in design tokens and the design system, with approved color pairs and rules for dark mode, disabled, and placeholder states, plus CI checks. Fixing it component by component after launch can mean rework on the scale of a rebrand.
 **Follow-up:** Does passing automated checks guarantee good contrast?
 
-Answer: No; tools miss text over images/gradients and states like hover or focus, so review them manually too.
+Answer: No. Tools miss text over images or gradients, and states like hover or focus. Review those manually too.
 
 ### REACT-293 — Don't rely on color alone
 **Difficulty:** Junior
 **Category:** Accessibility
 **Question:** Why shouldn't color be the only way to convey meaning (e.g. errors in red)?
-**Answer:** Color-blind users and monochrome displays can miss it, and screen readers can't see it at all. Add redundant cues: text ("Error:"), icons with accessible names, patterns, underline on links, and ARIA state like `aria-invalid`. Required fields should be marked with text or an asterisk explained in the form, not just a red border.
+**Answer:** Color-blind users and people on monochrome displays can miss it, and screen readers can't see color at all. I add backup cues: text like "Error:", icons with accessible names, patterns, underlines on links, and ARIA states like `aria-invalid`. For required fields, I use text or an asterisk that the form explains, not just a red border.
 **Follow-up:** How do you check this quickly?
 
-Answer: Use grayscale/color-blindness emulation in browser devtools and see if status is still obvious.
+Answer: Use the grayscale or color-blindness emulation in browser devtools, and see whether the status is still obvious.
 
 ### REACT-294 — Accessible names and hiding content
 **Difficulty:** Intermediate
 **Category:** Screen readers
 **Question:** How do `display:none`, `visibility:hidden`, `aria-hidden`, and a visually-hidden class differ for assistive tech?
-**Answer:** `display:none` and `visibility:hidden` remove content from both view and the accessibility tree. `aria-hidden="true"` hides it from assistive tech but leaves it visible. A visually-hidden (sr-only) class hides visually but keeps it available to screen readers. Use sr-only for icon-button text, and `aria-hidden` for decorative icons.
+**Answer:** `display:none` and `visibility:hidden` remove content from the screen and from the accessibility tree, so screen readers skip it too. `aria-hidden="true"` hides content from assistive technology but leaves it visible on screen. A visually-hidden class, often called `sr-only`, hides content visually but keeps it available to screen readers. I use `sr-only` for the text in icon buttons, and `aria-hidden` for decorative icons.
 **Code:**
 ```jsx
 <button><svg aria-hidden="true" />&nbsp;<span className="sr-only">Delete</span></button>
 ```
 **Follow-up:** How should icon-only buttons be named?
 
-Answer: Give them text via sr-only content or `aria-label`; never leave a nameless button.
+Answer: Give them text, either through `sr-only` content or `aria-label`. Never leave a button without a name.
 
 ### REACT-295 — `aria-hidden` on focusable elements
 **Difficulty:** Senior
 **Category:** Screen readers
 **Question:** Why is putting `aria-hidden="true"` on a container with focusable children a bug?
-**Answer:** Keyboard users can still tab into elements that screen readers are told don't exist, producing "silent" focus stops. When hiding offscreen content (drawers, background behind modals), also make it unfocusable: use `inert`, `hidden`, or `display:none`, or set `tabIndex={-1}`. The `inert` attribute handles both focus and AT exposure.
+**Answer:** Keyboard users can still tab into elements that screen readers have been told don't exist. This creates "silent" focus stops, where focus lands somewhere and nothing is announced. When hiding offscreen content, like drawers or the background behind a modal, I also make it unfocusable using `inert`, `hidden`, or `display:none`, or by setting `tabIndex={-1}`. The `inert` attribute handles both focus and assistive technology exposure.
 **Follow-up:** What does `inert` do?
 
-Answer: It makes a subtree non-interactive, unfocusable, and hidden from the accessibility tree.
+Answer: It makes a whole subtree non-interactive, unfocusable, and hidden from the accessibility tree.
 
 ### REACT-296 — Custom widgets: combobox, select, tabs
 **Difficulty:** Staff
 **Category:** ARIA patterns
 **Question:** Should you build custom comboboxes/selects/tabs yourself? How do you approach it?
-**Answer:** Rarely. These patterns need precise roles, states, keyboard maps, focus handling, and screen reader testing (`role="combobox"`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, etc.). Prefer native `<select>` where possible, otherwise headless libraries (React Aria, Radix, Headless UI, Ariakit) that follow WAI-ARIA APG and expose styling hooks. If building, follow APG exactly and test with VoiceOver/NVDA.
+**Answer:** Rarely. These widgets need exact roles and states, keyboard behavior, focus handling, and screen reader testing. A combobox, for example, needs `role="combobox"`, `aria-expanded`, `aria-controls`, and `aria-activedescendant`. I prefer a native `<select>` when possible. Otherwise I use a headless library, such as React Aria, Radix, Headless UI, or Ariakit, that follows the WAI-ARIA Authoring Practices and lets me style it. If I do build one, I follow those practices exactly and test with VoiceOver or NVDA.
 **Trade-offs:** Libraries cost dependency/bundle and some design constraints but remove a large class of accessibility bugs.
 **Follow-up:** Why is native `<select>` often still best?
 
-Answer: It's accessible, mobile-optimized, and keyboard-complete out of the box, at the cost of limited styling.
+Answer: It's accessible, mobile-friendly, and works fully with the keyboard out of the box. The cost is limited styling.
 
 ### REACT-297 — `fieldset` and `legend`
 **Difficulty:** Junior
 **Category:** Accessibility
 **Question:** When should you group controls with `<fieldset>` and `<legend>`?
-**Answer:** For related controls that share a question, such as radio groups, checkbox groups, or address blocks. The legend becomes the group's accessible name and is announced with each control, giving context like "Shipping method: Standard". A `div role="group"` with `aria-labelledby` is an alternative. Without grouping, radios read as "Standard, radio button" with no question.
+**Answer:** I use them for related controls that answer one shared question, like a group of radio buttons, a group of checkboxes, or an address block. The legend becomes the group's accessible name and is announced with each control, giving context like "Shipping method: Standard". A `div role="group"` with `aria-labelledby` is an alternative. Without grouping, a radio button might be read as just "Standard, radio button," with no question attached.
 **Follow-up:** Can `fieldset` be disabled as a group?
 
-Answer: Yes; `disabled` on the fieldset disables all descendant controls.
+Answer: Yes. Setting `disabled` on the fieldset disables all the controls inside it.
 
 ### REACT-298 — Input types, `autocomplete`, and `inputMode`
 **Difficulty:** Intermediate
 **Category:** Forms
 **Question:** Which native input attributes improve usability and accessibility in forms?
-**Answer:** Correct `type` (`email`, `tel`, `url`, `number`, `date`) triggers appropriate mobile keyboards and validation. `autocomplete` tokens (`email`, `given-name`, `one-time-code`, `current-password`) enable autofill and are a WCAG requirement for identity fields. `inputMode="numeric"` gives a numeric keypad without `type=number`'s quirks (e.g. for card or OTP). Also `required`, `min`, `pattern`, and `enterKeyHint`.
+**Answer:** The right `type`, such as `email`, `tel`, `url`, `number`, or `date`, gives mobile users the right keyboard and built-in validation. `autocomplete` values like `email`, `given-name`, `one-time-code`, and `current-password` enable autofill, and WCAG requires them for fields about the user's identity. `inputMode="numeric"` shows a numeric keypad without the quirks of `type="number"`, which suits card numbers or one-time codes. Other useful attributes are `required`, `min`, `pattern`, and `enterKeyHint`.
 **Follow-up:** Why avoid `type="number"` for IDs or card numbers?
 
-Answer: It allows spinner changes, drops leading zeros, and scroll-wheel edits; use text with `inputMode="numeric"` and `pattern`.
+Answer: It adds spinner buttons, drops leading zeros, and allows scroll-wheel changes. Use a text input with `inputMode="numeric"` and `pattern`.
 
 ### REACT-299 — Testing accessibility: RTL and axe
 **Difficulty:** Intermediate
 **Category:** Testing
 **Question:** How do you test accessibility in a React codebase at a basic level?
-**Answer:** Query by role and name with React Testing Library (`getByRole('button', {name: /save/i})`), which naturally validates semantics and labels. Add `jest-axe` (or `@axe-core/playwright`) to catch rule violations like missing labels or bad ARIA. Use `userEvent` to test keyboard flows (Tab, Enter, Escape, focus return). Automation catches roughly a third of issues, so complement it with manual keyboard and screen reader checks.
+**Answer:** I query elements by role and name with React Testing Library, like `getByRole('button', {name: /save/i})`. That naturally checks semantics and labels. I add `jest-axe`, or `@axe-core/playwright`, to catch rule violations like missing labels or incorrect ARIA. I use `userEvent` to test keyboard flows: Tab, Enter, Escape, and focus returning. Automated tools find only about a third of issues, so I add manual keyboard and screen reader checks.
 **Code:**
 ```jsx
 const { container } = render(<Form />);
@@ -530,14 +530,14 @@ expect(await axe(container)).toHaveNoViolations();
 ```
 **Follow-up:** Why prefer `getByRole` over `getByTestId`?
 
-Answer: It asserts what users and assistive tech actually perceive and fails when semantics break.
+Answer: It checks what users and assistive technology actually perceive, and it fails when semantics break.
 
 ### REACT-300 — Accessibility strategy for a team
 **Difficulty:** Staff
 **Category:** Accessibility
 **Question:** How would you build accessibility into a product team's process rather than treat it as a late audit?
-**Answer:** Shift left: accessible design-system primitives and tokens (contrast, focus, spacing), `eslint-plugin-jsx-a11y` in lint, axe checks in unit/E2E and CI gates, and Storybook a11y addons. Add definition-of-done items (keyboard path, labels, focus order), regular manual screen-reader passes, and an owner or champions group. Track issues like bugs, and involve users with disabilities when possible. Target WCAG 2.2 AA.
+**Answer:** I'd move it earlier, "shift left." That means accessible design-system components and tokens covering contrast, focus, and spacing, `eslint-plugin-jsx-a11y` in linting, axe checks in unit tests, end-to-end tests, and CI, and Storybook accessibility add-ons. I'd add definition-of-done items like keyboard path, labels, and focus order, regular manual screen reader reviews, and an owner or a champions group. I'd track accessibility issues like bugs, involve users with disabilities where possible, and target WCAG 2.2 AA.
 **Trade-offs:** Upfront investment and slower first delivery vs. avoiding costly retrofits, legal risk, and excluded users.
 **Follow-up:** What can't automated tools find?
 
-Answer: Logical focus order, meaningful alt text and labels, confusing flows, and real screen reader behaviour all need human review.
+Answer: Logical focus order, meaningful alt text and labels, confusing flows, and real screen reader behavior all need human review.

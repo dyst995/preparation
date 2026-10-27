@@ -1,8 +1,9 @@
 # NEST02 — Request lifecycle
 
-NestJS 10, Express adapter unless noted. Questions NEST-051–NEST-100.
+NestJS 10, Express adapter unless a question says otherwise. Questions NEST-051–NEST-100.
 
-Version pin: NestJS 10.4 (checked against 10.4.15). Enhancer APIs: `NestMiddleware`, `CanActivate`, `NestInterceptor`, `PipeTransform`, `ExceptionFilter`, `ExecutionContext`, `ArgumentsHost`, `createParamDecorator`, `ParseIntPipe`, `DefaultValuePipe`, `HttpException`, `Reflector`, `APP_GUARD`, `APP_PIPE`, `APP_INTERCEPTOR`, `APP_FILTER`. Per-request work starts after `init()`; module DI is the previous file.
+The order below matches NestJS 10.4 (checked against 10.4.15). Per-request work starts after `init()`. Module dependency injection is the previous file. Enhancers here are middleware, guards, interceptors, pipes, and exception filters, plus `ExecutionContext`, `ArgumentsHost`, and `createParamDecorator`. Global registration uses `APP_GUARD`, `APP_PIPE`, `APP_INTERCEPTOR`, and `APP_FILTER`.
+
 
 ### NEST-051 — The order one HTTP request walks
 
@@ -16,17 +17,17 @@ A `GET` has module middleware, a global guard, a route interceptor, a parameter 
 
 **Answer:**
 
-Order: middleware → guards → interceptor code before `next.handle()` → pipes → controller → interceptor operators on that observable → adapter reply. Globals then controller then route for inbound enhancers; outbound interceptor operators reverse (route, then controller, then global). Exception filters are not on the success path—they run when an exception leaves the route proxy. There is no separate “service” stage.
+One HTTP request walks a fixed pipeline, and each stage has one job. Express middleware runs first, then guards. Each interceptor then runs the code placed before `next.handle()`. Pipes run next, and only then the controller method. After the method returns, interceptor operators on the way out run in reverse: the route interceptor, then the controller interceptor, then the global one. Nest writes the response after that. Nothing threw, so exception filters stay idle. There is no separate service stage. A service runs only because the controller calls it.
 
 **Trade-offs:**
 
-One Express middleware collapses Nest context (no handler reference). Separate guards, pipes, and interceptors keep allow/deny, conversion, and response shape readable.
+One Express middleware can stamp a header, but it cannot see the handler. Separate guards, pipes, and interceptors keep allow-or-deny, conversion, and response shape easy to read.
 
 **Follow-up:**
 
 The same request throws inside the controller. Which stages still ran?
 
-Answer: Middleware, guards, inbound interceptor code, and inbound pipes already ran. Outbound `map` does not see a value. If the interceptor rethrows or has no `catchError`, the exception filter runs; normal `reply` of a return value does not.
+Answer: Middleware, guards, the inbound interceptor code, and the pipes already finished. The outbound `map` does not receive a value, and if the interceptor rethrows or has no `catchError`, the exception filter runs instead of a normal reply.
 
 ### NEST-052 — What middleware is allowed to touch
 
@@ -36,11 +37,11 @@ Answer: Middleware, guards, inbound interceptor code, and inbound pipes already 
 
 **Question:**
 
-`LoggerMiddleware.use(req, res, next)` should reject callers missing a role from `@Roles()` on the handler. Why is middleware wrong for that, and what must `use` do before it returns?
+`LoggerMiddleware.use(req, res, next)` should reject callers missing a role from `@Roles()` on the handler. Why is middleware the wrong place for that, and what must `use` do before it returns?
 
 **Answer:**
 
-Express middleware has no `ExecutionContext`—no `getHandler()` / `getClass()` for `Reflector`. Path matching has happened; the route proxy that knows the method has not. Role metadata belongs in a guard. `use` must either end the response or call `next()`; Nest does not call `next()` for you. Ending the response skips guards, interceptors, pipes, and the handler.
+Middleware is an Express function of the request, the response, and `next`. It runs after the path has matched and before Nest's route proxy, which is the layer that knows the controller method. There is no `ExecutionContext`, so there is no `getHandler()` or `getClass()` for `Reflector` to read `@Roles()`. Role checks belong in a guard, where that context exists. Before `use` returns it must either finish the response or call `next()`. Nest does not call `next()` for you. Ending the response here skips guards, interceptors, pipes, and the handler.
 
 **Code:**
 
@@ -55,7 +56,7 @@ use(req: Request, res: Response, next: NextFunction): void {
 
 Where do you log after the handler finishes if middleware already called `next()`?
 
-Answer: `res.on('finish', ...)` for status Express eventually sent. For the controller return value before write, use an outbound interceptor.
+Answer: Listen for `res.on('finish')` if you want the status Express eventually sent. If you want the controller's return value before it is written, use an interceptor on the way out.
 
 ### NEST-053 — forRoutes, exclude, and the global prefix
 
@@ -69,17 +70,17 @@ Answer: `res.on('finish', ...)` for status Express eventually sent. For the cont
 
 **Answer:**
 
-`configure` runs once during `init()`. `forRoutes(OrdersController)` registers that controller’s paths—e.g. `GET /api/orders` and `GET /api/orders/:id`. `GET /api/health` never matched `forRoutes`, so exclude of `health` is a no-op. In 10.4.15 the extractor prefixes middleware paths with the global prefix already on config; prefix after `init()` is too late.
+`configure` runs once during `init()`, while Nest is binding middleware, not on the first request. `forRoutes(OrdersController)` takes the paths that controller declares. With the prefix already set, those become paths such as `GET /api/orders` and `GET /api/orders/:id`, and only those run this middleware. `GET /api/health` was never one of those paths, so excluding `health` changes nothing. In 10.4.15 the path extractor copies the global prefix that is already on the config when `init()` builds it. Calling `setGlobalPrefix` after `init()` is too late for that copy.
 
 **Trade-offs:**
 
-Controller class keeps middleware aligned with declared routes; string paths cover shared URL prefixes across controllers.
+Passing the controller class keeps middleware aligned with the routes that class declares. A string path is better when one URL prefix is shared by several controllers.
 
 **Follow-up:**
 
 `configure` is `async` and awaits a remote call before `apply`. When does that run?
 
-Answer: During `init()`, before accept. Nest awaits async `configure`. Slow/failing calls delay or fail startup—not the first request.
+Answer: It runs during `init()`, before the process accepts connections. Nest awaits an async `configure`. A slow or failing call delays or fails startup, rather than the first request.
 
 ### NEST-054 — app.use and the JSON parser
 
@@ -89,21 +90,21 @@ Answer: During `init()`, before accept. Nest awaits async `configure`. Slow/fail
 
 **Question:**
 
-After `create(AppModule)`, bootstrap does `app.use(logger)` then `listen(3000)`. `logger` reads `req.body` and always sees `undefined` for JSON `POST`, while `configure()` middleware sees the body. Why?
+After `create(AppModule)`, bootstrap does `app.use(logger)` then `listen(3000)`. `logger` reads `req.body` and always sees `undefined` for a JSON `POST`, while middleware registered in `configure()` sees the body. Why?
 
 **Answer:**
 
-`create()` returns before `init()`. Early `app.use` appends to Express before `init()` registers JSON/urlencoded parsers (unless `bodyParser: false`), then module middleware, then routes. Early `logger` sits above the parser, so `req.body` is unset. Consumer middleware is registered after the parsers.
+`NestFactory.create()` returns before `init()`. The JSON and urlencoded parsers are registered inside `init()`, unless you passed `bodyParser: false`. Module middleware from `configure()` is registered after those parsers, and routes come after that. An `app.use` call made before `listen()` is appended to Express immediately, so this logger sits above the parsers. The body has not been read yet, and `req.body` is still unset. Middleware from `configure()` sits below the parsers, so it sees the parsed object.
 
 **Trade-offs:**
 
-Early `app.use` fits wrapping the raw stack (including unmatched routes) when the body is not needed. Prefer `configure` or post-`init()` `app.use` when the body matters.
+An early `app.use` is the right place to wrap the raw stack, including unmatched routes, when you do not need the body. Prefer `configure`, or `app.use` placed with the parsers already installed, when the body matters.
 
 **Follow-up:**
 
 `logger` is registered after a manual `await app.init()`, then `listen()`. Does it see `req.body`?
 
-Answer: Yes—`app.use` after parsers appends below them; `listen()` skips a second `init()`. It also sits after module middleware and routes unless placed carefully.
+Answer: `listen()` skips a second `init()`, and this `app.use` is appended after the parsers, the module middleware, and the routes. A normal Nest route writes the response and does not call `next()`, so the logger usually never runs for a handled request. If an earlier layer does call `next()`, `req.body` is already parsed.
 
 ### NEST-055 — Order when several modules bind middleware
 
@@ -113,21 +114,21 @@ Answer: Yes—`app.use` after parsers appends below them; `listen()` skips a sec
 
 **Question:**
 
-`AppModule` imports `BillingModule`. Both `configure` with `forRoutes('*')`. Which `use` runs first, and what decides order inside one `apply()`?
+`AppModule` imports `BillingModule`. Both call `configure` with `forRoutes('*')`. Which `use` runs first, and what decides the order inside one `apply()`?
 
 **Answer:**
 
-Inside `apply(First, Second)`, Express runs First then Second. Across modules, 10.4.15 registers by module distance (low first). Distance starts at 0; each import gets `max(current, parent+1)`. Root middleware runs before deeper feature modules.
+Inside a single `apply(First, Second)`, Express runs `First` and then `Second`. That order is just the order you passed. Across modules, NestJS 10.4.15 registers middleware by module distance, smallest distance first. Distance starts at 0 on the root module. Each import is given the larger of its current distance and one more than its parent's distance. The root module's middleware is therefore registered before a feature module imported underneath it, and it runs first on the request.
 
 **Trade-offs:**
 
-One module with deliberate `apply` order is readable. Distance order is predictable (root then features) but surprising when a shared module is imported deep.
+One module with a deliberate `apply` order is easy to read. Distance order is predictable, root then features, and it surprises people when a shared module is imported deep in the graph and therefore runs late.
 
 **Follow-up:**
 
 `BillingModule` is imported by the root and also three levels deeper. Which distance wins?
 
-Answer: The larger one. Distance only increases, so the deep import registers that middleware later.
+Answer: The larger one. The scanner only raises a module's distance, so the deep import is the distance that is kept, and that middleware is registered later.
 
 ### NEST-056 — Which filters see an exception thrown in middleware
 
@@ -137,21 +138,21 @@ Answer: The larger one. Distance only increases, so the deep import registers th
 
 **Question:**
 
-`AuthMiddleware.use` throws `UnauthorizedException`. The route has `@UseFilters(OrdersExceptionFilter)` and a global filter exists. Which filter writes? What if the same throw is in `app.use`?
+`AuthMiddleware.use` throws `UnauthorizedException`. The route has `@UseFilters(OrdersExceptionFilter)` and a global filter exists. Which filter writes the response? What if the same throw is in `app.use`?
 
 **Answer:**
 
-Class middleware is wrapped in `RouterProxy`. Throws (or rejected `async use`) use an exceptions handler with undefined module key—global filters attach; method/controller filters on the route do not. `app.use` errors go through Nest’s Express error handler with the global list only.
+Class middleware is wrapped so that a throw, or a rejected async `use`, is passed to an exceptions handler. That handler is created with no module key, which means it only has the global filter list. The method filter and the controller filter are attached to the route proxy, and this request has not reached that proxy, so `OrdersExceptionFilter` does not run. A throw from `app.use` takes the same kind of path: Nest's Express error handler, again with the global list only.
 
 **Trade-offs:**
 
-Throwing `HttpException` from consumer middleware reuses global filter shape. `res.status(401).json(...)` skips filters entirely.
+Throwing an `HttpException` from consumer middleware reuses the global filter's response shape. Calling `res.status(401).json(...)` yourself ends the response and skips filters entirely.
 
 **Follow-up:**
 
 Middleware calls `next(new UnauthorizedException())` instead of throwing. Does `OrdersExceptionFilter` run?
 
-Answer: No. `next(err)` uses the Express error handler’s global filter list. Method filters are not selected.
+Answer: No. `next(err)` enters the Express error handler, which uses the global filter list. Method filters are not selected for that error.
 
 ### NEST-057 — What canActivate is allowed to return
 
@@ -161,21 +162,21 @@ Answer: No. `next(err)` uses the Express error handler’s global filter list. M
 
 **Question:**
 
-`canActivate` may return `boolean`, `Promise<boolean>`, or `Observable<boolean>`. What does Nest do with each, and when do interceptors and pipes start?
+`canActivate` may return a `boolean`, a `Promise<boolean>`, or an `Observable<boolean>`. What does Nest do with each, and when do interceptors and pipes start?
 
 **Answer:**
 
-Guards run after middleware, before interceptors. Each result is normalized: boolean as-is, Promise awaited, Observable via `lastValueFrom` (must complete; last value wins). Only after every guard yields truthy do interceptors and then pipes run. First non-true stops the chain.
+Guards run after middleware and before interceptors. Nest turns every return value into one boolean decision. A plain boolean is used as it is. A Promise is awaited. An Observable is consumed with `lastValueFrom`, so it must complete, and the last value is the decision. Interceptors start only after every guard has produced a truthy result, and pipes start after those interceptors call `next.handle()`. The first non-true result stops the chain, and later guards are not called.
 
 **Trade-offs:**
 
-Promise fits store lookups; Observable fits existing streams; sync boolean is simplest when no I/O is needed.
+A Promise fits a store lookup. An Observable fits a stream you already have. A synchronous boolean is the simplest choice when the decision needs no I/O.
 
 **Follow-up:**
 
 `canActivate` returns `Promise.resolve(false)`. Do later guards run?
 
-Answer: No. Nest throws `ForbiddenException` (`Forbidden resource`). Later `canActivate` calls are skipped.
+Answer: No. Nest throws `ForbiddenException` with the message `Forbidden resource`, and it does not call the later guards.
 
 ### NEST-058 — return false and throw UnauthorizedException
 
@@ -185,21 +186,21 @@ Answer: No. Nest throws `ForbiddenException` (`Forbidden resource`). Later `canA
 
 **Question:**
 
-A guard throws `UnauthorizedException` if `Authorization` is missing, returns `false` for `Bearer expired`, else `true`. For each failure, what status/body does the client get, and does `getInvoice` run?
+A guard throws `UnauthorizedException` when `Authorization` is missing, returns `false` for `Bearer expired`, and returns `true` otherwise. For each failure, what status and body does the client get, and does `getInvoice` run?
 
 **Answer:**
 
-Neither failure reaches the handler, pipes, or interceptors. Missing header → `UnauthorizedException` → 401, body `{ message: 'Unauthorized', statusCode: 401 }` (default empty-arg shape). `return false` → Nest throws `ForbiddenException` → 403 `Forbidden resource`. Method never runs.
+Both failures stop the request before the handler, the pipes, and the interceptors. A missing header is your `UnauthorizedException`. The default filter turns that into status 401 and a body of `{ message: 'Unauthorized', statusCode: 401 }`, which is the shape of `UnauthorizedException` constructed with no arguments. Returning `false` is different. Nest itself throws `ForbiddenException`, so the client gets 403 and the message `Forbidden resource`. `getInvoice` does not run in either case.
 
 **Trade-offs:**
 
-`return false` is fine for uniform 403. Use explicit throws when 401 vs 403 (or custom bodies) matter.
+Returning `false` is enough when every denial should be the same 403. Throw an explicit exception when the client must be able to tell 401 from 403, or when the body must be custom.
 
 **Follow-up:**
 
-Method filter `@Catch(UnauthorizedException)` vs global `@Catch()`. Which runs for `Bearer expired`?
+The method has `@Catch(UnauthorizedException)` and a global filter has `@Catch()`. Which one runs for `Bearer expired`?
 
-Answer: Global `@Catch()`. `false` becomes `ForbiddenException`, so the Unauthorized method filter does not match.
+Answer: The global `@Catch()`. Returning `false` becomes `ForbiddenException`, so the method filter that only catches `UnauthorizedException` does not match.
 
 ### NEST-059 — Several guards on one route
 
@@ -209,21 +210,21 @@ Answer: Global `@Catch()`. `false` becomes `ForbiddenException`, so the Unauthor
 
 **Question:**
 
-`APP_GUARD` = `AuthGuard`, controller `@UseGuards(RolesGuard, AuditGuard)`, method `@UseGuards(FeatureGuard)`. All return `true`. Order? If `RolesGuard` returns `false`, who still runs?
+`APP_GUARD` is `AuthGuard`. The controller has `@UseGuards(RolesGuard, AuditGuard)`. The method has `@UseGuards(FeatureGuard)`. All of them return `true`. What is the order? If `RolesGuard` returns `false`, which guards still run?
 
 **Answer:**
 
-Order: global → controller → method; within a group, binding order. So Auth → Roles → Audit → Feature. First non-true stops: if Roles returns `false`, Audit and Feature never run; Nest throws `ForbiddenException`.
+Nest runs global guards, then controller guards, then method guards. Inside one `@UseGuards()` list, it keeps the order you wrote. This route is therefore Auth, then Roles, then Audit, then Feature. A guard that returns a non-true value stops the chain immediately. If `RolesGuard` returns `false`, `AuditGuard` and `FeatureGuard` are never called, and Nest throws `ForbiddenException`. Later guards are not a place to record that denial.
 
 **Trade-offs:**
 
-Small guards stay testable; one mega-guard hides short-circuit order. Controller guards apply to every method.
+Small guards stay easy to test, and the short-circuit order stays visible. One large guard hides that order. A controller guard applies to every method on that controller.
 
 **Follow-up:**
 
-`AuditGuard` must record Roles denials but never runs after `false`. Where to record?
+`AuditGuard` must record Roles denials, but it never runs after `false`. Where do you record them?
 
-Answer: Inside `RolesGuard` before returning `false`, or throw and record in a filter. Later guards are not denial hooks.
+Answer: Record the denial inside `RolesGuard` before it returns `false`, or throw and record it in an exception filter. A later guard is not a denial hook.
 
 ### NEST-060 — useGlobalGuards and APP_GUARD
 
@@ -233,21 +234,21 @@ Answer: Inside `RolesGuard` before returning `false`, or throw and record in a f
 
 **Question:**
 
-`RolesGuard` injects `Reflector`. Bootstrap `useGlobalGuards(new RolesGuard())` vs `{ provide: APP_GUARD, useClass: RolesGuard }`. Which constructs correctly, and if both exist, who runs first?
+`RolesGuard` injects `Reflector`. Bootstrap calls `useGlobalGuards(new RolesGuard())`. Another module registers `{ provide: APP_GUARD, useClass: RolesGuard }`. Which one is constructed correctly, and if both exist, which runs first?
 
 **Answer:**
 
-`new RolesGuard()` outside the container gets no `Reflector`. `APP_GUARD` / `@UseGuards(RolesGuard)` class tokens are constructed by DI. `useGlobalGuards` appends after create. With both, DI-registered globals from module scan run first (import order), then bootstrap `useGlobalGuards` instances.
+`new RolesGuard()` happens outside the container, so that instance never receives `Reflector`. `APP_GUARD` with `useClass`, and `@UseGuards(RolesGuard)` when you pass the class, are constructed by dependency injection and do receive it. `useGlobalGuards` appends its instances after `create()` has already registered the `APP_GUARD` providers. When both exist, the injected globals run first, in module-scan order, and the bootstrap instances run after them.
 
 **Trade-offs:**
 
-Prefer `APP_GUARD` when dependencies exist. Manual `new` is honest only for zero-dep guards.
+Prefer `APP_GUARD` whenever the guard has dependencies. `new` is honest only for a guard whose constructor needs nothing.
 
 **Follow-up:**
 
-Imported `AuthModule` registers `APP_GUARD` Roles; root registers Feature; bootstrap `useGlobalGuards(HeaderPresent)`. Order?
+Imported `AuthModule` registers an `APP_GUARD` for Roles. The root module registers Feature. Bootstrap then calls `useGlobalGuards(HeaderPresent)`. What is the order?
 
-Answer: Roles (imported first), then Feature, then HeaderPresent.
+Answer: Feature, then Roles, then HeaderPresent. During the scan the root module is recorded before the modules it imports, and `useGlobalGuards` appends after that scan.
 
 ### NEST-061 — ExecutionContext and ArgumentsHost
 
@@ -257,21 +258,21 @@ Answer: Roles (imported first), then Feature, then HeaderPresent.
 
 **Question:**
 
-A guard, interceptor, and exception filter need the Express request; the guard also needs the handler. What does each receive, and which methods are valid?
+A guard, an interceptor, and an exception filter all need the Express request. The guard also needs the handler. What does each one receive, and which methods are valid?
 
 **Answer:**
 
-Filters get `ArgumentsHost` (`getArgs`, `getType`, `switchToHttp` / Rpc / Ws). HTTP: `getRequest`/`getResponse`/`getNext` are args 0–2. Guards and interceptors get `ExecutionContext`, which extends that host with `getClass()` and `getHandler()`. Filter hosts often have null handler/class.
+An exception filter receives an `ArgumentsHost`. That host can `getArgs()`, report `getType()`, and switch to HTTP, RPC, or WebSockets. On HTTP, `getRequest()`, `getResponse()`, and `getNext()` are arguments 0, 1, and 2. A guard and an interceptor receive an `ExecutionContext`, which is that same host plus `getClass()` and `getHandler()`. Those two methods are how you read route metadata. A filter's host often has a null handler and a null class, because the filter is not always attached to a method.
 
 **Trade-offs:**
 
-Helpers on `ArgumentsHost` reuse across filters and guards for request access; metadata helpers should take `ExecutionContext`.
+A helper written against `ArgumentsHost` can read the request from both filters and guards. A helper that reads metadata should require an `ExecutionContext`, because a filter host may not have a handler.
 
 **Follow-up:**
 
-`Reflector.get('roles', context.getHandler())` when `@Roles()` is only on the class?
+`Reflector.get('roles', context.getHandler())` when `@Roles()` is only on the class. What do you get?
 
-Answer: `undefined`. Class metadata is on `getClass()`. Use override/merge over both (NEST-062).
+Answer: `undefined`. Class metadata lives on `getClass()`. Read both targets and decide whether the method overrides the class or merges with it, as in NEST-062.
 
 ### NEST-062 — Role metadata on the method and on the class
 
@@ -281,21 +282,21 @@ Answer: `undefined`. Class metadata is on `getClass()`. Use override/merge over 
 
 **Question:**
 
-Class `@Roles('admin')`, one method `@Roles('billing')`, another with no `@Roles()`. How should `RolesGuard` resolve roles, and how do missing user vs wrong role differ?
+The class has `@Roles('admin')`. One method has `@Roles('billing')`. Another method has no `@Roles()`. How should `RolesGuard` resolve the roles, and how should a missing user differ from a wrong role?
 
 **Answer:**
 
-`getAllAndOverride('roles', [handler, class])`: first defined wins—billing method uses `['billing']`; undecorated method falls back to `['admin']`. Missing/unauthenticated user → 401; authenticated without required role → 403 (throw explicitly; do not blur with bare `false` unless 403 is always correct).
+`Reflector.getAllAndOverride('roles', [handler, class])` walks those two targets and returns the first value that is not `undefined`. The billing method therefore uses `['billing']`, and the undecorated method falls back to the class list `['admin']`. Treat a missing or unauthenticated user as 401. Treat an authenticated user who lacks the required role as 403, and throw that exception yourself. A bare `return false` is always 403, so it cannot express the 401 case.
 
 **Trade-offs:**
 
-`createDecorator` / `SetMetadata` are the same mechanism; override vs merge changes whether method replaces or adds to class roles.
+`SetMetadata` and a small `createDecorator` helper are the same storage mechanism. Override means the method replaces the class. Merge means the method adds to the class. Pick the one the product rule actually wants.
 
 **Follow-up:**
 
-Method `@Roles('billing')`, class `@Roles('admin','billing')`, switch to `getAllAndMerge`. What’s checked?
+The method has `@Roles('billing')` and the class has `@Roles('admin', 'billing')`. You switch to `getAllAndMerge`. What is checked?
 
-Answer: Concatenated arrays (handler then class). A user with only `admin` can pass `some`—override would have blocked that.
+Answer: The concatenated arrays, handler first and then class. A user who has only `admin` can pass a `some` check. Override would have required `billing` and blocked that user.
 
 ### NEST-063 — Interceptors on the way in and on the way out
 
@@ -305,21 +306,21 @@ Answer: Concatenated arrays (handler then class). A user with only `admin` can p
 
 **Question:**
 
-Global `G`, controller `C`, method `M` each log `in` before `next.handle()` and `out` in `map`. Handler returns `{ ok: true }`. Log order? Whose `map` sees the object first?
+Global interceptor `G`, controller interceptor `C`, and method interceptor `M` each log `in` before `next.handle()` and `out` inside `map`. The handler returns `{ ok: true }`. What is the log order, and whose `map` sees the object first?
 
 **Answer:**
 
-Inbound: G → C → M → pipes → handler. Outbound FILO: M’s `map` first, then C, then G. So logs: G-in, C-in, M-in, M-out, C-out, G-out. M’s `map` sees `{ ok: true }` first.
+On the way in, Nest calls interceptors from the outside inward: global, then controller, then method. Pipes and the handler run inside the innermost `next.handle()`. On the way out, RxJS operators run in reverse, so the method interceptor's `map` runs first, then the controller's, then the global's. The log is G-in, C-in, M-in, M-out, C-out, G-out. `M`'s `map` is the first to see `{ ok: true }`. Later maps see whatever the inner map returned.
 
 **Trade-offs:**
 
-One interceptor that times and wraps is simple but less reusable; separate map/tap compose if binding order is deliberate.
+One interceptor that both times the call and wraps the body is simple, and it is less reusable. Separate `map` and `tap` interceptors compose cleanly when you bind them in a deliberate order.
 
 **Follow-up:**
 
-M’s `map` returns `{ wrapped: true }`; C and G only `tap`. Client body?
+`M`'s `map` returns `{ wrapped: true }`. `C` and `G` only `tap`. What body does the client get?
 
-Answer: `{ wrapped: true }`. `tap` does not replace; adapter writes M’s object.
+Answer: `{ wrapped: true }`. `tap` looks at the value and does not replace it, so the adapter writes the object `M` returned.
 
 ### NEST-064 — An interceptor that never calls next.handle
 
@@ -329,21 +330,21 @@ Answer: `{ wrapped: true }`. `tap` does not replace; adapter writes M’s object
 
 **Question:**
 
-`CacheInterceptor` on a `GET`: hit returns `of(cached)` without `next.handle()`; miss calls it, stores, returns. What runs on a hit?
+A `CacheInterceptor` on a `GET` returns `of(cached)` on a hit and does not call `next.handle()`. On a miss it calls `next.handle()`, stores the result, and returns it. What runs on a hit?
 
 **Answer:**
 
-Middleware and guards already finished. Hit skips inner interceptors, pipes, and the controller (no DB). Outer interceptors still see the cached emission on the return path if they wrapped this one and called `next.handle()`.
+Middleware and guards have already finished before any interceptor runs. On a hit, this interceptor returns a cached observable and never calls `next.handle()`, so everything inside that call is skipped: later interceptors, pipes, and the controller. The database is not touched. Interceptors wrapped outside this one still run. If they called `next.handle()`, they see the cached value on the way back out, because that value is what this interceptor emitted.
 
 **Trade-offs:**
 
-Short-circuit skips param re-validation on hit—acceptable if the cache key came from a prior validated request.
+The short-circuit also skips parameter validation on the hit. That is acceptable when the cache key came from a request you already validated.
 
 **Follow-up:**
 
-Global cache interceptor; controller interceptor logs `in` before its `next.handle()`. On hit, does `in` appear?
+The cache interceptor is global, and a controller interceptor logs `in` before its own `next.handle()`. On a hit, does `in` appear?
 
-Answer: No if global returns `of(cached)` without calling `next.handle()`—controller interceptor never starts. Bind logging outside/around cache if you need it.
+Answer: No, when the global interceptor returns `of(cached)` without calling `next.handle()`. The controller interceptor never starts. Bind the log outside the cache interceptor if you still need that line.
 
 ### NEST-065 — catchError and the exception filter
 
@@ -353,21 +354,21 @@ Answer: No if global returns `of(cached)` without calling `next.handle()`—cont
 
 **Question:**
 
-Handler throws `NotFoundException`. Interceptor `catchError` either returns `of({ missing: true })` or `throwError(() => err)`. Method filter `@Catch(NotFoundException)`. Which runs the filter, and what does the client get?
+The handler throws `NotFoundException`. An interceptor's `catchError` either returns `of({ missing: true })` or `throwError(() => err)`. The method has `@Catch(NotFoundException)`. Which choice runs the filter, and what does the client get?
 
 **Answer:**
 
-`of(...)` recovers: success path, typically 200 + `{ missing: true }` (status already set); filter does not run. `throwError` keeps the error; method filter runs and writes its response. `map` never sees the throw.
+`next.handle()` is an observable, and a throw from the handler is an error notification on that observable. `map` ignores errors, so it never sees this throw. `catchError` does. Returning `of({ missing: true })` turns the error into a successful value. The client typically gets 200 and that object, and the exception filter does not run. Returning `throwError` keeps the error on the stream. The method filter then matches `NotFoundException` and writes its own response.
 
 **Trade-offs:**
 
-Recovering with `of` hides failures from filters and HTTP error monitoring; rethrow preserves filter-owned error contracts.
+Recovering with `of` hides the failure from filters and from HTTP error monitoring. Rethrowing keeps the error contract in the filter, which is usually where the status and body are owned.
 
 **Follow-up:**
 
-Interceptor rethrows; method filter only logs. Client receives?
+The interceptor rethrows, and the method filter only logs. What does the client receive?
 
-Answer: Whatever that filter writes—or an unfinished response if it never `reply`s/`json`s. Log in `catchError` then write in the filter if needed.
+Answer: Whatever that filter writes. If it never calls `reply` or `json`, the response stays unfinished. Log in `catchError` and write the body in the filter when both are required.
 
 ### NEST-066 — How pipes are applied to arguments
 
@@ -377,21 +378,21 @@ Answer: Whatever that filter writes—or an unfinished response if it never `rep
 
 **Question:**
 
-Handler has `@Body() body`, `@Query('page') page`, `@Param('id', ParseIntPipe) id`. Global and method `@UsePipes` exist. What runs per argument, and can body wait on query?
+A handler has `@Body() body`, `@Query('page') page`, and `@Param('id', ParseIntPipe) id`. A global pipe and a method `@UsePipes()` also exist. What runs for each argument, and can the body pipe wait for the query pipe?
 
 **Answer:**
 
-Pipes run inside `next.handle()` after inbound interceptors. Per argument: global → controller `@UsePipes` → method `@UsePipes` → parameter pipes, left to right, awaited. Arguments are resolved with `Promise.all`, so one argument’s pipes do not wait on another’s completion order for starting—do not rely on cross-argument sequencing.
+Pipes run inside `next.handle()`, after the inbound interceptor code and before the controller method. For one argument, Nest runs the global pipes, then controller `@UsePipes()`, then method `@UsePipes()`, then the pipes declared on that parameter. Each of those is awaited, left to right. Separate arguments do not wait for each other. Nest resolves them with `Promise.all`, so a body pipe and a query pipe start together. Do not rely on one argument's pipe finishing before another argument's pipe starts.
 
 **Trade-offs:**
 
-Global pipes for shared policy; parameter pipes for one-off coercion; controller `@UsePipes` sits in between.
+A global pipe is the place for a shared rule. A parameter pipe is the place for one-off coercion. Controller `@UsePipes()` sits between those two.
 
 **Follow-up:**
 
-Method pipe logs `method`, `ParseIntPipe` logs `param`, both on `id`. Which first?
+A method pipe logs `method` and `ParseIntPipe` logs `param`, both on `id`. Which runs first?
 
-Answer: `method`, then `param`. Parameter pipes append last for that argument.
+Answer: `method`, then `param`. Parameter pipes are appended after the method pipes for that argument.
 
 ### NEST-067 — DefaultValuePipe and ParseIntPipe
 
@@ -401,21 +402,21 @@ Answer: `method`, then `param`. Parameter pipes append last for that argument.
 
 **Question:**
 
-`@Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number`. Values for missing `page`, `page=4`, `page=4abc`? If the pipes are swapped?
+The parameter is `@Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number`. What does the handler receive when `page` is missing, when it is `4`, and when it is `4abc`? What changes if the two pipes are swapped?
 
 **Answer:**
 
-Left to right. Missing → `undefined` → DefaultValue `1` → ParseInt → `1`. `page=4` → `4`. `page=4abc` → ParseInt throws `BadRequestException`. Swapped: missing `undefined` fails ParseInt before default; default never helps.
+Pipes on one parameter run from left to right, and each pipe receives the previous pipe's return value. A missing query parameter arrives as `undefined`. `DefaultValuePipe` replaces only `null` and `undefined`, so it supplies `1`, and `ParseIntPipe` turns that into the number `1`. `page=4` is already a string `'4'`, and `ParseIntPipe` returns `4`. `page=4abc` is not an integer, so `ParseIntPipe` throws `BadRequestException`. Swap the pipes and the missing value hits `ParseIntPipe` while it is still `undefined`, so the request is 400 and the default never runs.
 
 **Trade-offs:**
 
-This pair fits a single query; multi-field queries belong in a DTO + `ValidationPipe`.
+This pair is a good fit for one query field. A query with several fields belongs in a DTO validated by `ValidationPipe`.
 
 **Follow-up:**
 
-`page=` empty string. Handler value?
+The query is `page=` , an empty string. What does the handler receive?
 
-Answer: DefaultValue keeps `''`; ParseInt rejects → 400. Empty string is not replaced; custom pipe if empty should mean default.
+Answer: The handler does not run, because the request fails with 400. `DefaultValuePipe` keeps the empty string, `ParseIntPipe` rejects it, and a custom pipe is required if an empty string should become the default.
 
 ### NEST-068 — A pipe that throws
 
@@ -425,21 +426,21 @@ Answer: DefaultValue keeps `''`; ParseInt rejects → 400. Empty string is not r
 
 **Question:**
 
-`ParseIntPipe` throws `BadRequestException`. Route has a guard, interceptor with `catchError`, method `@Catch(BadRequestException)`, global `@Catch()`. What already ran, and which filter writes if the interceptor rethrows?
+`ParseIntPipe` throws `BadRequestException`. The route has a guard, an interceptor with `catchError`, a method `@Catch(BadRequestException)`, and a global `@Catch()`. What has already run, and which filter writes the response if the interceptor rethrows?
 
 **Answer:**
 
-Middleware, guard, inbound interceptor, and `next.handle()` started; handler has not. Throw is inside the observable—interceptor `catchError` sees it; on rethrow, method filter matches first (then controller/global). Handler log never runs.
+Middleware, the guard, and the interceptor code before `next.handle()` have already run. Argument pipes run inside that `next.handle()`, so the throw happens on the observable the interceptor is watching, and the controller method has not started. The interceptor's `catchError` therefore sees the `BadRequestException`. If it rethrows, Nest picks a filter from the method outward. The method filter matches this exception and is the one that writes. The handler log never runs.
 
 **Trade-offs:**
 
-Fixing status in `catchError` is convenient globally; a filter keeps HTTP error bodies in one place—usually better for shared `BadRequest` shape.
+Changing the status inside `catchError` is convenient when every route should share one recovery. A filter keeps the HTTP error body in one place, which is usually better for a shared `BadRequest` shape.
 
 **Follow-up:**
 
-Same exception thrown from the controller body instead. Does the interceptor still see it before the method filter?
+The same exception is thrown from the controller body instead. Does the interceptor still see it before the method filter?
 
-Answer: Yes—method body is inside `next.handle()`. Difference: early method lines may already have run.
+Answer: Yes. The method body runs inside `next.handle()`, so `catchError` still sees the error before the filter. The difference is that lines above the throw in the method have already run.
 
 ### NEST-069 — When a custom parameter decorator runs
 
@@ -449,21 +450,21 @@ Answer: Yes—method body is inside `next.handle()`. Difference: early method li
 
 **Question:**
 
-`@CurrentUser()` via `createParamDecorator` reads `request.user` set by a guard. A pipe is also on the parameter. When does the factory run relative to guard, interceptor, pipe, and handler?
+`@CurrentUser()` is built with `createParamDecorator` and reads `request.user`, which a guard set. A pipe is also declared on that parameter. When does the factory run, relative to the guard, the interceptor, the pipe, and the handler?
 
 **Answer:**
 
-Factory runs during argument resolution inside `next.handle()`—after middleware, guards, and inbound interceptor code; before pipes on that value and before the handler. Order: extract via factory → pipes → handler.
+The factory runs while Nest is resolving handler arguments, which happens inside `next.handle()`. By then middleware, guards, and the inbound interceptor code have finished. The factory's return value is then passed through the pipes on that parameter, and the handler receives whatever the last pipe returns. So the order for this value is: guard sets `request.user`, interceptor calls `next.handle()`, factory reads it, pipes transform it, handler runs. The factory is an extractor. It is not a second guard.
 
 **Trade-offs:**
 
-Custom decorators keep handlers free of `@Req()`; raw `@Req()` is clearer when many fields are needed.
+A custom decorator keeps `@Req()` out of handlers that only need one field. Raw `@Req()` is clearer when the handler needs many fields from the request.
 
 **Follow-up:**
 
-No AuthGuard; interceptor sets `request.user` in outbound `map`. What does `@CurrentUser()` see?
+There is no auth guard, and an interceptor sets `request.user` inside an outbound `map`. What does `@CurrentUser()` see?
 
-Answer: Whatever was already on the request (usually `undefined`). Factory runs before outbound `map`. Set user in middleware/guard.
+Answer: Whatever was already on the request, usually `undefined`. The factory runs before the outbound `map`. Set the user in middleware or in a guard.
 
 ### NEST-070 — Who writes the HTTP response
 
@@ -473,21 +474,21 @@ Answer: Whatever was already on the request (usually `undefined`). Factory runs 
 
 **Question:**
 
-One `POST` returns `{ id: '1' }` with no `@Res()`. Another uses `@Res()` and `res.json(...)`. A third uses `@Res({ passthrough: true })`. Who writes, and when is status chosen?
+One `POST` returns `{ id: '1' }` and does not use `@Res()`. Another uses `@Res()` and calls `res.json(...)`. A third uses `@Res({ passthrough: true })`. Who writes the body in each case, and when is the status chosen?
 
 **Answer:**
 
-After guards succeed, Nest sets default status (POST 201, else 200, or `@HttpCode`) before interceptors. Returning a value: Nest `reply`s after outbound interceptors. Bare `@Res()`: you own the response; Nest does not `reply` the return. Passthrough: you may touch `res`, Nest still sends the return value.
+After the guards succeed, Nest sets the default status before interceptors run. A `POST` is 201, other successful methods are 200, and `@HttpCode()` replaces that default. If the handler returns a value and does not take over the response, Nest sends that value after the outbound interceptors. A bare `@Res()` means you own the response: Nest will not send the return value. `@Res({ passthrough: true })` lets you touch `res`, and Nest still sends the returned value.
 
 **Trade-offs:**
 
-Return values keep filters/interceptors/`@HttpCode` unified. Bare `@Res()` fits streams/downloads you pipe yourself.
+Returning a value keeps filters, interceptors, and `@HttpCode()` on one path. A bare `@Res()` fits a stream or a download that you pipe yourself.
 
 **Follow-up:**
 
-`@Sse()` handler returns `Promise.resolve({ data: 'ready' })`. Result?
+An `@Sse()` handler returns `Promise.resolve({ data: 'ready' })`. What is the result?
 
-Answer: After settle, SSE requires an `Observable`; a plain object throws `ReferenceError` about needing an Observable stream.
+Answer: After the promise settles, SSE still requires an Observable. A plain object throws a `ReferenceError` saying the handler must return an Observable stream.
 
 ### NEST-071 — Which exception filter is selected
 
@@ -497,21 +498,21 @@ Answer: After settle, SSE requires an `Observable`; a plain object throws `Refer
 
 **Question:**
 
-Method `@Catch(NotFoundException)`, controller `@Catch(HttpException)`, global `@Catch()`. Handler throws `NotFoundException`. Which `catch` runs? If the method filter rethrows, does the controller filter run?
+The method has `@Catch(NotFoundException)`, the controller has `@Catch(HttpException)`, and a global filter has `@Catch()`. The handler throws `NotFoundException`. Which `catch` runs? If the method filter rethrows, does the controller filter run?
 
 **Answer:**
 
-List is built global → controller → method, then reversed—method first. First `@Catch` match by `instanceof` (empty list = all) wins: the method filter. Nest invokes only that selected filter. A rethrow inside it does not resume the walk to the controller filter.
+Nest builds the filter list as global, then controller, then method, and then searches from the method end. The method filter is considered first. `@Catch()` matches with `instanceof`, and an empty `@Catch()` matches every value. `NotFoundException` matches the method filter, so that filter is the one Nest calls. Nest invokes only the selected filter. A rethrow inside it does not continue the walk to the controller filter or the global filter.
 
 **Trade-offs:**
 
-Method filters for odd contracts; controller for resource-wide shape; global `@Catch()` for process fallback (including middleware).
+A method filter is for a route with an odd contract. A controller filter is for one resource's shape. A global `@Catch()` is the process-wide fallback, and it is also the filter that can see middleware errors.
 
 **Follow-up:**
 
-Method `@Catch(HttpException)`, throw plain `Error('disk full')`. Which filter?
+The method filter is `@Catch(HttpException)`, and the handler throws `new Error('disk full')`. Which filter runs?
 
-Answer: Global `@Catch()` (empty metatypes). Method/controller `HttpException` filters skip. Else `BaseExceptionFilter` (NEST-072).
+Answer: The global `@Catch()`, because its metatype list is empty and it matches everything. The method and controller filters that name `HttpException` skip a plain `Error`. If nothing matches, `BaseExceptionFilter` handles it, as in NEST-072.
 
 ### NEST-072 — The default exceptions handler
 
@@ -521,21 +522,21 @@ Answer: Global `@Catch()` (empty metatypes). Method/controller `HttpException` f
 
 **Question:**
 
-No custom filter matches. Client response for `NotFoundException`, `new Error('disk full')`, and JSON-parser `SyntaxError`? If headers already sent?
+No custom filter matches. What does the client receive for `NotFoundException`, for `new Error('disk full')`, and for a JSON-parser `SyntaxError`? What happens if the headers were already sent?
 
 **Answer:**
 
-`HttpException`: `getStatus()`/`getResponse()` as-is (default 404 Not Found body). Unknown/`Error`: 500 `{ statusCode: 500, message: 'Internal server error' }` (message not leaked). Parser `SyntaxError` often matches http-errors/`statusCode` path as 400. If `headersSent`, base filter skips `reply` and ends the response; still logs.
+`BaseExceptionFilter` is the fallback when no custom `@Catch()` matches. For an `HttpException` it sends `getStatus()` and `getResponse()` as they are, so a default `NotFoundException` is 404 with the Not Found body. An unknown `Error` becomes 500 with `{ statusCode: 500, message: 'Internal server error' }`, and the original message stays in the server log. A JSON parser `SyntaxError` usually has both a status code and a message, so the filter replies 400. If headers were already sent, the filter skips `reply`, ends the response, and still logs.
 
 **Trade-offs:**
 
-Built-in filter is enough for generic 500s; custom `APP_FILTER` when every 500 must include a request id.
+The built-in filter is enough for a generic 500. Add an `APP_FILTER` when every 500 must also carry a request id.
 
 **Follow-up:**
 
-`@Res()` writes `res.json({ accepted: true })` then throws `Error('later')`. Client sees?
+The handler uses `@Res()`, writes `res.json({ accepted: true })`, and then throws `Error('later')`. What does the client see?
 
-Answer: `{ accepted: true }`. Base filter sees headers sent, ends without a second JSON error body.
+Answer: `{ accepted: true }`. The base filter sees that headers were sent and ends the response without a second JSON error body.
 
 ### NEST-073 — The same lifecycle on the Fastify adapter
 
@@ -545,21 +546,21 @@ Answer: `{ accepted: true }`. Base filter sees headers sent, ends without a seco
 
 **Question:**
 
-App uses `FastifyAdapter`. Guards/interceptors/pipes/filters unchanged. What stays the same, and what breaks in a filter calling `response.status(401).json(...)`?
+The app uses `FastifyAdapter`. Guards, interceptors, pipes, and filters are unchanged. What stays the same, and what breaks in a filter that calls `response.status(401).json(...)`?
 
 **Answer:**
 
-Core schedules the same order and contracts. `getHandler`/`getClass` still work. Fastify’s reply API is not Express `res.status().json()`—use `HttpAdapterHost.httpAdapter.reply(...)` or Fastify’s reply methods. Express-only request fields may also need adapters.
+The Nest pipeline stays the same. Middleware, guards, interceptors, pipes, the handler, and filters still run in the same order, and `getHandler()` and `getClass()` still work. What changes is the object behind `getResponse()`. Fastify's reply is not Express's `res`, so `response.status(401).json(...)` is an Express call and fails or does nothing useful on Fastify. Write through `HttpAdapterHost.httpAdapter.reply(...)`, or call the Fastify reply methods. Fields that exist only on the Express request need the same kind of adapter.
 
 **Trade-offs:**
 
-Stay on Express for familiar `res`/`middleware`. Fastify keeps Nest lifecycle but forces adapter-aware response writes.
+Express is the familiar choice when you want `res` and Express middleware. Fastify keeps the Nest lifecycle and requires every response write to go through the adapter or Fastify's own reply.
 
 **Follow-up:**
 
-Guard reads `request.headers.authorization` via `switchToHttp().getRequest()`. Rewrite for Fastify?
+A guard reads `request.headers.authorization` through `switchToHttp().getRequest()`. Do you rewrite that for Fastify?
 
-Answer: Usually no—headers exist on Fastify’s request. Rewrite only Express-only fields; keep `CanActivate` return contract.
+Answer: Usually no. Fastify's request has `headers` too. Rewrite only fields that are Express-specific, and keep the `CanActivate` return contract the same.
 
 ### NEST-074 — Read the log when a pipe fails
 
@@ -569,21 +570,21 @@ Answer: Usually no—headers exist on Fastify’s request. Rewrite only Express-
 
 **Question:**
 
-`GET /orders?page=nope` with Trace middleware/guard/interceptor (`map` + `catchError` rethrow), method `@Catch(BadRequestException)` filter, global `@Catch()` filter, and `ParseIntPipe` on `page`. Which logs, order, and status?
+`GET /orders?page=nope` has trace logs in middleware, a guard, and an interceptor (`map` plus `catchError` that rethrows). The method has `@Catch(BadRequestException)`, a global filter has `@Catch()`, and `page` uses `ParseIntPipe`. Which logs appear, in what order, and what status is returned?
 
 **Answer:**
 
-Logs: `middleware`, `guard`, `interceptor-in`, `interceptor-error`, `method-filter`. No `handler`, no `interceptor-out`, no `global-filter` (method filter matched). Client gets `ParseIntPipe`’s 400 `BadRequestException` body via the method filter’s `reply`.
+The request gets as far as argument binding and then fails. The log order is `middleware`, `guard`, `interceptor-in`, `interceptor-error`, and `method-filter`. `ParseIntPipe` throws `BadRequestException` inside `next.handle()`, so the handler never logs and the outbound `map` never logs. The interceptor rethrows, and the method filter matches, so the global filter does not run. The client receives the pipe's 400 body, written by that method filter's `reply`.
 
 **Trade-offs:**
 
-Layer logs confirm real order; keep request-id tracing in production instead of permanent `console.log` per layer.
+Layer logs are useful while you are confirming the real order. In production, keep a request id on the request and drop the permanent `console.log` on every layer.
 
 **Follow-up:**
 
-Same route with `page=2`. Logs and body?
+The same route is called with `page=2`. What are the logs and the body?
 
-Answer: `middleware`, `guard`, `interceptor-in`, `handler`, `interceptor-out`. No filters. Body `{ page: 2 }`, status 200.
+Answer: The logs are `middleware`, `guard`, `interceptor-in`, `handler`, and `interceptor-out`. No filter runs. The body is `{ page: 2 }` and the status is 200.
 
 ### NEST-075 — Choosing the layer
 
@@ -593,21 +594,21 @@ Answer: `middleware`, `guard`, `interceptor-in`, `handler`, `interceptor-out`. N
 
 **Question:**
 
-Stamp `x-request-id`, reject missing `Authorization` with 401, require `@Roles('billing')` on `POST /orders`, coerce `?page` or 400, turn unhandled `Error` into generic 500. Which layer owns each, and why not one interceptor for all five?
+You need to stamp `x-request-id`, reject a missing `Authorization` header with 401, require `@Roles('billing')` on `POST /orders`, coerce `?page` or return 400, and turn an unhandled `Error` into a generic 500. Which layer owns each job, and why not one interceptor for all five?
 
 **Answer:**
 
-Middleware: request-id (no handler needed). Guard(s): auth 401 and roles 403 (need `ExecutionContext`/metadata). Pipe: page coercion. Exception filter: unknown → 500. One interceptor cannot see middleware failures, runs after guards (too late for auth short-circuit), lacks clean param binding, and recovering errors hides filter contracts.
+Put the request id in middleware, because that work does not need the handler. Put authentication and roles in guards, because a guard can return 401 or 403 and can read handler metadata through `ExecutionContext`. Put page coercion in a pipe, because pipes own one argument. Put the unknown-error 500 in an exception filter, because filters own the error response. One interceptor cannot cover this. It does not see failures that happen in middleware, it runs too late to replace the auth short-circuit, it is a poor place to bind one parameter, and swallowing errors there hides the filter's contract.
 
 **Trade-offs:**
 
-Combining auth+roles in one guard is fine if 401 vs 403 stays explicit; splitting matches short-circuit order.
+Auth and roles can live in one guard when 401 and 403 stay explicit. Splitting them matches the short-circuit order: identity first, then the role.
 
 **Follow-up:**
 
-Success bodies `{ data, requestId }` and errors include `requestId`. Which layers, and what must middleware do?
+Success bodies should be `{ data, requestId }`, and errors should include `requestId` too. Which layers do that, and what must the middleware do?
 
-Answer: Interceptor `map` for success; global filter for errors. Middleware must store the id on `req` (and usually the response header) where both can read it.
+Answer: An interceptor `map` wraps the success body. A global filter adds the id to errors. Middleware must store the id on the request, and usually set the response header, so both of those layers can read the same value.
 
 ### NEST-076 — What switchToHttp attaches to the host
 
@@ -617,21 +618,21 @@ Answer: Interceptor `map` for success; global filter for errors. Middleware must
 
 **Question:**
 
-A guard calls `context.switchToHttp()` then `context.switchToRpc()`. On an HTTP route, what do `getRequest()`, `getData()`, and `getType()` return, and did either call change the transport?
+A guard calls `context.switchToHttp()` and then `context.switchToRpc()`. On an HTTP route, what do `getRequest()`, `getData()`, and `getType()` return, and did either call change the transport?
 
 **Answer:**
 
-`switchToHttp` assigns HTTP accessors onto the same host (args 0–2 = req/res/next). It does not change transport. `getType()` stays `'http'`. `getData()` is an RPC accessor—meaningful after `switchToRpc`, not the HTTP body. Switching adapters on the host does not retarget the request.
+`switchToHttp()` does not change the transport. It attaches HTTP accessors to the same host, where arguments 0, 1, and 2 are the request, the response, and `next`. `getType()` stays `'http'` because the route really is HTTP. `getData()` is an RPC accessor. It is meaningful after `switchToRpc()`, and it is not the HTTP body. Switching the host to another adapter only changes which getters you are using. It does not retarget the request onto another transport.
 
 **Trade-offs:**
 
-Prefer `switchToHttp().getRequest()` over raw `getArgByIndex(0)` for clarity in shared helpers.
+`switchToHttp().getRequest()` is clearer than `getArgByIndex(0)` in a helper shared by several enhancers. The index form is easy to get wrong when the argument list changes.
 
 **Follow-up:**
 
-Filter `catch` host is `new ExecutionContextHost([req, res, next])`. `getResponse()`?
+A filter's `catch` host is `new ExecutionContextHost([req, res, next])`. What does `getResponse()` return?
 
-Answer: Express response (arg 1). `getHandler`/`getClass` are null; `getType()` defaults to `'http'`.
+Answer: The Express response, which is argument 1. `getHandler()` and `getClass()` are null, and `getType()` defaults to `'http'`.
 
 ### NEST-077 — Status written through getResponse
 
@@ -641,21 +642,21 @@ Answer: Express response (arg 1). `getHandler`/`getClass` are null; `getType()` 
 
 **Question:**
 
-`POST /orders` has no `@HttpCode()`. Guard sets `getResponse().status(202)`; alternatively an interceptor sets 202 before `next.handle()`. Handler returns `{ id: '1' }`. Client status in each case?
+`POST /orders` has no `@HttpCode()`. A guard sets `getResponse().status(202)`. In a second version, an interceptor sets 202 before `next.handle()`. The handler returns `{ id: '1' }`. What status does the client get in each case?
 
 **Answer:**
 
-After guards, Nest `setStatus` applies route default (POST → 201), overwriting the guard’s 202. Interceptor before/after `next.handle()` (and `map` before `reply`) can set 202 that sticks because `reply` keeps the response object’s status. Guard version → 201; interceptor version → 202.
+After the guards succeed, Nest applies the route's default status. A `POST` with no `@HttpCode()` is 201, and that assignment overwrites the 202 the guard just set. Interceptors run after that assignment. An interceptor that sets 202 before `next.handle()`, or inside `map` before Nest replies, writes onto the response object that `reply` later uses. The guard version therefore ends as 201. The interceptor version ends as 202.
 
 **Trade-offs:**
 
-Prefer `@HttpCode(202)` for fixed statuses; interceptor `res.status` when status depends on runtime.
+Use `@HttpCode(202)` when the status is fixed for the route. Set `res.status` in an interceptor when the status depends on something you only know at runtime.
 
 **Follow-up:**
 
-Interceptor sets 202 inside `map` after the handler. Still 202?
+The interceptor sets 202 inside `map`, after the handler has returned. Is the status still 202?
 
-Answer: Yes—`map` runs before `reply`; status on the response object wins.
+Answer: Yes. `map` runs before Nest replies, and the status on the response object is the one that is sent.
 
 ### NEST-078 — getNext and the Nest pipeline
 
@@ -665,21 +666,21 @@ Answer: Yes—`map` runs before `reply`; status on the response object wins.
 
 **Question:**
 
-A guard calls `context.switchToHttp().getNext()` then returns `true`. What did that continue, and what continues Nest’s guard→interceptor path?
+A guard calls `context.switchToHttp().getNext()` and then returns `true`. What did that call continue, and what continues Nest's path from the guard to the interceptors?
 
 **Answer:**
 
-`getNext()` is Express `next` into the next Express layer—not Nest’s transition from `canActivate` to interceptors. Nest continues by awaiting guards, then `setStatus`, then `interceptorsConsumer.intercept`. Do not mix Express `next()` into guards.
+`getNext()` is Express `next`. Calling it continues the next Express layer. It does not move Nest from `canActivate` to interceptors. Nest continues on its own: it awaits every guard, sets the route status, and then calls the interceptor chain. A guard should return a boolean, a Promise, or an Observable, and leave Express `next()` to middleware. Calling both continues two pipelines for one request.
 
 **Trade-offs:**
 
-Middleware owns `next()`; guards own boolean/Promise/Observable results. Mixing duplicates continuation and races the proxy.
+Middleware owns `next()`. Guards own the boolean result. Mixing them duplicates the continuation and can race the route proxy.
 
 **Follow-up:**
 
-Handler takes `@Next() next` and calls `next()` without writing. What about the return value?
+The handler takes `@Next() next` and calls `next()` without writing a body. What happens to the return value?
 
-Answer: Bare `@Next()` marks response handled; Nest does not `reply` the return. Express continues; client gets whatever a later layer writes.
+Answer: A bare `@Next()` marks the response as handled, so Nest does not send the return value. Express continues, and the client receives whatever a later layer writes.
 
 ### NEST-079 — A parameter decorator that returns false
 
@@ -689,21 +690,21 @@ Answer: Bare `@Next()` marks response handled; Nest does not `reply` the return.
 
 **Question:**
 
-`@CurrentUser()` factory returns `false` when `request.user` is missing. No guard. Does the handler run, and what does it receive?
+The `@CurrentUser()` factory returns `false` when `request.user` is missing. There is no guard. Does the handler run, and what argument does it receive?
 
 **Answer:**
 
-Handler runs with argument `false`. Factories extract values; they do not authorize. Returning `false` is a normal value (then pipes see it). Only throwing (e.g. `UnauthorizedException`) stops the handler from inside argument resolution.
+The handler runs, and the argument is `false`. A parameter factory extracts a value. It does not authorize the request. `false` is an ordinary value, and any pipes on that parameter see `false` too. The handler is stopped from inside argument resolution only when the factory throws, for example an `UnauthorizedException`. Returning `false` here does not mean what `canActivate` returning `false` means.
 
 **Trade-offs:**
 
-Throw from the factory to stop the route; return values never imply deny the way `canActivate` false does.
+Throw from the factory when a missing user must stop the route. Return a value when the handler is allowed to decide what that value means.
 
 **Follow-up:**
 
-Factory throws `UnauthorizedException` instead. Which stages already finished?
+The factory throws `UnauthorizedException` instead. Which stages have already finished?
 
-Answer: Middleware, guards, inbound interceptor code. Pipes for that arg and the handler have not started; interceptor `catchError` can see the error.
+Answer: Middleware, guards, and the inbound interceptor code have finished. The pipes for that argument and the handler have not started. An interceptor `catchError` can still see the error.
 
 ### NEST-080 — The data argument of createParamDecorator
 
@@ -713,21 +714,21 @@ Answer: Middleware, guards, inbound interceptor code. Pipes for that arg and the
 
 **Question:**
 
-`@CurrentUser('email')` vs `@CurrentUser(ParseIntPipe)`. What is `data` in the factory, and which registers a pipe?
+Compare `@CurrentUser('email')` with `@CurrentUser(ParseIntPipe)`. What is `data` inside the factory, and which of those two registers a pipe?
 
 **Answer:**
 
-Nest uses `isPipe`: class/object with `transform` → pipe list; else → `data`. `'email'` is data (`factory('email', ctx)`), no pipe from that arg. `ParseIntPipe` registers as a pipe; `data` is `undefined`. Factory return then feeds that pipe.
+`createParamDecorator` looks at each extra argument and asks whether it is a pipe. A class or object with a `transform` method is added to that parameter's pipe list. Anything else is passed to the factory as `data`. The string `'email'` is data, so the factory is called as `factory('email', ctx)` and that argument adds no pipe. `ParseIntPipe` is a pipe, so it is registered and `data` is `undefined`. The factory's return value is what that pipe then receives.
 
 **Trade-offs:**
 
-Dedicated field decorators type cleanly; `data` suits many fields with one lookup. Put pipes in the pipe slot, not as fake data.
+A dedicated decorator per field is easier to type. One decorator plus `data` is better when many fields share one lookup. Put pipes in the pipe position, not in `data`.
 
 **Follow-up:**
 
-`@CurrentUser('email', ParseIntPipe)`; email `'ada@example.com'`. What does ParseInt see?
+The parameter is `@CurrentUser('email', ParseIntPipe)` and the email is `'ada@example.com'`. What does `ParseIntPipe` see?
 
-Answer: The string email. Data selects the field; ParseInt then throws `BadRequestException`. Handler does not run.
+Answer: The email string. `data` selects the field, and `ParseIntPipe` then runs on that string and throws `BadRequestException`. The handler does not run.
 
 ### NEST-081 — A parameter factory that returns a Promise
 
@@ -737,21 +738,21 @@ Answer: The string email. Data selects the field; ParseInt then throws `BadReque
 
 **Question:**
 
-`createParamDecorator` factory is `async` and resolves to `{ id: '1' }`. No pipes vs a no-op global pipe. Handler value? If the promise rejects?
+A `createParamDecorator` factory is `async` and resolves to `{ id: '1' }`. What does the handler receive when there are no pipes, and when a no-op global pipe is present? What happens if the promise rejects?
 
 **Answer:**
 
-`createPipesFn` awaits `getParamValue`, which adopts the factory Promise—handler gets `{ id: '1' }` with or without a pass-through pipe. Rejection rejects argument resolution; handler does not run; interceptor/filters see the error.
+Nest awaits the factory while it is building the argument. The handler receives `{ id: '1' }` whether or not a pass-through pipe is also attached, because the pipe runs on the resolved value. If the promise rejects, argument resolution rejects. The handler does not run, and the error is visible to an interceptor's `catchError` and to the exception filters. An async factory is still just an extractor. It runs after guards and inside `next.handle()`.
 
 **Trade-offs:**
 
-Async factories load during argument binding (after guards, inside `next.handle()`). Prefer middleware/guard for auth identity used by many layers.
+An async factory loads data during argument binding. Prefer middleware or a guard when many layers need the same identity, so you do not repeat that lookup inside the parameter.
 
 **Follow-up:**
 
-Factory rejects with `UnauthorizedException`, no pipe. Handler runs?
+The factory rejects with `UnauthorizedException` and there is no pipe. Does the handler run?
 
-Answer: No. `Promise.all` over params rejects; `catchError`/filters can see it without a pipe.
+Answer: No. `Promise.all` over the parameters rejects, so the handler is skipped. `catchError` and the filters can see the error without any pipe being involved.
 
 ### NEST-082 — How Nest wraps the handler return for map
 
@@ -761,21 +762,21 @@ Answer: No. `Promise.all` over params rejects; `catchError`/filters can see it w
 
 **Question:**
 
-Interceptor: `next.handle().pipe(map(data => ({ data })))`. Handlers return `{ ok: true }`, `Promise.resolve({ ok: true })`, or `of({ ok: true })`. What does `map` see, and the client?
+An interceptor does `next.handle().pipe(map(data => ({ data })))`. Three handlers return `{ ok: true }`, `Promise.resolve({ ok: true })`, and `of({ ok: true })`. What does `map` see, and what does the client receive?
 
 **Answer:**
 
-`next.handle()` is always an Observable. Plain values and Promises are normalized so `map` receives `{ ok: true }` in all three cases; client gets `{ data: { ok: true } }`. Returned Observables are flattened; emissions feed `map`.
+`next.handle()` is always an Observable, even when the handler did not return one. Nest wraps a plain value and a Promise so that `map` receives the settled value. In all three cases `map` sees `{ ok: true }`, and the client receives `{ data: { ok: true } }`. A returned Observable is flattened, and its emissions are what `map` sees. You do not need to return `of(...)` yourself unless you are actually streaming.
 
 **Trade-offs:**
 
-Returning `of(...)` for one HTTP body adds nothing Nest doesn’t already wrap; use Observables when streaming is real.
+Returning `of(...)` for a single HTTP body adds nothing Nest does not already wrap. Return an Observable when the handler really streams more than one value.
 
 **Follow-up:**
 
-Handler observable emits `{ n: 1 }` then `{ n: 2 }` then completes. Body written?
+The handler observable emits `{ n: 1 }`, then `{ n: 2 }`, then completes. What body is written?
 
-Answer: `{ data: { n: 2 } }`—`lastValueFrom` keeps the last emission. Empty completion rejects into the exception path.
+Answer: `{ data: { n: 2 } }`. Nest uses `lastValueFrom`, which keeps the last emission. An observable that completes with no emission rejects, and that rejection takes the exception path.
 
 ### NEST-083 — What intercept itself must return
 
@@ -785,21 +786,21 @@ Answer: `{ data: { n: 2 } }`—`lastValueFrom` keeps the last emission. Empty co
 
 **Question:**
 
-Versions: `return { cached: true }` (no `next.handle()`); `return Promise.resolve(next.handle())`; `return next.handle().pipe(map(...))`. Which satisfy 10.4.15, and what happens to the plain object?
+Three versions of `intercept`: `return { cached: true }` with no `next.handle()`; `return Promise.resolve(next.handle())`; and `return next.handle().pipe(map(...))`. Which of these satisfy NestJS 10.4.15, and what happens to the plain object?
 
 **Answer:**
 
-Must return `Observable` or `Promise<Observable>`. Pipe form is standard; `Promise.resolve(next.handle())` is valid and still runs the handler. Plain `{ cached: true }` is not an Observable—breaks the consumer/`mergeAll` contract. Cache hits should `return of(cached)`.
+`intercept` must return an Observable, or a Promise that resolves to an Observable. The `pipe(map(...))` form is the normal one. `Promise.resolve(next.handle())` is also valid, and the handler still runs because that observable is subscribed later. A plain `{ cached: true }` is not an observable, so the interceptor consumer cannot merge it and the pipeline breaks. A cache hit should `return of(cached)`. Await any I/O you need, then return either `next.handle()` or `of(...)`.
 
 **Trade-offs:**
 
-Await I/O then return `next.handle()` (or `of(...)`)—never await and return a bare body object.
+Awaiting a cache lookup and then returning `next.handle()` keeps the method async and still legal. Returning the cached body as a plain object looks similar and is rejected by the pipeline.
 
 **Follow-up:**
 
-`async intercept` awaits cache then `return next.handle()`. Valid?
+`async intercept` awaits the cache and then `return next.handle()`. Is that valid?
 
-Answer: Yes—`Promise<Observable<...>>` is allowed. Handler runs only if that return executes after the await.
+Answer: Yes. The return type is `Promise<Observable<...>>`, which Nest accepts. The handler runs only if that return is actually executed after the await.
 
 ### NEST-084 — Where catchError sits relative to map
 
@@ -809,21 +810,21 @@ Answer: Yes—`Promise<Observable<...>>` is allowed. Handler runs only if that r
 
 **Question:**
 
-Handler throws `NotFoundException`. Pipe A: `map` then `catchError`. Pipe B: `catchError` → `of({ missing: true })` then `map` → `{ data }`. What does each `map` see, and which can reach `@Catch(NotFoundException)`?
+The handler throws `NotFoundException`. Pipe A is `map` and then `catchError`. Pipe B is `catchError` returning `of({ missing: true })` and then `map` wrapping `{ data }`. What does each `map` see, and which pipe can still reach `@Catch(NotFoundException)`?
 
 **Answer:**
 
-`map` ignores errors. A: `map` skips; `catchError` runs—rethrow reaches the method filter. B: `catchError` recovers first; `map` sees `{ missing: true }` → `{ data: { missing: true } }`; filter never runs.
+`map` only sees next notifications. An error skips it. In pipe A, `map` is skipped, `catchError` runs, and a rethrow still reaches the method filter. In pipe B, `catchError` turns the error into `{ missing: true }` before `map` runs, so `map` sees that object and the client receives `{ data: { missing: true } }`. The filter never runs, because the stream is successful again. Operator order is the whole decision.
 
 **Trade-offs:**
 
-`catchError` before `map` envelopes recovered bodies; rethrow after `map` preserves filter-owned errors.
+`catchError` before `map` lets you wrap a recovered body in the same envelope as a success. `catchError` after `map`, rethrowing, keeps the original error for the filter.
 
 **Follow-up:**
 
-`map` throws `BadRequestException` for `{ ok: false }`; later `catchError` rethrows. Filter sees?
+`map` throws `BadRequestException` when the value is `{ ok: false }`, and a later `catchError` rethrows. What does the filter see?
 
-Answer: `BadRequestException`. Handler succeeded; `@Catch(NotFoundException)` does not match.
+Answer: `BadRequestException`. The handler itself succeeded. A method filter written as `@Catch(NotFoundException)` does not match this error.
 
 ### NEST-085 — APP_INTERCEPTOR and useGlobalInterceptors
 
@@ -833,21 +834,21 @@ Answer: `BadRequestException`. Handler succeeded; `@Catch(NotFoundException)` do
 
 **Question:**
 
-`LoggingInterceptor` needs `AuditService`. `useGlobalInterceptors(new LoggingInterceptor())` vs `{ provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }`. Who gets DI, and inbound order if both exist?
+`LoggingInterceptor` needs `AuditService`. Compare `useGlobalInterceptors(new LoggingInterceptor())` with `{ provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }`. Which one gets dependency injection, and what is the inbound order if both exist?
 
 **Answer:**
 
-Only `APP_INTERCEPTOR`/`useClass` is constructed with the module injector. Manual `new` skips DI. Scan-registered globals run before bootstrap `useGlobalInterceptors` appends. Inbound: DI globals first, then manual instances.
+Only the `APP_INTERCEPTOR` registration is constructed by the module injector, so only that instance receives `AuditService`. `new LoggingInterceptor()` skips injection. During startup, Nest records static `APP_INTERCEPTOR` providers while it scans modules, and `useGlobalInterceptors` appends after that. On the way in, those injected globals run first and the manually constructed instances run after them. The same rule you use for guards applies here: `new` is only honest when the constructor has no dependencies.
 
 **Trade-offs:**
 
-`APP_INTERCEPTOR` for dependencies; manual `new` only for empty constructors.
+`APP_INTERCEPTOR` is the right registration when the interceptor needs services. A manual `new` is limited to an empty constructor.
 
 **Follow-up:**
 
-Request-scoped `APP_INTERCEPTOR`—where stored vs static global?
+The `APP_INTERCEPTOR` is request-scoped. Where is it stored, compared with a static global interceptor?
 
-Answer: Request-interceptor / scoped enhancer path, not the static global list; resolved per request context, relative to static globals by enhancer wiring.
+Answer: It is stored on the per-request interceptor list, not on the static global list. Each request resolves a new instance, and Nest places those instances after the static global interceptors.
 
 ### NEST-086 — Two APP_INTERCEPTOR registrations
 
@@ -857,21 +858,21 @@ Answer: Request-interceptor / scoped enhancer path, not the static global list; 
 
 **Question:**
 
-`AppModule` registers `APP_INTERCEPTOR` Logging; imported `AuditModule` registers Audit. Bootstrap `useGlobalInterceptors(new TimingInterceptor())`. Inbound order? What does Audit’s `map` see if all three call `next.handle()` and `map`?
+`AppModule` registers an `APP_INTERCEPTOR` for logging. Imported `AuditModule` registers one for audit. Bootstrap calls `useGlobalInterceptors(new TimingInterceptor())`. What is the inbound order? If all three call `next.handle()` and `map`, what does Audit's `map` see?
 
 **Answer:**
 
-In 10.4, `AppModule`’s `APP_INTERCEPTOR` providers are recorded before imported `AuditModule`’s; `useGlobalInterceptors` appends Timing last. Inbound: Logging → Audit → Timing → handler. Outbound maps reverse, so Timing’s `map` sees the handler value first; Audit’s `map` sees Timing’s mapped result.
+In NestJS 10.4 the root module's providers are recorded before the providers of modules it imports, because the root is inserted into the module map first. `useGlobalInterceptors` appends Timing after both of those. The inbound order is Logging, then Audit, then Timing, then the handler. Outbound `map` operators run in reverse, so Timing's `map` sees the handler value first. Audit's `map` sees whatever Timing's `map` returned, not the raw handler value.
 
 **Trade-offs:**
 
-One interceptor with ordered steps is clearer; separate `APP_INTERCEPTOR`s when modules own concerns—then scan order matters.
+One interceptor with ordered steps is easier to follow. Separate `APP_INTERCEPTOR` registrations make sense when each module owns its own concern, and then the scan order becomes part of the contract.
 
 **Follow-up:**
 
-Both in `AppModule.providers`, audit first, logging second; no `useGlobalInterceptors`. Whose `map` sees `{ ok: true }` first?
+Both interceptors are in `AppModule.providers`, audit first and logging second, with no `useGlobalInterceptors`. Whose `map` sees `{ ok: true }` first?
 
-Answer: `LoggingInterceptor`—later registration is inner inbound, so its `map` is first outbound.
+Answer: `LoggingInterceptor`. The later registration is the inner one on the way in, so its `map` is the first on the way out.
 
 ### NEST-087 — Functional middleware and class middleware
 
@@ -881,21 +882,21 @@ Answer: `LoggingInterceptor`—later registration is inner inbound, so its `map`
 
 **Question:**
 
-`apply(requestIdMiddleware, RequestIdMiddleware)`—function vs class with constructor DI. How does Nest register each, and which gets the injector?
+`apply` receives both `requestIdMiddleware`, a function, and `RequestIdMiddleware`, a class whose constructor needs injection. How does Nest register each, and which one gets the injector?
 
 **Answer:**
 
-Functions stay functional middleware (wrapped). Classes matching `isMiddlewareClass` (`class` / uppercase `function` with `use`) are constructed from the middleware injector with DI. Only the class form receives constructor dependencies.
+A plain function stays a function. Nest wraps it and registers it as middleware, and there is no constructor to inject into. A class, or a function whose name starts with a capital letter and that has a `use` method, is treated as class middleware. Nest constructs that one from the middleware injector of the module that called `apply`, so constructor dependencies are resolved. Only the class form receives those dependencies. The function form can still close over a service that `configure` itself injected.
 
 **Trade-offs:**
 
-Close over an injected service from `configure` for functional middleware; class middleware is cleaner for multi-dep `use`.
+Closing over a service from `configure` is enough for a small function. A class is easier to read when `use` needs several dependencies.
 
 **Follow-up:**
 
-Request-scoped class middleware—when is a new instance created?
+When is a new instance created for request-scoped class middleware?
 
-Answer: Per request when that middleware runs—not at `configure` time. Functional form has no Nest scope.
+Answer: When that middleware runs for a request, not when `configure` is called. The function form has no Nest scope at all.
 
 ### NEST-088 — Why middleware has no ExecutionContext
 
@@ -905,21 +906,21 @@ Answer: Per request when that middleware runs—not at `configure` time. Functio
 
 **Question:**
 
-`use` wants `Reflector.get('roles', handler)`. Why no `ExecutionContext`/`getHandler()`, and what does the middleware catch host contain if `use` throws?
+`use` wants to call `Reflector.get('roles', handler)`. Why is there no `ExecutionContext` and no `getHandler()`, and what is in the host if `use` throws?
 
 **Answer:**
 
-Middleware is Express `(req, res, next)` before the route proxy that knows the controller method. Success path never builds a full handler context. Catch host is typically `[req, res, next]`—HTTP accessors work; `getHandler`/`getClass` are null.
+Middleware is Express `(req, res, next)`. It runs before the route proxy, and the route proxy is the layer that knows which controller method was selected. On the success path Nest never builds a full handler context for middleware, so there is nothing for `getHandler()` to return. If `use` throws, the catch host is typically `[req, res, next]`. HTTP accessors work on that host. `getHandler()` and `getClass()` are null, so `Reflector` cannot read route roles from it.
 
 **Trade-offs:**
 
-Building `ExecutionContextHost` yourself still won’t invent the handler. Use a guard for metadata.
+You can build an `ExecutionContextHost` yourself and still have no handler to put in it. A guard is the layer that has both the request and the method.
 
 **Follow-up:**
 
-`req.params.id` on `forRoutes(OrdersController)` with `orders/:id`—same as `getHandler()`?
+On `forRoutes(OrdersController)` for `orders/:id`, is `req.params.id` the same thing as `getHandler()`?
 
-Answer: No. Params are URL data from Express; `getHandler()` is the method reference for metadata. Guards can read both.
+Answer: `req.params.id` is the URL value Express parsed, and `getHandler()` is the method reference used to read metadata. A guard can read both.
 
 ### NEST-089 — A service inside class middleware
 
@@ -929,21 +930,21 @@ Answer: No. Params are URL data from Express; `getHandler()` is the method refer
 
 **Question:**
 
-`RequestIdMiddleware` injects `IdService` from exported `CoreModule`. `OrdersModule.configure` applies it. What must `OrdersModule` import, and what does `use` still lack?
+`RequestIdMiddleware` injects `IdService`, which is exported by `CoreModule`. `OrdersModule.configure` applies the middleware. What must `OrdersModule` import, and what does `use` still not have?
 
 **Answer:**
 
-Import `CoreModule` so the configuring module’s injector sees `IdService`. `apply(RequestIdMiddleware)` mounts and constructs it—listing it only in `providers` does not. Injection still does not provide `ExecutionContext`/handler metadata.
+`OrdersModule` must import `CoreModule`, so the module that calls `configure` can see `IdService` in its injector. `apply(RequestIdMiddleware)` is what mounts the class and causes Nest to construct it. Listing the class only in `providers` does not attach it to any route. Constructor injection still does not supply an `ExecutionContext` or the handler. `use` can call `IdService`, and it still cannot read `@Roles()` metadata.
 
 **Trade-offs:**
 
-Inject loggers/id generators freely; Reflector without a handler still cannot read route roles.
+Inject loggers and id generators freely. `Reflector` without a handler still cannot read the roles declared on the route.
 
 **Follow-up:**
 
-`IdService.next` throws `ServiceUnavailableException`. Which filters write?
+`IdService.next` throws `ServiceUnavailableException`. Which filters write the response?
 
-Answer: Global filters (or default handler). Controller/method filters on the route are not used for the middleware proxy.
+Answer: Global filters, or the default exception handler if no global filter matches. Controller and method filters on the route are not used for the middleware proxy.
 
 ### NEST-090 — @Catch walks for the first match
 
@@ -953,21 +954,21 @@ Answer: Global filters (or default handler). Controller/method filters on the ro
 
 **Question:**
 
-`@UseFilters(BroadFilter, NarrowFilter)`: Broad `@Catch(HttpException)`, Narrow `@Catch(NotFoundException)`. Throw `NotFoundException`. Which runs, and why isn’t the more specific class preferred?
+`@UseFilters(BroadFilter, NarrowFilter)`: Broad is `@Catch(HttpException)` and Narrow is `@Catch(NotFoundException)`. The handler throws `NotFoundException`. Which filter runs, and why is the more specific class not chosen automatically?
 
 **Answer:**
 
-`@Catch` matches by `instanceof` (or empty list = all). Selection is first match on the reversed filter list—not “most specific subclass.” Metadata `[Broad, Narrow]` reverses to `[Narrow, Broad]`, so `NarrowFilter` runs for `NotFoundException`. If Broad were tried first, its `@Catch(HttpException)` would also match NotFound and win. Order beats specificity.
+`@Catch()` matches with `instanceof`. An empty list matches everything. Nest does not pick the most specific subclass. It walks the filter list from the method end and stops at the first match. The metadata order `[Broad, Narrow]` is searched as `[Narrow, Broad]`, so `NarrowFilter` runs for `NotFoundException`. If Broad were tried first, its `@Catch(HttpException)` would also match `NotFoundException`, because `NotFoundException` extends `HttpException`, and Broad would win. The order you wrote decides the winner.
 
 **Trade-offs:**
 
-One `@Catch(HttpException)` with status branches avoids order traps; two filters need deliberate `@UseFilters` order.
+One `@Catch(HttpException)` that branches on status avoids this trap. Two filters are fine when the `@UseFilters` order is deliberate.
 
 **Follow-up:**
 
-Add controller `@Catch(NotFoundException)`; method still Broad then Narrow. Who runs?
+You add a controller filter `@Catch(NotFoundException)`. The method still lists Broad then Narrow. Which one runs?
 
-Answer: `NarrowFilter`—method filters before controller; Narrow matches and stops.
+Answer: `NarrowFilter`. Method filters are considered before controller filters, Narrow matches, and the walk stops.
 
 ### NEST-091 — @Catch() and @Catch(Error)
 
@@ -977,21 +978,21 @@ Answer: `NarrowFilter`—method filters before controller; Narrow matches and st
 
 **Question:**
 
-Method `@Catch(Error)`, global `@Catch()`. Throws: `NotFoundException`, `new Error('disk full')`, string `'disk full'`. Which filter for each?
+The method filter is `@Catch(Error)` and the global filter is `@Catch()`. The handler throws `NotFoundException`, then `new Error('disk full')`, then the string `'disk full'`. Which filter runs for each?
 
 **Answer:**
 
-Method first. `NotFoundException instanceof Error` → method. Plain `Error` → method. String `'disk full'` is not `instanceof Error` → method skips → global `@Catch()` matches. Method filters that assume `HttpException` APIs can throw inside `catch` on non-HTTP Errors.
+The method filter is tried first. `NotFoundException` is an `Error`, so the method filter matches. A plain `Error` matches it too. The string `'disk full'` is not `instanceof Error`, so the method filter skips it and the global `@Catch()` matches, because an empty catch list accepts every value. A method filter that then calls `HttpException` methods on a plain `Error` can throw again inside `catch`. Check the type before you call `getStatus()` or `getResponse()`.
 
 **Trade-offs:**
 
-Method `@Catch()` owns all throws including strings; `@Catch(HttpException)` leaves unknowns to global/base.
+A method `@Catch()` with no arguments owns every throw from that route, including strings. `@Catch(HttpException)` leaves unknown values for the global filter or the base filter.
 
 **Follow-up:**
 
-Only global `@Catch(HttpException)`; throw `'disk full'`. What runs?
+The only custom filter is a global `@Catch(HttpException)`, and the code throws the string `'disk full'`. What runs?
 
-Answer: No custom match → `BaseExceptionFilter` → 500 generic internal error body.
+Answer: No custom filter matches, so `BaseExceptionFilter` runs and the client receives the generic 500 body.
 
 ### NEST-092 — @UseFilters list order
 
@@ -1001,21 +1002,21 @@ Answer: No custom match → `BaseExceptionFilter` → 500 generic internal error
 
 **Question:**
 
-Only `@UseFilters(AlphaFilter, BetaFilter)`: Alpha `@Catch(BadRequestException)`, Beta `@Catch()`. Throw `BadRequestException`. Which runs?
+The only binding is `@UseFilters(AlphaFilter, BetaFilter)`. Alpha is `@Catch(BadRequestException)` and Beta is `@Catch()`. The handler throws `BadRequestException`. Which filter runs?
 
 **Answer:**
 
-Reverse → `[Beta, Alpha]`. Beta’s empty `@Catch()` matches everything first → Beta runs; Alpha never called despite being “more specific.”
+Nest searches the method list from the end, so `[Alpha, Beta]` is tried as Beta and then Alpha. Beta's empty `@Catch()` matches every value, including this `BadRequestException`, so Beta runs and Alpha is never called. Alpha being "more specific" does not matter. Specificity is not the selection rule. If you want Alpha to see `BadRequestException`, it has to be the filter that the walk reaches first, which means it has to sit at the end of the `@UseFilters` list.
 
 **Trade-offs:**
 
-Single filter with internal `instanceof` makes order obvious; two filters require putting catch-all last in the reversed sense (catch-all first in `@UseFilters` is wrong).
+One filter that branches with `instanceof` makes the order obvious. Two filters require you to remember that a catch-all listed last in `@UseFilters` is actually tried first.
 
 **Follow-up:**
 
-Also a global `@Catch()`; method still Alpha then Beta(`@Catch()`). Who runs?
+A global `@Catch()` is added as well. The method list is still Alpha, then Beta with `@Catch()`. Which one runs?
 
-Answer: Beta—method reversed pair still before global; Beta stops the walk.
+Answer: Beta. The reversed method pair is still considered before the global filter, and Beta matches and stops the walk.
 
 ### NEST-093 — HttpException getResponse as the body
 
@@ -1025,21 +1026,21 @@ Answer: Beta—method reversed pair still before global; Beta stops the walk.
 
 **Question:**
 
-No custom filter. JSON for `new NotFoundException()`, `new HttpException('missing', 404)`, `new HttpException({ error: 'missing' }, 404)`?
+No custom filter is registered. What JSON is sent for `new NotFoundException()`, for `new HttpException('missing', 404)`, and for `new HttpException({ error: 'missing' }, 404)`?
 
 **Answer:**
 
-Uses `getResponse()` + `getStatus()`. Default NotFound object → `{ statusCode: 404, message: 'Not Found' }`. String response → typically wrapped/objectified with that message and status. Object response → sent as that object (`{ error: 'missing' }`) with status 404—`getResponse()` is the body contract.
+The base filter uses `getStatus()` for the status and `getResponse()` for the body. A default `NotFoundException` already stores an object, so the client receives `{ statusCode: 404, message: 'Not Found' }`. When `getResponse()` is a string, the filter wraps it as `{ statusCode, message }` with that string and the exception's status. When `getResponse()` is an object, that object is the body. `new HttpException({ error: 'missing' }, 404)` is sent as `{ error: 'missing' }` with status 404. The object you passed is the contract.
 
 **Trade-offs:**
 
-Subclasses keep controllers clean; custom objects when the API isn’t `{ statusCode, message }`.
+Built-in subclasses keep controller code small and the body consistent. Pass your own object when the API body is not `{ statusCode, message }`.
 
 **Follow-up:**
 
-Your filter always `json`s `{ statusCode, message: exception.message }`. What is lost for object responses?
+Your filter always sends `{ statusCode, message: exception.message }`. What is lost for an object response?
 
-Answer: Fields like `error` from `getResponse()`. Prefer sending `getResponse()` when the throw site chose the body.
+Answer: Fields such as `error` that lived on `getResponse()`. Send `getResponse()` when the throw site chose the body.
 
 ### NEST-094 — Unknown errors and the http-errors shape
 
@@ -1049,21 +1050,21 @@ Answer: Fields like `error` from `getResponse()`. Prefer sending `getResponse()`
 
 **Question:**
 
-`BaseExceptionFilter` for `new Error('disk full')`, `{ statusCode: 400, message: 'bad query' }`, and `{ statusCode: 400 }`. Status/body/logging?
+What does `BaseExceptionFilter` do with `new Error('disk full')`, with `{ statusCode: 400, message: 'bad query' }`, and with `{ statusCode: 400 }`? Include status, body, and logging.
 
 **Answer:**
 
-Plain Error → 500 generic body; log message/stack server-side. Object with truthy `statusCode` and `message` → http-errors path: that status/body. `{ statusCode: 400 }` alone lacks message → treated as unknown → 500 generic (not a client 400).
+A plain `Error` is an unknown exception. The client gets 500 and the generic internal-error body, and the message and stack are logged on the server. An object is treated as an HTTP error only when both `statusCode` and `message` are truthy. `{ statusCode: 400, message: 'bad query' }` therefore goes out as 400 with that body. `{ statusCode: 400 }` has no message, so it fails that check and becomes a generic 500. The filter is not guessing. Both fields have to be present.
 
 **Trade-offs:**
 
-Prefer `HttpException` over duck-typed `{ statusCode, message }`. Custom `@Catch()` if you must normalize third-party shapes.
+Prefer `HttpException` over a plain object that happens to have `statusCode` and `message`. Use a custom `@Catch()` when you must normalize a third-party error shape.
 
 **Follow-up:**
 
-`Object.assign(new Error('disk full'), { statusCode: 400 })`. Path?
+The thrown value is `Object.assign(new Error('disk full'), { statusCode: 400 })`. Which path does it take?
 
-Answer: http-errors (statusCode + message truthy) → 400 `{ statusCode: 400, message: 'disk full' }`. Attach `statusCode` only when the message is client-safe.
+Answer: The HTTP-error path, because both `statusCode` and `message` are truthy. The client gets 400 and `{ statusCode: 400, message: 'disk full' }`. Attach `statusCode` only when that message is safe to show.
 
 ### NEST-095 — headersSent before the filter writes
 
@@ -1073,21 +1074,21 @@ Answer: http-errors (statusCode + message truthy) → 400 `{ statusCode: 400, me
 
 **Question:**
 
-Handler `@Res()` (no passthrough) does `res.json({ accepted: true })` then throws `Error('later')`. No custom filter. Client receives? What does `BaseExceptionFilter` skip?
+A handler with `@Res()` and no passthrough calls `res.json({ accepted: true })` and then throws `Error('later')`. There is no custom filter. What does the client receive, and what does `BaseExceptionFilter` skip?
 
 **Answer:**
 
-Client keeps `{ accepted: true }`. Base filter sees `headersSent`, skips `reply`, calls `end`. No second error JSON.
+The client keeps `{ accepted: true }`. By the time the filter runs, Express has already sent that JSON and the headers. `BaseExceptionFilter` checks `headersSent` before it writes. The check covers both the `HttpException` branch and the unknown-error branch. When the headers are already gone, the filter skips `reply` and calls `end`. It does not send a second error body. The throw is still logged.
 
 **Trade-offs:**
 
-Bare `@Res()` means the handler owns post-write failures—catch and write before sending, or accept end-only cleanup.
+A bare `@Res()` means the handler owns failures that happen after the write. Catch them and write the error before you send, or accept that the filter can only end the response.
 
 **Follow-up:**
 
-Same sequence but `NotFoundException` after `res.json`. Does HttpException branch still `reply` 404?
+The same sequence throws `NotFoundException` after `res.json`. Does the `HttpException` branch still reply with 404?
 
-Answer: No—headers check wraps both branches; client still has `{ accepted: true }`.
+Answer: No. The headers check wraps both branches. The client still has `{ accepted: true }`.
 
 ### NEST-096 — A filter that writes after the handler already did
 
@@ -1097,21 +1098,21 @@ Answer: No—headers check wraps both branches; client still has `{ accepted: tr
 
 **Question:**
 
-Method `@Catch()` logs then `response.json({ statusCode: 500, message: 'Internal server error' })` after handler already `res.json({ accepted: true })` and threw. What’s missing vs `BaseExceptionFilter`?
+A method `@Catch()` logs and then calls `response.json({ statusCode: 500, message: 'Internal server error' })`. The handler already called `res.json({ accepted: true })` and then threw. What is missing compared with `BaseExceptionFilter`?
 
 **Answer:**
 
-Selected custom filter is Nest’s only writer—base filter’s `headersSent` guard is not applied. Second `json` on a finished response is rejected/erroneous in Express. Client already has `{ accepted: true }`.
+Once Nest selects your filter, that filter is the only writer. The base filter's `headersSent` guard is not applied for you. A second `json` on a response Express has already finished is rejected, and the client already has `{ accepted: true }`. The log line still runs. The safe pattern is to extend `BaseExceptionFilter` and call `super.catch`, or to check the headers yourself and call `json` only when they have not been sent.
 
 **Trade-offs:**
 
-Extend `BaseExceptionFilter` / call `super.catch` to reuse the headers check; hand `json` only when headers are clear.
+Extending the base filter reuses the headers check. Hand-written `json` is fine only when you know the handler did not already write.
 
 **Follow-up:**
 
-Handler sets `res.status(202)` then throws before any write. What does a careful `reply(500, ...)` send?
+The handler sets `res.status(202)` and then throws before any write. What does a careful `reply(500, ...)` send?
 
-Answer: 500 and the error body—`reply` sets status; prior 202 is replaced unless your filter preserves it.
+Answer: Status 500 and the error body. `reply` sets the status, so the earlier 202 is replaced unless your filter deliberately keeps it.
 
 ### NEST-097 — false and undefined in getAllAndOverride
 
@@ -1121,21 +1122,21 @@ Answer: 500 and the error body—`reply` sets status; prior 202 is replaced unle
 
 **Question:**
 
-Global guard reads `isPublic` with `getAllAndOverride` (handler then class). Class `@SetMetadata('isPublic', true)`. One method `false`, another no metadata. What does each read, and who skips auth?
+A global guard reads `isPublic` with `getAllAndOverride`, handler first and then class. The class has `@SetMetadata('isPublic', true)`. One method sets `false`. Another method sets no metadata. What does each method read, and which requests skip auth?
 
 **Answer:**
 
-First value not `undefined` wins—including `false`/`null`/`0`/`''`. Method with `false` → `false` (class ignored). Method with no metadata → class `true`. Skip auth only when result `=== true` (or your chosen truthy policy)—`false` means authenticate.
+`getAllAndOverride` returns the first value that is not `undefined`. `false`, `null`, `0`, and `''` all count as real values and stop the walk. The method that set `false` reads `false`, and the class value is ignored. The method with no metadata falls through to the class and reads `true`. Skip authentication only when the result is exactly `true`, or whatever truthy policy you documented. `false` means the request must still be authenticated.
 
 **Trade-offs:**
 
-Default-private + `@Public()` fails closed; default-public + method `false` fits small internal controllers.
+Default-private plus a `@Public()` decorator fails closed, which is the safer product rule. Default-public plus a method-level `false` fits a small internal controller.
 
 **Follow-up:**
 
-Method metadata `null` instead of `false`. Override result and `=== true`?
+The method metadata is `null` instead of `false`. What does override return, and what does `=== true` do?
 
-Answer: Returns `null`; class not read; `null === true` is false → authenticate.
+Answer: It returns `null`. The class value is not read. `null === true` is false, so the guard still authenticates.
 
 ### NEST-098 — Two decorators writing one metadata key
 
@@ -1145,21 +1146,21 @@ Answer: Returns `null`; class not read; `null === true` is false → authenticat
 
 **Question:**
 
-Two stacked method decorators each `SetMetadata('roles', someArray)`. Guard `Reflector.get('roles', getHandler())`. What is guaranteed?
+Two decorators stacked on one method each call `SetMetadata('roles', someArray)`. The guard calls `Reflector.get('roles', getHandler())`. What is guaranteed?
 
 **Answer:**
 
-`defineMetadata` replaces—last writer wins; earlier array is gone. `getAllAndMerge` cannot recover two writes on the same target. Decorator evaluation order decides the survivor; do not stack two writers on one key/one target.
+`SetMetadata` uses `defineMetadata`, which replaces the previous value for that key on that target. The earlier array is gone. `getAllAndMerge` cannot bring it back, because merge reads different targets, and both writes hit the same method. TypeScript evaluates stacked decorators from the one closest to the method upward, so the outermost decorator is the value that remains. Do not stack two writers on one key of one target if both arrays must survive.
 
 **Trade-offs:**
 
-Merge across handler+class targets; never two method decorators sharing one key if both values must survive.
+Merge across the handler and the class when both targets should contribute. Keep a single writer on the method when the method should replace the class.
 
 **Follow-up:**
 
-Method `@Roles('billing')`, class `@Roles('audit')`, `getAllAndMerge`. Checked roles?
+The method has `@Roles('billing')` and the class has `@Roles('audit')`. `getAllAndMerge` is used. Which roles are checked?
 
-Answer: `['billing', 'audit']` (different targets). Use override when method should replace class.
+Answer: `['billing', 'audit']`, because those are different targets. Use override when the method should replace the class list.
 
 ### NEST-099 — The value transform returns is the argument
 
@@ -1169,21 +1170,21 @@ Answer: `['billing', 'audit']` (different targets). Use override when method sho
 
 **Question:**
 
-`@Body()` is `{ name: ' ada ' }`. `TrimNamePipe` returns new `{ name: 'ada' }`. Handler also logs `req.body`. Parameter vs `req.body`?
+`@Body()` is `{ name: ' ada ' }`. `TrimNamePipe` returns a new object `{ name: 'ada' }`. The handler also logs `req.body`. What does the parameter receive, and what does `req.body` still hold?
 
 **Answer:**
 
-Parameter is the pipe’s return `{ name: 'ada' }`. `req.body` stays the original extracted object unless you mutated it—Nest does not write pipe output back onto `req.body`.
+The handler parameter is whatever the last pipe returned, here `{ name: 'ada' }`. Nest does not write that object back onto `req.body`. The request keeps the object that was originally extracted, unless the pipe mutated that same object. Anything else in the request that reads `req.body` still sees `{ name: ' ada ' }`. If you need the raw body for an audit log and the trimmed body for the handler, return a new object and leave the request alone.
 
 **Trade-offs:**
 
-New objects keep raw body for audit; in-place mutation is cheaper but shared with anything holding `req.body`.
+A new object keeps the raw body available for audit. Mutating in place is cheaper, and every holder of `req.body` then sees the mutation.
 
 **Follow-up:**
 
-Second pipe returns `{ name: value.name, trimmed: true }`. Handler receives?
+A second pipe returns `{ name: value.name, trimmed: true }`. What does the handler receive?
 
-Answer: `{ name: 'ada', trimmed: true }`—only the last transform’s return is the argument.
+Answer: `{ name: 'ada', trimmed: true }`. Only the last `transform` return value becomes the argument.
 
 ### NEST-100 — A pipe that returns undefined
 
@@ -1193,18 +1194,18 @@ Answer: `{ name: 'ada', trimmed: true }`—only the last transform’s return is
 
 **Question:**
 
-`TrimNamePipe` trims `value.name` in place and falls off with no `return`. Body was `{ name: ' ada ' }`. Handler argument? Did the handler run?
+`TrimNamePipe` trims `value.name` in place and then falls off the end of `transform` with no `return`. The body was `{ name: ' ada ' }`. What argument does the handler receive, and did the handler run?
 
 **Answer:**
 
-Handler runs with `undefined`. Missing `return` yields `undefined`; Nest does not keep the previous value. In-place trim still mutated the original object on `req.body`, but the parameter is `undefined`.
+The handler runs, and the argument is `undefined`. A function with no `return` produces `undefined`, and Nest uses that return value as the argument. It does not keep the previous value when you forget to return it. The in-place trim still mutated the original object, so `req.body.name` is `'ada'`, while the parameter the handler was given is `undefined`. That split is easy to misread as a missing body.
 
 **Trade-offs:**
 
-Return `value` for “no-op” global pipes. Returning `undefined` looks like a missing body and is hard to debug.
+Return `value` from a global pipe that sometimes has nothing to change. Returning `undefined` looks like a missing body and is painful to debug.
 
 **Follow-up:**
 
-Pipe `return value.name.trim()` instead of the object. Handler receives?
+The pipe does `return value.name.trim()` instead of returning the object. What does the handler receive?
 
-Answer: String `'ada'`. Last return replaces the whole argument; TypeScript types are not enforced at runtime.
+Answer: The string `'ada'`. The last return value replaces the whole argument. TypeScript's parameter type is not enforced at runtime.

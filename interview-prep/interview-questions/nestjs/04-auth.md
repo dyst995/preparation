@@ -16,13 +16,13 @@ What is the difference between authentication and authorization, and where does 
 
 **Answer:**
 
-Authentication (authn) answers "who are you?" and produces an identity on `req.user`. Authorization (authz) answers "what may you do?" and consumes that identity. In Nest, authn is typically a Passport strategy plus `AuthGuard`; authz is a separate guard (roles, permissions, policies) plus service-level ownership checks.
+Authentication answers "who are you?" and ends with an identity attached to the request, usually `req.user`. Authorization answers "what are you allowed to do?" and uses that identity to make a decision. In Nest, authentication is typically a Passport strategy plus `AuthGuard`. Authorization is a separate guard, such as roles, permissions, or policies, plus ownership checks inside services. Keeping them separate means each can change without breaking the other.
 
 **Follow-up:**
 
-Why shouldn't the authn guard also check roles?
+Why shouldn't the authentication guard also check roles?
 
-Answer: Mixing them couples "how we log in" to "what rules apply". Separate guards let you swap JWT for sessions or an IdP without touching permission logic, and let public-but-role-less routes skip authz cleanly.
+Answer: Mixing them ties "how we log in" to "what the rules are". If they're separate, you can swap JWT for sessions or an external identity provider without touching permission logic, and public routes can skip the role check cleanly.
 
 ### NEST-152 — How `@nestjs/passport` works
 
@@ -36,13 +36,13 @@ How does `@nestjs/passport` integrate Passport into Nest?
 
 **Answer:**
 
-Passport is Express-style middleware. `@nestjs/passport` wraps it: you extend `PassportStrategy(Strategy)`, register the class as a provider, and the wrapper registers the strategy with Passport under a name. `AuthGuard('name')` calls `passport.authenticate` inside `canActivate`, so it runs in Nest's guard pipeline with DI. Whatever `validate()` returns is attached to `req.user`.
+Passport is built as Express-style middleware, and `@nestjs/passport` adapts it to Nest. You write a class that extends `PassportStrategy(Strategy)` and register it as a provider. The wrapper then registers that strategy with Passport under a name. When you use `AuthGuard('name')`, it calls `passport.authenticate` inside `canActivate`, so it runs as a normal Nest guard with dependency injection. Whatever your `validate()` method returns becomes `req.user`.
 
 **Follow-up:**
 
 What happens if the strategy class is never added to a module's `providers`?
 
-Answer: It is never instantiated, so Passport never registers it, and `AuthGuard('jwt')` fails at request time with an "Unknown authentication strategy" error.
+Answer: It is never created, so Passport never learns about it. The first request through `AuthGuard('jwt')` then fails with an "Unknown authentication strategy" error.
 
 ### NEST-153 — The local strategy
 
@@ -56,13 +56,13 @@ How does the local (username/password) strategy work, and where is it used?
 
 **Answer:**
 
-`LocalStrategy extends PassportStrategy(Strategy)` and implements `validate(username, password)`, usually calling `AuthService.validateUser`. A returned user becomes `req.user`; throwing or returning a falsy value gives 401. Rename fields with `super({ usernameField: 'email' })`. It is applied only on the login route, which then issues a token or session.
+The local strategy checks a username and password. You extend `PassportStrategy(Strategy)` and write `validate(username, password)`, which usually calls something like `AuthService.validateUser`. If it returns a user, that user becomes `req.user`. If it throws or returns nothing, the client gets a 401. To log in with email instead, pass `usernameField: 'email'` to `super()`. You attach it only to the login route, which then issues a token or session.
 
 **Follow-up:**
 
 Why use the local strategy only on `POST /login`?
 
-Answer: Passwords should travel only once per login. Every other route should use a token or session, so the password isn't sent, parsed, and hashed on each request.
+Answer: A password should only be sent once, at login. Every other request should use a token or session, so you don't send, parse, and hash the password on every call.
 
 ### NEST-154 — `AuthGuard` and `handleRequest`
 
@@ -76,13 +76,13 @@ What does `AuthGuard('jwt')` do, and what is `handleRequest` for?
 
 **Answer:**
 
-It runs the named strategy and, on success, assigns the result to `req.user`. `handleRequest(err, user, info, context)` decides the outcome; by default it throws `UnauthorizedException` if there is an error or no user. Override it to customize errors, inspect `info` (such as `TokenExpiredError`), or allow optional authentication by returning `null`.
+`AuthGuard('jwt')` runs the strategy with that name. If authentication succeeds, it puts the result on `req.user`. After Passport finishes, `handleRequest(err, user, info, context)` decides what happens next. By default it throws `UnauthorizedException` when there is an error or no user. You can override it to change the error message, look at `info` (for example a `TokenExpiredError`), or allow optional login by returning `null` instead of throwing.
 
 **Follow-up:**
 
-How would you build an optionally authenticated endpoint?
+How would you build an endpoint where login is optional?
 
-Answer: Subclass the guard, override `handleRequest` to return `user ?? null` instead of throwing, and apply it to that route; the handler then branches on whether `req.user` exists.
+Answer: Subclass the guard and override `handleRequest` to return `user ?? null` instead of throwing. The handler can then check whether `req.user` exists and respond differently.
 
 ### NEST-155 — Configuring `JwtStrategy`
 
@@ -96,13 +96,13 @@ How do you configure `JwtStrategy` with `passport-jwt`, and what does `validate`
 
 **Answer:**
 
-Call `super({ jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(), ignoreExpiration: false, secretOrKey: config.get('JWT_ACCESS_SECRET') })`. Passport verifies signature and `exp` first; `validate(payload)` then runs with the decoded payload and maps it to the object for `req.user`, e.g. `{ userId: payload.sub, roles: payload.roles }`.
+In the constructor you call `super()` with three main options: `jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken()` to find the token, `ignoreExpiration: false` to reject expired tokens, and `secretOrKey` from your config. Passport checks the signature and expiry first. Only then does it call `validate(payload)` with the decoded payload. You return the object you want on `req.user`, for example `{ userId: payload.sub, roles: payload.roles }`.
 
 **Follow-up:**
 
 Should `validate` hit the database on every request?
 
-Answer: Only if you need up-to-date state such as "is this user still active". It adds latency per request but catches deactivated users immediately; otherwise trust the signed payload and rely on short expiry.
+Answer: Only if you need fresh data, such as "is this user still active?". It costs a query per request but catches deactivated users immediately. Otherwise, trust the signed payload and keep token lifetimes short.
 
 ### NEST-156 — `JwtModule` setup
 
@@ -116,13 +116,13 @@ How do you set up `JwtModule`, and when do you need `registerAsync`?
 
 **Answer:**
 
-`JwtModule.register({ secret, signOptions: { expiresIn: '15m' } })` is fine for static values. Use `registerAsync` with `useFactory` and `inject: [ConfigService]` when the secret comes from configuration resolved at runtime. Then inject `JwtService` and use `signAsync` / `verifyAsync`.
+For fixed values, `JwtModule.register({ secret, signOptions: { expiresIn: '15m' } })` is enough. You need `registerAsync` when the values come from configuration that is only available at runtime. In that case you use `useFactory` with `inject: [ConfigService]` to build the options. Once the module is set up, you inject `JwtService` wherever you need it and call `signAsync` to create tokens and `verifyAsync` to check them.
 
 **Follow-up:**
 
 How do you use different secrets for access and refresh tokens with one `JwtService`?
 
-Answer: Pass options per call: `jwt.signAsync(payload, { secret: refreshSecret, expiresIn: '7d' })` and `verifyAsync(token, { secret })`, overriding the module defaults.
+Answer: Pass options on each call, for example `jwt.signAsync(payload, { secret: refreshSecret, expiresIn: '7d' })` and `verifyAsync(token, { secret })`. Those override the module defaults.
 
 ### NEST-157 — Access and refresh tokens
 
@@ -136,13 +136,13 @@ Explain the access token + refresh token pattern.
 
 **Answer:**
 
-The access token is short-lived (5–15 minutes), sent on every request, and verified statelessly. The refresh token is long-lived (days), used only at `/auth/refresh` to mint a new access token. This limits the damage of a stolen access token without forcing frequent logins. Refresh tokens are stored server-side (hashed) so they can be revoked.
+You give the user two tokens. The access token lives for a short time, around 5 to 15 minutes. The client sends it on every request, and the server verifies it without a database lookup. The refresh token lives much longer, for days. The client uses it only on `/auth/refresh` to get a new access token. If an access token is stolen, it expires quickly. The server stores refresh tokens hashed, so it can revoke them.
 
 **Follow-up:**
 
 Why not issue one JWT valid for 30 days?
 
-Answer: A leaked token would be usable for 30 days and cannot be revoked without extra state. Splitting the roles keeps the frequently transmitted token short-lived.
+Answer: If it leaks, it works for 30 days, and you can't revoke it without extra state. Splitting into two tokens keeps the one sent on every request short-lived.
 
 ### NEST-158 — Refresh token rotation
 
@@ -156,17 +156,17 @@ What is refresh token rotation, and how does reuse detection work?
 
 **Answer:**
 
-Each refresh issues a new refresh token and invalidates the old one. If an already-used token shows up again, either an attacker or the real user is replaying it, so the server revokes the whole token family (all tokens from that login) and forces re-authentication. Implement with a `family` id and `revokedAt`/`usedAt` fields per token record.
+With rotation, every refresh gives you a new refresh token and invalidates the old one. If an old token shows up again, someone is replaying it, either an attacker or the real user with stale state. At that point the server revokes the whole token family, meaning all tokens from that login, and forces a fresh sign-in. To implement it, store a `family` id and fields like `usedAt` or `revokedAt` on each token record.
 
 **Trade-offs:**
 
-Rotation limits the value of a stolen refresh token but adds a write per refresh and makes flaky networks or parallel tabs able to trigger false positives.
+Rotation reduces the value of a stolen refresh token, but it adds a database write on every refresh. Flaky networks or multiple browser tabs can also trigger false alarms.
 
 **Follow-up:**
 
 How do you handle two parallel refresh calls from the same legitimate client?
 
-Answer: Serialize refresh on the client (a single in-flight promise), and/or allow a short grace window on the server where the just-rotated token is still accepted once.
+Answer: On the client, share a single in-flight refresh request. On the server, you can also allow a short grace window where the just-rotated token is accepted once more.
 
 ### NEST-159 — Storing refresh tokens
 
@@ -180,13 +180,13 @@ How should refresh tokens be stored server-side?
 
 **Answer:**
 
-Store a hash, never the raw token, with `userId`, `family`, `expiresAt`, device metadata, and `revokedAt`. On refresh, hash the incoming value and look it up. Redis with a TTL or a DB table both work. A DB leak then does not expose usable tokens.
+Never store the raw token. Store a hash of it, along with the `userId`, a `family` id, `expiresAt`, some device information, and a `revokedAt` field. When a refresh request arrives, hash the incoming token and look up that hash. A database table or Redis with a TTL both work. This way, if your database leaks, the attacker gets hashes that cannot be used as tokens.
 
 **Follow-up:**
 
 Why can SHA-256 be fine for refresh tokens but not for passwords?
 
-Answer: Refresh tokens are long random values with high entropy, so brute force is infeasible even with a fast hash. Passwords have low entropy and need a slow, salted hash.
+Answer: Refresh tokens are long, random values, so guessing them is impossible even with a fast hash. Passwords are short and predictable, so they need a slow, salted hash.
 
 ### NEST-160 — localStorage vs httpOnly cookies
 
@@ -200,13 +200,13 @@ Where should a browser SPA keep tokens: localStorage or httpOnly cookies?
 
 **Answer:**
 
-localStorage is readable by any script on the page, so an XSS bug leaks the token. An `httpOnly` cookie cannot be read by JS, but browsers attach it automatically, which brings CSRF. A common compromise: access token in memory, refresh token in an `httpOnly; Secure; SameSite` cookie scoped to the refresh path.
+Any script on the page can read localStorage, so a single XSS bug can leak the token. An `httpOnly` cookie can't be read by JavaScript, but the browser attaches it automatically, which opens the door to CSRF. A common compromise is to keep the access token in memory and put the refresh token in an `httpOnly; Secure; SameSite` cookie limited to the refresh path. Each option trades one risk for another.
 
 **Follow-up:**
 
 Does `httpOnly` fully protect against XSS?
 
-Answer: No. It stops token theft, but injected script can still send authenticated requests from the victim's browser while the page is open.
+Answer: No. It stops attackers from stealing the token, but injected script can still make authenticated requests from the victim's browser while the page is open.
 
 ### NEST-161 — Cookie flags and setting cookies in Nest
 
@@ -220,13 +220,13 @@ Which cookie flags matter, and how do you set and read cookies in Nest?
 
 **Answer:**
 
-`httpOnly` (no JS access), `Secure` (HTTPS only), `SameSite` (`Lax`/`Strict`/`None`), `path`, `domain`, `maxAge`. Register `cookie-parser` with `app.use(cookieParser())` to read `req.cookies`. To write: inject `@Res({ passthrough: true }) res: Response` and call `res.cookie('rt', token, { httpOnly: true, secure: true, sameSite: 'strict', path: '/auth/refresh' })`.
+The important flags are `httpOnly` (no JavaScript access), `Secure` (HTTPS only), `SameSite` (`Lax`, `Strict`, or `None`), plus `path`, `domain`, and `maxAge`. To read cookies, add `app.use(cookieParser())`, then use `req.cookies`. To write one, inject `@Res({ passthrough: true }) res: Response` and call `res.cookie('rt', token, { httpOnly: true, secure: true, sameSite: 'strict', path: '/auth/refresh' })`.
 
 **Follow-up:**
 
 What breaks if you inject `@Res()` without `passthrough: true`?
 
-Answer: Nest switches to library-specific mode: you must send the response yourself, and returned values, interceptors that map the response, and serialization no longer apply.
+Answer: Nest hands control of the response to you. You must send it yourself, and returned values, response-mapping interceptors, and serialization stop working.
 
 ### NEST-162 — Sessions vs JWT
 
@@ -240,17 +240,17 @@ How do you choose between server-side sessions and JWTs?
 
 **Answer:**
 
-Sessions keep state on the server and send an opaque id in a cookie: instant revocation and a private payload, but they need shared storage when scaling. JWTs are self-contained and verified without a lookup, which suits horizontal scaling and service-to-service calls, but are hard to revoke and easy to bloat. For a classic web app with one backend, sessions are often simpler and safer; for APIs used by many clients and services, JWT with refresh fits better.
+With sessions, the server keeps the state and the browser holds only an opaque id in a cookie. You get instant revocation and a private payload, but you need shared storage once you run several instances. JWTs carry their own data and can be verified without a lookup, which suits many services and clients, but they are hard to revoke. For a classic web app with one backend, sessions are often simpler and safer. For APIs with many clients, JWT with refresh fits better.
 
 **Trade-offs:**
 
-Sessions trade scalability simplicity for revocation and control; JWTs trade revocation for stateless verification.
+Sessions give you revocation and control but need shared state. JWTs scale without state but are hard to revoke.
 
 **Follow-up:**
 
 Is "JWT is stateless" still true once you add a revocation list?
 
-Answer: Not fully. A denylist or per-user version check reintroduces a lookup per request, so you keep JWT's format but lose part of its statelessness.
+Answer: Not completely. A denylist or per-user version check adds a lookup on each request. You keep the JWT format, but lose part of the stateless benefit.
 
 ### NEST-163 — `express-session` in Nest
 
@@ -264,13 +264,13 @@ How do you use `express-session` with Passport in Nest, and which store belongs 
 
 **Answer:**
 
-In `main.ts`, register `session({ secret, resave: false, saveUninitialized: false, cookie: { httpOnly: true, secure: true, sameSite: 'lax' } })`, then `passport.initialize()` and `passport.session()`, in that order. Implement `serializeUser/deserializeUser` in a `PassportSerializer` provider. The default `MemoryStore` leaks memory and doesn't share across instances, so use Redis (`connect-redis`) or a DB store.
+In `main.ts`, register `session({ secret, resave: false, saveUninitialized: false, cookie: { httpOnly: true, secure: true, sameSite: 'lax' } })`. Then add `passport.initialize()` and `passport.session()`, in that order. Implement `serializeUser` and `deserializeUser` in a `PassportSerializer` provider. The default `MemoryStore` leaks memory and isn't shared between instances, so in production use Redis through `connect-redis`, or a database store.
 
 **Follow-up:**
 
 What does `saveUninitialized: false` protect you from?
 
-Answer: It avoids creating and storing empty sessions (and setting cookies) for anonymous visitors, which saves storage and reduces fingerprinting and session-flooding.
+Answer: It stops the server from creating and storing empty sessions, and setting cookies, for anonymous visitors. That saves storage and reduces session-flooding and fingerprinting.
 
 ### NEST-164 — CSRF with cookie auth
 
@@ -284,13 +284,13 @@ When is CSRF a risk, and how do you mitigate it in Nest?
 
 **Answer:**
 
-CSRF applies when the browser attaches credentials automatically, i.e. cookie-based auth. Bearer tokens in an `Authorization` header are not auto-attached, so they are not CSRF-prone. Mitigate with `SameSite=Lax/Strict`, CSRF tokens (double-submit cookie or synchronizer token, e.g. `csrf-csrf`; `csurf` is deprecated), `Origin`/`Referer` checks, or a required custom header. Never change state in GET handlers.
+CSRF is a risk when the browser sends credentials automatically, which is what happens with cookie-based auth. A bearer token in the `Authorization` header isn't sent automatically, so it isn't vulnerable. To protect cookie auth, use `SameSite=Lax` or `Strict`, add CSRF tokens (double-submit cookie or synchronizer token, for example with `csrf-csrf`, since `csurf` is deprecated), check `Origin` or `Referer`, or require a custom header. Never change state in GET handlers.
 
 **Follow-up:**
 
 Does `SameSite=Lax` alone make a cookie-authenticated API CSRF-safe?
 
-Answer: It blocks most cross-site POSTs, but not same-site attacks (e.g. from a sibling subdomain), old browsers, or unsafe GET handlers; use it as defense in depth with tokens.
+Answer: It blocks most cross-site POSTs, but not same-site attacks (such as from a sibling subdomain), old browsers, or unsafe GET handlers. Treat it as one layer alongside tokens.
 
 ### NEST-165 — CORS with credentials
 
@@ -304,13 +304,13 @@ How does CORS interact with cookie-based auth in Nest?
 
 **Answer:**
 
-Credentialed requests need `Access-Control-Allow-Credentials: true` and a specific allowed origin, and the client must use `credentials: 'include'`. In Nest: `app.enableCors({ origin: ['https://app.example.com'], credentials: true })`. CORS is a browser rule, not server-side access control; non-browser clients ignore it.
+For requests that carry cookies, the server must send `Access-Control-Allow-Credentials: true` and name a specific allowed origin. The client must also set `credentials: 'include'`. In Nest that looks like `app.enableCors({ origin: ['https://app.example.com'], credentials: true })`. Remember that CORS is a browser rule, not real access control. Tools like curl or other servers ignore it completely, so you still need authentication on the server.
 
 **Follow-up:**
 
 Why can't you use `origin: '*'` with `credentials: true`?
 
-Answer: The CORS spec forbids a wildcard with credentials, and browsers reject such responses, because it would let any site make authenticated requests and read the result.
+Answer: The CORS specification forbids it, and browsers reject such responses. Otherwise any website could make authenticated requests as the user and read the results.
 
 ### NEST-166 — bcrypt vs argon2
 
@@ -324,13 +324,13 @@ How do bcrypt and argon2 compare for password hashing, and how do you use them s
 
 **Answer:**
 
-Both are slow, salted, adaptive hashes. bcrypt is battle-tested and CPU-hard, with a 72-byte input limit. Argon2id (current OWASP recommendation) is memory-hard, which resists GPU/ASIC attacks, with tunable memory/time/parallelism. Both embed the salt and parameters in the output, so `compare` needs no separate salt. Tune cost to roughly 100–300 ms per hash, rehash on login when parameters are outdated, and use the library compare (constant-time), never `===`.
+Both are deliberately slow, salted hashes. bcrypt is well tested and CPU-heavy, but ignores input beyond 72 bytes. Argon2id, the current OWASP recommendation, also needs a lot of memory, which makes GPU attacks harder, and you can tune memory, time, and parallelism. Both store the salt and settings inside the output, so you don't manage a salt yourself. Aim for roughly 100–300 ms per hash, rehash on login when settings are outdated, and always use the library's compare function, never `===`.
 
 **Follow-up:**
 
 What is a pepper, and where would you store it?
 
-Answer: A secret value mixed in (e.g. HMAC) before hashing, stored outside the database (secrets manager or env). A DB-only leak then isn't enough to crack hashes offline.
+Answer: A pepper is a secret value mixed into the password (for example with HMAC) before hashing. Store it outside the database, in a secrets manager or environment variable, so a database leak alone isn't enough to crack hashes.
 
 ### NEST-167 — Full login flow
 
@@ -344,13 +344,13 @@ Walk through a complete login flow in Nest with access and refresh tokens.
 
 **Answer:**
 
-`POST /auth/login` → `LocalAuthGuard` validates credentials → controller calls `authService.login(user)` → service signs an access token and a refresh token and stores the refresh token's hash → controller returns the access token in the body and sets the refresh token as an httpOnly cookie. Later requests use `JwtAuthGuard`. Return the same error for "unknown user" and "wrong password" to avoid user enumeration.
+The client calls `POST /auth/login`. `LocalAuthGuard` checks the credentials, then the controller calls `authService.login(user)`. The service signs an access token and a refresh token, and stores a hash of the refresh token. The controller returns the access token in the response body and sets the refresh token as an `httpOnly` cookie. Later requests are protected by `JwtAuthGuard`. Give the same error for "unknown user" and "wrong password", so attackers can't discover which emails exist.
 
 **Follow-up:**
 
 How do you avoid timing differences that reveal whether an email exists?
 
-Answer: Always run a hash comparison, using a dummy hash when the user is not found, so both paths take about the same time.
+Answer: Always run a hash comparison. When the user isn't found, compare against a dummy hash so both paths take about the same time.
 
 ### NEST-168 — Logout with JWTs
 
@@ -364,13 +364,13 @@ How does logout work when you use JWTs?
 
 **Answer:**
 
-A stateless JWT can't be deleted server-side; the client just drops it. Real logout means revoking the refresh token record, clearing the cookie, and optionally denylisting the access token's `jti` until it expires. With short access TTLs, revoking the refresh token is usually enough. With sessions, `req.session.destroy()` is immediate.
+A JWT is stateless, so the server can't delete it. The client simply discards it. A real logout means revoking the refresh token record on the server and clearing the cookie. You can also denylist the access token's `jti` until it expires. When access tokens are short-lived, revoking the refresh token is usually enough. With sessions it's simpler: `req.session.destroy()` ends the session immediately.
 
 **Follow-up:**
 
 How does "logout from all devices" work?
 
-Answer: Revoke every refresh token for the user (delete the rows or bump a per-user `tokenVersion`), so no device can obtain new access tokens.
+Answer: Revoke every refresh token for that user, either by deleting the rows or by increasing a per-user `tokenVersion`. Then no device can get a new access token.
 
 ### NEST-169 — Revocation and blacklist trade-offs
 
@@ -384,17 +384,17 @@ What are the trade-offs of a token blacklist versus other revocation strategies?
 
 **Answer:**
 
-A denylist (Redis set of `jti` with TTL equal to the remaining lifetime) gives immediate revocation but adds a lookup per request. Alternatives: very short access TTLs, a per-user `tokenVersion` or "valid after" timestamp checked on requests, or token introspection. Most apps revoke only refresh tokens and accept the short access-token window.
+A denylist, for example a Redis set of token `jti` values that expires when the token would, revokes tokens immediately. The price is a lookup on every request. Alternatives include very short access token lifetimes, a per-user `tokenVersion` or "valid after" timestamp, and token introspection. Most apps only revoke refresh tokens and accept that an access token may stay valid for a few more minutes.
 
 **Trade-offs:**
 
-Immediate revocation costs a store lookup and a failure dependency on every request; short TTLs cost more refresh traffic.
+Immediate revocation costs a lookup, and a new failure point, on every request. Short lifetimes avoid that but mean more refresh traffic.
 
 **Follow-up:**
 
 Why is a per-user `tokenVersion` often cheaper than a per-token blacklist?
 
-Answer: It is one small value per user (cacheable) that invalidates all tokens at once, instead of storing an entry for every revoked token.
+Answer: It's one small value per user that you can cache, and changing it invalidates all of that user's tokens at once. A blacklist needs an entry for every revoked token.
 
 ### NEST-170 — JWT claims
 
@@ -408,13 +408,13 @@ Which JWT claims matter, and what must never go into the payload?
 
 **Answer:**
 
-Standard claims: `sub`, `exp`, `iat`, `nbf`, `iss`, `aud`, `jti`. Add minimal custom claims such as roles or tenant id. A JWT is signed, not encrypted: anyone can base64-decode it. Never include passwords, secrets, or sensitive PII, and avoid large permission trees; claims go stale until the token expires.
+The standard claims to know are `sub` (who), `exp` (expiry), `iat` (issued at), `nbf` (not before), `iss` (issuer), `aud` (audience), and `jti` (token id). Add only a few custom claims, such as roles or a tenant id. A JWT is signed but not encrypted, so anyone can decode and read it. Never put passwords, secrets, or sensitive personal data inside. Also avoid big permission lists, because claims go stale until the token expires.
 
 **Follow-up:**
 
 What do `iss` and `aud` protect against when you validate them?
 
-Answer: Tokens minted for another issuer or another service. Without them, a valid token from a different app that shares a key could be accepted by yours.
+Answer: They reject tokens made for a different issuer or service. Without them, a valid token from another app that shares a key could be accepted by yours.
 
 ### NEST-171 — HS256 vs RS256
 
@@ -428,13 +428,13 @@ HS256 vs RS256: when do you choose asymmetric signing?
 
 **Answer:**
 
-HS256 uses one shared secret to sign and verify, so every verifier can also forge tokens. RS256/ES256 signs with a private key and verifies with a public key, so many services can verify while only the auth service signs; keys can be published via JWKS and rotated with `kid`. In `JwtModule`, set `privateKey`, `publicKey`, and `signOptions.algorithm`. Always pin allowed `algorithms` on verification.
+HS256 uses one shared secret to both sign and verify, so every service that can verify tokens can also forge them. RS256 or ES256 uses a private key to sign and a public key to verify. That lets many services verify tokens while only the auth service can create them. You can publish public keys through JWKS and rotate them using `kid`. In `JwtModule`, set `privateKey`, `publicKey`, and the algorithm. Always list the allowed algorithms when verifying.
 
 **Follow-up:**
 
 What is algorithm confusion and how do you prevent it?
 
-Answer: An attacker changes `alg` (to `none`, or to HS256 using the public key as the secret). Prevent it by restricting accepted algorithms in verification options and never choosing the algorithm from the token header.
+Answer: An attacker changes the token's `alg` header, for example to `none`, or to HS256 using your public key as the secret. Prevent it by restricting accepted algorithms in your verify options and never trusting the algorithm named in the token.
 
 ### NEST-172 — Custom guard with `CanActivate`
 
@@ -448,13 +448,13 @@ How do you write a custom guard, and what do return values and exceptions mean?
 
 **Answer:**
 
-Implement `canActivate(context: ExecutionContext)` on an `@Injectable()` class, read the request through `context.switchToHttp().getRequest()`, and return `true`/`false` (sync, `Promise`, or `Observable`). `false` yields 403; throwing yields that exception's status, e.g. `UnauthorizedException` → 401. `ExecutionContext` adds `getHandler()` and `getClass()` for reading metadata.
+Create an `@Injectable()` class that implements `canActivate(context: ExecutionContext)`. Get the request with `context.switchToHttp().getRequest()`. Return `true` to allow, or `false` to deny. The result can be a plain value, a `Promise`, or an `Observable`. Returning `false` produces a 403. Throwing an exception gives that exception's status, so `UnauthorizedException` gives 401. The context also offers `getHandler()` and `getClass()` so you can read metadata.
 
 **Follow-up:**
 
 Why does returning `false` give 403 instead of 401?
 
-Answer: Nest throws a `ForbiddenException` for denied guards by default. Throw `UnauthorizedException` yourself when the failure is missing or invalid credentials.
+Answer: Nest throws a `ForbiddenException` by default when a guard denies access. If the problem is missing or invalid credentials, throw `UnauthorizedException` yourself.
 
 ### NEST-173 — Guard vs middleware vs interceptor
 
@@ -468,13 +468,13 @@ Why are guards the right place for auth, rather than middleware or interceptors?
 
 **Answer:**
 
-Middleware runs before routing and has no `ExecutionContext` or handler metadata, so it can't tell which route is public or needs a role. Guards run after middleware knowing exactly which handler will run, so they can read decorators. Interceptors run after guards and wrap the handler for cross-cutting work (logging, mapping), not access control.
+Middleware runs before routing, so it has no `ExecutionContext` and doesn't know which handler will run. That means it can't tell whether a route is public or needs a certain role. Guards run after middleware and know exactly which handler is about to execute, so they can read decorators and metadata. Interceptors run after guards and wrap the handler for things like logging or response mapping. They aren't meant for access control.
 
 **Follow-up:**
 
 Is any auth-related work reasonable in middleware?
 
-Answer: Yes: cheap, route-agnostic work like parsing cookies, attaching a request id, or loosely decoding a token. The accept/deny decision still belongs in a guard.
+Answer: Yes, cheap work that doesn't depend on the route, such as parsing cookies, adding a request id, or loosely decoding a token. The actual allow or deny decision still belongs in a guard.
 
 ### NEST-174 — Global guards with `APP_GUARD`
 
@@ -488,13 +488,13 @@ How do you apply an auth guard globally, and why prefer `APP_GUARD` over `useGlo
 
 **Answer:**
 
-`app.useGlobalGuards(new JwtAuthGuard())` creates the guard outside the DI container, so it cannot inject `Reflector` or `ConfigService`. Registering `{ provide: APP_GUARD, useClass: JwtAuthGuard }` in a module makes it a normal provider with full DI. A global guard plus an explicit `@Public()` opt-out is "secure by default".
+`app.useGlobalGuards(new JwtAuthGuard())` creates the guard outside Nest's container, so it can't inject things like `Reflector` or `ConfigService`. Registering `{ provide: APP_GUARD, useClass: JwtAuthGuard }` in a module makes it a normal provider with full dependency injection. A global guard combined with an explicit `@Public()` opt-out gives you "secure by default": any new route is protected unless you deliberately open it.
 
 **Follow-up:**
 
 Does a global `APP_GUARD` apply to microservice transports in a hybrid app?
 
-Answer: Not automatically. Global enhancers registered via `useGlobalGuards` skip microservice contexts unless `inheritAppConfig` is enabled; `APP_GUARD` providers do apply to them, so guards must handle non-HTTP contexts.
+Answer: Yes, `APP_GUARD` providers also apply there, while `useGlobalGuards` skips microservice contexts unless `inheritAppConfig` is on. So your guard must handle non-HTTP contexts safely.
 
 ### NEST-175 — The `@Public()` decorator
 
@@ -508,13 +508,13 @@ How do you implement `@Public()` to opt a route out of the global auth guard?
 
 **Answer:**
 
-`export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);`. In the global guard's `canActivate`, call `reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [context.getHandler(), context.getClass()])`; if truthy return `true`, otherwise `super.canActivate(context)`. Use it on login, register, health, and webhook routes.
+First, create the decorator: `export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);`. Then, in the global guard's `canActivate`, read it with `reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [context.getHandler(), context.getClass()])`. If the value is truthy, return `true`. Otherwise call `super.canActivate(context)` to run the normal authentication. Use it on routes such as login, register, health checks, and webhooks.
 
 **Follow-up:**
 
-How do you make a `@Public()` route still populate `req.user` when a token is sent?
+How do you make a `@Public()` route still fill `req.user` when a token is sent?
 
-Answer: For public routes, still try to authenticate but swallow failures: call `super.canActivate` in a try/catch (or override `handleRequest` to return `null`) and always return `true`.
+Answer: Still try to authenticate, but ignore failures. Wrap `super.canActivate` in a try/catch, or override `handleRequest` to return `null`, and always return `true`.
 
 ### NEST-176 — `getAllAndOverride` vs `getAllAndMerge`
 
@@ -528,13 +528,13 @@ What is the difference between `Reflector.getAllAndOverride` and `getAllAndMerge
 
 **Answer:**
 
-`getAllAndOverride` returns the first defined value in the target order (handler, then class), so method-level metadata wins. `getAllAndMerge` combines arrays or objects from all targets. Use override for flags like `@Public()`; use merge when class-level and method-level values should accumulate.
+Both read metadata from several places, usually the handler and the class. `getAllAndOverride` returns the first value it finds, checking the handler before the class, so method-level metadata wins. `getAllAndMerge` combines the values from all targets into one array or object. Use override for simple flags like `@Public()`. Use merge when class-level and method-level values should add up, such as roles that accumulate.
 
 **Follow-up:**
 
 With `@Roles('admin')` on the class and `@Roles('editor')` on a method, which do you want?
 
-Answer: It depends on intent: override means only `editor` is allowed on that method; merge means `admin` or `editor`. Pick override to narrow or replace access, merge to widen it, and document the choice.
+Answer: It depends on your intent. Override means only `editor` can use that method, which narrows access. Merge means `admin` or `editor` can, which widens it. Pick one deliberately and document it.
 
 ### NEST-177 — `@Roles()` and `RolesGuard`
 
@@ -548,13 +548,13 @@ How do you build a `@Roles()` decorator and `RolesGuard`?
 
 **Answer:**
 
-`export const Roles = (...roles: Role[]) => SetMetadata('roles', roles);`. `RolesGuard` reads `reflector.getAllAndOverride<Role[]>('roles', [handler, class])`; with no metadata it allows the request, otherwise it checks `req.user.roles.some(r => required.includes(r))`. It must run after the authn guard so `req.user` exists.
+The decorator just stores metadata: `export const Roles = (...roles: Role[]) => SetMetadata('roles', roles);`. The `RolesGuard` reads it with `reflector.getAllAndOverride<Role[]>('roles', [handler, class])`. If no roles are set, it lets the request through. Otherwise it checks that the user has at least one required role: `req.user.roles.some(r => required.includes(r))`. The authentication guard must run first, so that `req.user` exists.
 
 **Follow-up:**
 
 What should the guard do when `req.user` is missing?
 
-Answer: Deny (throw `UnauthorizedException`/return false) rather than crash on `undefined`; a missing user on a role-protected route means authn did not run or failed.
+Answer: Deny the request, by throwing `UnauthorizedException` or returning false, rather than crashing on `undefined`. A missing user on a protected route means authentication didn't run or failed.
 
 ### NEST-178 — Guard execution order
 
@@ -568,13 +568,13 @@ In what order do guards run, and how do you ensure authn runs before authz?
 
 **Answer:**
 
-Global guards first, then controller-level, then route-level; within `@UseGuards(A, B)` left to right. Multiple global `APP_GUARD` providers run in registration order. The first to throw or return `false` stops the chain.
+Global guards run first, then controller-level guards, then route-level guards. Within `@UseGuards(A, B)`, they run left to right. Several global `APP_GUARD` providers run in the order they are registered. The first guard that throws or returns `false` stops the whole chain. So to make sure authentication happens before authorization, you need to control that order explicitly.
 
 **Follow-up:**
 
 How do you guarantee `JwtAuthGuard` runs before `RolesGuard` when both are `APP_GUARD`?
 
-Answer: Declare them in the same providers array in that order, or make `RolesGuard` apply only through `@UseGuards` after the global authn guard. Add an e2e test to lock the order down.
+Answer: Declare them in that order in the same providers array. Or apply `RolesGuard` only through `@UseGuards` after the global authentication guard. Add an e2e test so the order can't change by accident.
 
 ### NEST-179 — RBAC, ABAC, permissions
 
@@ -588,13 +588,13 @@ Compare RBAC, permission-based, and ABAC authorization.
 
 **Answer:**
 
-RBAC maps users to roles to actions: simple but coarse, prone to role explosion. Permission-based assigns fine-grained strings (`post:update`) to roles or users. ABAC evaluates attributes of user, resource, and context (owner, department, time): most flexible but harder to audit. Many apps use roles for coarse gates plus attribute/ownership checks for resources.
+RBAC (role-based) links users to roles and roles to actions. It's simple, but coarse, and can lead to "role explosion". Permission-based access assigns fine-grained permissions, like `post:update`, to roles or users. ABAC (attribute-based) decides using attributes of the user, the resource, and the context, such as owner, department, or time of day. It's the most flexible, but harder to audit. Many apps use roles for broad checks and attribute checks for specific resources.
 
 **Follow-up:**
 
 When does RBAC alone stop being enough?
 
-Answer: When rules depend on the resource instance or context ("only edit own posts", "only during business hours", "only within the same tenant").
+Answer: When the rule depends on the specific resource or context, for example "only edit your own posts", "only during business hours", or "only within your own tenant".
 
 ### NEST-180 — CASL in Nest
 
@@ -608,13 +608,13 @@ How does CASL fit into Nest authorization?
 
 **Answer:**
 
-CASL defines abilities with `can(action, subject, conditions)` and `cannot`. An injectable `CaslAbilityFactory` builds an `Ability` for the current user; code then checks `ability.can('update', article)` in a guard or service. It covers role-level and instance-level rules (`{ authorId: user.id }`) in one model, and rules can be shared with the front end. Don't adopt it for a simple admin/user split.
+CASL lets you define rules with `can(action, subject, conditions)` and `cannot`. In Nest you usually create an injectable `CaslAbilityFactory` that builds an `Ability` for the current user. Then a guard or service asks `ability.can('update', article)`. It handles role-level and instance-level rules, such as `{ authorId: user.id }`, in one model, and the rules can be shared with the front end. For a simple admin versus user split, it's overkill.
 
 **Follow-up:**
 
 How do you check instance conditions when the guard runs before the entity is loaded?
 
-Answer: Do a type-level check in the guard (`can('update', 'Article')`) and the instance check in the service after loading, or use `accessibleBy` to build a query filter.
+Answer: Do a type-level check in the guard, like `can('update', 'Article')`, and the instance check in the service after loading the entity. Or use `accessibleBy` to turn the rules into a query filter.
 
 ### NEST-181 — Policy handler guards
 
@@ -628,13 +628,13 @@ What is a policy handler guard?
 
 **Answer:**
 
-A `PoliciesGuard` reads metadata from `@CheckPolicies(...)` (functions or classes with `handle(ability)`), builds the user's ability, and runs every handler. Controllers then declare authorization declaratively: `@CheckPolicies(ab => ab.can(Action.Read, Article))`. Class-based handlers can use DI through `ModuleRef`.
+It's a guard, often called `PoliciesGuard`, that reads rules from a `@CheckPolicies(...)` decorator. Each rule is a function, or a class with a `handle(ability)` method. The guard builds the user's ability and runs every rule against it. Controllers then state their authorization requirements declaratively, for example `@CheckPolicies(ab => ab.can(Action.Read, Article))`. Class-based handlers can use dependency injection through `ModuleRef`.
 
 **Follow-up:**
 
 What are the downsides of declarative policies for rules that need the loaded entity?
 
-Answer: The guard runs before the handler loads the entity, so instance-level rules can't be evaluated there; they must move into the service, splitting authorization across two places.
+Answer: The guard runs before the handler loads the entity, so instance-level rules can't be checked there. They have to move into the service, which splits authorization across two places.
 
 ### NEST-182 — Ownership checks
 
@@ -648,13 +648,13 @@ Where should resource-ownership checks live: in a guard or in the service?
 
 **Answer:**
 
-Guards run before the handler and don't have the entity; loading it there duplicates queries. Instance checks ("is this my order?") belong in the service after loading, or directly in the query (`where: { id, userId }`), which also avoids revealing existence. Keep guards for coarse checks such as role, permission, or tenant membership.
+Usually in the service. Guards run before the handler and don't have the entity, so loading it in the guard means querying twice. A question like "is this my order?" is best answered after loading the order, or directly in the query, for example `where: { id, userId }`. That also avoids revealing whether the record exists. Keep guards for coarse checks such as role, permission, or tenant membership.
 
 **Follow-up:**
 
 Should a resource that exists but isn't yours return 404 or 403?
 
-Answer: Often 404, to avoid disclosing that the id exists; use 403 when the resource is known to the caller and the distinction helps them (e.g. shared resources).
+Answer: Often 404, so you don't reveal that the id exists. Use 403 when the caller already knows about the resource and the distinction helps, such as with shared resources.
 
 ### NEST-183 — `@CurrentUser()` and typing `req.user`
 
@@ -668,13 +668,13 @@ How do you create a `@CurrentUser()` decorator and type `req.user`?
 
 **Answer:**
 
-`createParamDecorator((data: keyof AuthUser | undefined, ctx: ExecutionContext) => { const user = ctx.switchToHttp().getRequest().user; return data ? user?.[data] : user; })`. Type it with an `AuthUser` interface and either `interface AuthenticatedRequest extends Request { user: AuthUser }` or an Express `Request` module augmentation.
+Use `createParamDecorator`. It receives optional data and the `ExecutionContext`, reads `ctx.switchToHttp().getRequest().user`, and returns either the whole user or one property if you passed a key. To type it, define an `AuthUser` interface. Then either extend Express's `Request` with `interface AuthenticatedRequest extends Request { user: AuthUser }`, or add the field with a module augmentation.
 
 **Follow-up:**
 
 Why is a param decorator better than injecting `REQUEST` into services?
 
-Answer: `REQUEST` injection makes the service request-scoped, which bubbles scope up the chain and costs performance. A param decorator passes the user explicitly and keeps services singletons that are easy to test.
+Answer: Injecting `REQUEST` makes the service request-scoped, and that spreads up the dependency chain and hurts performance. A param decorator passes the user in explicitly and keeps services as easy-to-test singletons.
 
 ### NEST-184 — 401 vs 403
 
@@ -688,13 +688,13 @@ When do you use 401 and when 403, and which Nest exceptions map to them?
 
 **Answer:**
 
-`UnauthorizedException` (401): credentials missing, invalid, or expired; the client should authenticate. `ForbiddenException` (403): authenticated but not allowed. A guard returning `false` gives 403 by default, so throw 401 yourself for authn failures. Keep messages generic to avoid leaking whether a user or resource exists.
+Use 401, `UnauthorizedException`, when credentials are missing, invalid, or expired. It tells the client to log in again. Use 403, `ForbiddenException`, when the user is logged in but isn't allowed to do this. Remember that a guard returning `false` gives 403 by default, so throw 401 yourself for authentication failures. Keep error messages generic, so you don't reveal whether a user or resource exists.
 
 **Follow-up:**
 
 What header should accompany a 401?
 
-Answer: `WWW-Authenticate` (e.g. `Bearer`) per HTTP semantics; many APIs omit it, but it's correct for standards-compliant clients.
+Answer: `WWW-Authenticate`, for example `Bearer`, according to HTTP rules. Many APIs skip it, but it's correct for standards-compliant clients.
 
 ### NEST-185 — API key authentication
 
@@ -708,13 +708,13 @@ How would you implement API key authentication in Nest?
 
 **Answer:**
 
-Clients send `X-API-Key`. Use a custom guard or `passport-headerapikey`: read the header, look up the record (by non-secret prefix), compare the hashed secret, check status, expiry, and scopes, then attach a principal like `{ type: 'apiKey', clientId, scopes }` to the request. API keys identify applications or machines, not end users.
+Clients send the key in a header such as `X-API-Key`. You can write a custom guard or use `passport-headerapikey`. The guard reads the header, finds the record using a non-secret prefix, compares the hashed secret, and checks status, expiry, and scopes. If everything is fine, it attaches a principal like `{ type: 'apiKey', clientId, scopes }` to the request. Remember that API keys identify applications or machines, not end users.
 
 **Follow-up:**
 
 Why attach a "principal" rather than assume `req.user` is always a human user?
 
-Answer: Routes may accept both users and API clients; a typed principal lets guards and services branch on `type` and scopes instead of misreading a client as a person.
+Answer: A route may accept both users and API clients. A typed principal lets guards and services check the `type` and scopes, instead of treating a client as a person.
 
 ### NEST-186 — API key storage, scopes, rotation
 
@@ -728,13 +728,13 @@ How should API keys be generated, stored, scoped, and rotated?
 
 **Answer:**
 
-Generate with a CSPRNG, show the full key once, and store only a hash plus a non-secret prefix/id for lookup. Attach scopes and optional expiry, IP allowlist, and rate limits. Allow multiple active keys per client so rotation has no downtime, record `lastUsedAt`, and compare in constant time.
+Generate keys with a cryptographically secure random generator, and show the full key to the user only once. Store only a hash, plus a non-secret prefix or id used for lookup. Give each key scopes, and optionally an expiry, an IP allowlist, and rate limits. Allow several active keys per client, so you can rotate without downtime. Record `lastUsedAt`, and compare hashes in constant time.
 
 **Follow-up:**
 
 Why can a fast hash such as SHA-256 be acceptable for API keys?
 
-Answer: Generated keys have high entropy, so offline brute force is infeasible; a slow hash would only add latency to every request.
+Answer: Generated keys are long and random, so offline guessing is not realistic. A slow hash would only add delay to every request.
 
 ### NEST-187 — OAuth2 authorization code with PKCE
 
@@ -748,13 +748,13 @@ Explain the OAuth2 authorization code flow with PKCE at a high level.
 
 **Answer:**
 
-The client redirects the user to the authorization server with a `code_challenge`; the user logs in and consents; the server redirects back with a short-lived `code`; the client exchanges `code` plus `code_verifier` at the token endpoint for access (and refresh) tokens. PKCE prevents code interception, so it is required for public clients (SPA, mobile) and recommended for all. In Nest you are usually the client (a callback route) or the resource server validating tokens.
+The client sends the user to the authorization server with a `code_challenge`. The user logs in and approves. The server redirects back with a short-lived `code`. The client then sends that `code` plus the original `code_verifier` to the token endpoint and receives access and refresh tokens. PKCE stops someone who intercepts the code from using it. It's required for public clients like SPAs and mobile apps, and recommended for all. In Nest you're usually the client or the resource server.
 
 **Follow-up:**
 
 Why is the implicit flow deprecated?
 
-Answer: It returns tokens in the URL fragment, exposing them to browser history, referrers, and scripts, and has no client authentication; code flow with PKCE replaces it.
+Answer: It returns tokens in the URL fragment, where they can leak through browser history, referrers, and scripts, and the client isn't authenticated. Code flow with PKCE replaces it.
 
 ### NEST-188 — Social login and account linking
 
@@ -768,13 +768,13 @@ How do you add social login (Google/GitHub) and handle account linking?
 
 **Answer:**
 
-Use `passport-google-oauth20` or similar: configure `clientID`, `clientSecret`, `callbackURL`, `scope`, and in `validate(accessToken, refreshToken, profile)` find or create the local user. Then issue your own tokens or session; don't use the provider's token as your session. Link by provider id, or by email only when the provider confirms it is verified, or require the user to log in first and then connect.
+Use a Passport strategy such as `passport-google-oauth20`. Configure `clientID`, `clientSecret`, `callbackURL`, and `scope`. In `validate(accessToken, refreshToken, profile)`, find or create the local user. Then issue your own token or session; don't use the provider's token as your session. To link accounts, match by provider id, or by email only when the provider confirms the email is verified. Another safe option is to require the user to log in first and then connect the provider.
 
 **Follow-up:**
 
 Why is auto-linking by unverified email dangerous?
 
-Answer: An attacker can register at the provider with the victim's email unverified and take over the victim's local account.
+Answer: An attacker can create an account at the provider using the victim's email without verifying it, then log in and take over the victim's local account.
 
 ### NEST-189 — OIDC and delegating to an IdP
 
@@ -788,13 +788,13 @@ What is the difference between OAuth2 and OIDC, and when would you delegate to a
 
 **Answer:**
 
-OAuth2 is delegated authorization (access tokens); OpenID Connect adds identity (ID token, `userinfo`, standard claims). An IdP gives you MFA, SSO, social login, and password policies without building them. Your Nest API becomes a resource server: validate JWTs with the IdP's JWKS (`passport-jwt` + `jwks-rsa`), check `iss` and `aud`, and map claims/scopes to roles. Build in-house only when needs are simple or highly custom.
+OAuth2 is about delegated authorization: it gives apps access tokens. OpenID Connect adds identity on top, with an ID token, a `userinfo` endpoint, and standard claims. An identity provider gives you MFA, single sign-on, social login, and password policies without building them. Your Nest API then acts as a resource server. It validates JWTs using the provider's JWKS, checks `iss` and `aud`, and maps claims to roles. Build your own only when needs are simple or very custom.
 
 **Follow-up:**
 
 What must your API handle when the IdP rotates signing keys?
 
-Answer: Fetch and cache the JWKS, pick the key by `kid`, and refetch when an unknown `kid` appears, with rate limiting so bad tokens can't trigger floods of fetches.
+Answer: Cache the JWKS and pick the key by `kid`. If you see an unknown `kid`, refetch the key set, with rate limiting so bad tokens can't cause a flood of fetches.
 
 ### NEST-190 — Resolving the tenant
 
@@ -808,13 +808,13 @@ How do you resolve the tenant in a multi-tenant API, and how do you keep it trus
 
 **Answer:**
 
-Sources: a JWT claim (`tenantId`), subdomain, or `X-Tenant-ID` header. Prefer the signed claim; if the tenant comes from the client, verify the authenticated user is a member. Resolve in a guard or middleware that attaches `req.tenantId`, exposed through a param decorator. Users in several tenants need a switch flow that issues a new token.
+The tenant can come from a JWT claim like `tenantId`, a subdomain, or a header such as `X-Tenant-ID`. Prefer the signed claim. If the tenant comes from the client, always verify that the logged-in user belongs to it. Resolve it once in a guard or middleware, store it as `req.tenantId`, and expose it through a param decorator. If users can belong to several tenants, add a switch flow that issues a new token.
 
 **Follow-up:**
 
 What is the risk of trusting a client-supplied tenant header without a membership check?
 
-Answer: Any user could read or modify other tenants' data just by changing the header (broken access control / IDOR across tenants).
+Answer: Any user could read or change another tenant's data just by editing the header. That is broken access control, a cross-tenant IDOR.
 
 ### NEST-191 — Tenant isolation below the auth layer
 
@@ -828,17 +828,17 @@ How do you enforce tenant isolation beyond the auth layer?
 
 **Answer:**
 
-Enforce at the data layer: always scope queries by `tenantId` (a base repository or ORM global filters), or use Postgres Row-Level Security with `SET LOCAL app.tenant_id` per transaction. Request-scoped providers can carry the tenant, but scope bubbles up the dependency chain; `AsyncLocalStorage` (e.g. `nestjs-cls`) is lighter. Add tests that attempt cross-tenant access.
+Enforce it where the data lives. Always scope queries by `tenantId`, for example through a base repository or ORM global filters. Or use Postgres Row-Level Security, setting `SET LOCAL app.tenant_id` inside each transaction. Request-scoped providers can carry the tenant, but scope spreads up the dependency chain. `AsyncLocalStorage`, for example through `nestjs-cls`, is lighter. Also write tests that deliberately try cross-tenant access.
 
 **Trade-offs:**
 
-Application-level filtering is easy but one forgotten `where` leaks data; RLS is safer but adds DB complexity and connection/transaction handling.
+Application-level filtering is easy, but one forgotten `where` leaks data. Row-Level Security is safer, but adds database complexity and needs careful connection and transaction handling.
 
 **Follow-up:**
 
 What are the performance implications of request-scoped providers carrying the tenant?
 
-Answer: Each request re-instantiates the scoped provider and every consumer up the chain, adding allocation and GC cost and disabling singleton behavior (and lifecycle hooks) for those providers.
+Answer: Every request creates a new instance of the provider and everything that depends on it. That adds allocation and garbage collection cost, and those providers lose singleton behavior.
 
 ### NEST-192 — WebSocket authentication
 
@@ -852,13 +852,13 @@ How do you authenticate WebSocket connections in a Nest gateway?
 
 **Answer:**
 
-Authenticate during the handshake, not per message: read the token from `handshake.auth.token`, a header, or a cookie in `handleConnection` or an adapter middleware, verify with `JwtService`, store the user on `client.data.user`, and disconnect on failure. Guards also work in gateways (`@UseGuards(WsJwtGuard)`) via `context.switchToWs().getClient()`, throwing `WsException`. Avoid tokens in query strings since they end up in logs.
+Authenticate once during the handshake, not on every message. Read the token from `handshake.auth.token`, a header, or a cookie, in `handleConnection` or an adapter middleware. Verify it with `JwtService`, store the user on `client.data.user`, and disconnect if it fails. Guards also work in gateways with `@UseGuards(WsJwtGuard)`, using `context.switchToWs().getClient()` and throwing `WsException`. Avoid tokens in query strings, since URLs end up in logs.
 
 **Follow-up:**
 
 What happens to a long-lived socket when the access token expires?
 
-Answer: Nothing automatically: the connection stays authenticated. Track `exp` and disconnect, or require the client to re-authenticate with a fresh token over the socket.
+Answer: Nothing, automatically. The connection stays authenticated. You need to track `exp` and disconnect, or make the client re-authenticate over the socket with a fresh token.
 
 ### NEST-193 — Auth across microservices
 
@@ -872,13 +872,13 @@ How should authentication and authorization work across microservices?
 
 **Answer:**
 
-Authenticate once at the edge (API gateway or BFF), verify the JWT there, and propagate identity downstream via a signed token or trusted metadata over an mTLS internal network. Each service still authorizes within its own domain. Use asymmetric signing so services verify with a public key, and give service-to-service calls their own credentials (client credentials or mTLS) instead of blindly forwarding user tokens.
+Authenticate once at the edge, in an API gateway or a backend-for-frontend, and verify the JWT there. Pass the identity downstream with a signed token or trusted metadata, over a network protected by mTLS. Each service still makes its own authorization decisions for its domain. Use asymmetric signing so services can verify with a public key. For service-to-service calls, use separate credentials such as client credentials or mTLS, instead of blindly forwarding user tokens.
 
 **Follow-up:**
 
 Why is "internal network equals trusted" a weak assumption?
 
-Answer: One compromised service or misconfigured route gives lateral access to everything; zero-trust means each hop authenticates and authorizes.
+Answer: If one service is compromised or a route is misconfigured, the attacker can move sideways to everything else. With zero-trust, every hop authenticates and authorizes.
 
 ### NEST-194 — Brute-force protection
 
@@ -892,13 +892,13 @@ How do you protect login and refresh endpoints from brute force?
 
 **Answer:**
 
-Use `@nestjs/throttler` with strict limits on `/auth/login`, `/auth/refresh`, and password reset (`@Throttle({ default: { limit: 5, ttl: 60000 } })`), keyed by IP and/or account, with Redis storage for multi-instance deployments. Add progressive delays, CAPTCHA after failures, and alerting. Account lockout can be abused to lock out a victim, so prefer delays or per-IP-plus-account keys.
+Use `@nestjs/throttler` with strict limits on `/auth/login`, `/auth/refresh`, and password reset, for example `@Throttle({ default: { limit: 5, ttl: 60000 } })`. Track attempts by IP, by account, or both, and use Redis storage when you run several instances. Add growing delays, CAPTCHA after repeated failures, and alerts. Hard account lockout can be abused to lock out a victim, so prefer delays or combined IP-plus-account limits.
 
 **Follow-up:**
 
 Why can pure IP-based throttling be insufficient?
 
-Answer: Attackers distribute attempts across many IPs (botnets, proxies), and users behind a shared NAT can be blocked together; combine with per-account limits.
+Answer: Attackers spread attempts across many IPs, and legitimate users behind a shared network can get blocked together. Combine it with per-account limits.
 
 ### NEST-195 — Reset, verification, and 2FA
 
@@ -912,13 +912,13 @@ How do password reset, email verification, and 2FA fit into the auth architectur
 
 **Answer:**
 
-Reset and verification: generate a single-use random token, store its hash with an expiry, email a link, and invalidate on use and after password change; respond identically whether or not the email exists. 2FA (TOTP): after the password step issue a short-lived "partial" state, require the code, then issue full tokens; store the secret encrypted and provide recovery codes. Keep these in dedicated services behind `AuthService`.
+For reset and verification, create a single-use random token, store its hash with an expiry, and email a link. Invalidate the token after use and after a password change. Respond the same way whether or not the email exists. For 2FA with TOTP, after the password step issue a short-lived partial state, require the code, and only then issue full tokens. Store the 2FA secret encrypted and provide recovery codes. Keep these features in dedicated services behind `AuthService`.
 
 **Follow-up:**
 
 Why revoke existing sessions and refresh tokens after a password reset?
 
-Answer: The reset often happens because of suspected compromise; leaving old sessions alive would let an attacker keep access after the password changes.
+Answer: A reset often happens because an account may be compromised. If old sessions stay alive, an attacker keeps access even after the password changes.
 
 ### NEST-196 — Unit testing a guard
 
@@ -932,13 +932,13 @@ How do you unit test an auth guard?
 
 **Answer:**
 
-Instantiate the guard with a mocked `Reflector` and a fake `ExecutionContext` (`createMock` from `@golevelup/ts-jest`, or a hand-built object with `switchToHttp`, `getHandler`, `getClass`). Assert: public route passes, missing role denied, correct role allowed, and exceptions have the right type. Test the metadata logic in isolation rather than booting the app.
+Create the guard directly, with a mocked `Reflector` and a fake `ExecutionContext`. You can use `createMock` from `@golevelup/ts-jest`, or build a small object with `switchToHttp`, `getHandler`, and `getClass`. Then test each case: a public route passes, a missing role is denied, the correct role is allowed, and exceptions have the right type. Test the metadata logic on its own, without starting the whole app.
 
 **Follow-up:**
 
 How would you test that a method-level `@Public()` overrides class-level protection?
 
-Answer: Use a real `Reflector` with a small test controller (or mock `getAllAndOverride` to return `true`) and assert the guard allows it without calling the underlying JWT check.
+Answer: Use a real `Reflector` with a small test controller, or mock `getAllAndOverride` to return `true`. Then check that the guard allows the request without calling the underlying JWT check.
 
 ### NEST-197 — E2E testing protected endpoints
 
@@ -952,13 +952,13 @@ How do you write e2e tests for protected endpoints?
 
 **Answer:**
 
-Build the app with `Test.createTestingModule({ imports: [AppModule] })` and use `supertest`. Either log in as a test user, or sign a token with `JwtService`. To bypass authn in non-auth tests use `.overrideGuard(JwtAuthGuard).useValue({ canActivate: ctx => { ctx.switchToHttp().getRequest().user = fakeUser; return true; } })`. Keep dedicated tests for 401 without a token and 403 with the wrong role.
+Build the app with `Test.createTestingModule({ imports: [AppModule] })` and call it with `supertest`. You can either log in as a test user or sign a token yourself with `JwtService`. In tests that aren't about auth, you can bypass authentication with `.overrideGuard(JwtAuthGuard).useValue(...)`, where the fake guard sets a fake user on the request. Keep separate tests for a 401 without a token and a 403 with the wrong role.
 
 **Follow-up:**
 
 Why is overriding the guard in every e2e test a coverage risk?
 
-Answer: It hides real wiring bugs (missing `@Public`, wrong guard order, strategy misconfiguration), so keep some tests using the real guards and tokens.
+Answer: It hides real wiring problems, such as a missing `@Public`, a wrong guard order, or a misconfigured strategy. Keep some tests that use the real guards and real tokens.
 
 ### NEST-198 — Mocking `JwtService` and strategies
 
@@ -972,13 +972,13 @@ How do you mock `JwtService` and test Passport strategies?
 
 **Answer:**
 
-For services, provide `{ provide: JwtService, useValue: { signAsync: jest.fn(), verifyAsync: jest.fn() } }` and test payloads and error paths. For strategy classes, call `validate()` directly as a plain method. Don't test Passport internals; test your payload-to-user mapping, and guard behavior through e2e. Use fixed secrets, short expirations, and fake timers for expiry.
+For services, provide a fake: `{ provide: JwtService, useValue: { signAsync: jest.fn(), verifyAsync: jest.fn() } }`. Then test the payloads and error paths. For a strategy, call `validate()` directly as an ordinary method. Don't test Passport's internals; test your mapping from payload to user, and test guard behavior through e2e tests. Use fixed secrets, short expirations, and Jest fake timers when you need to test expiry.
 
 **Follow-up:**
 
 How do you test that an expired token returns 401 without waiting?
 
-Answer: Sign a token with a negative or tiny `expiresIn` (or set `iat`/`exp` in the past), or advance Jest fake timers, then call the endpoint and assert 401.
+Answer: Sign a token with a negative or tiny `expiresIn`, or set `iat` and `exp` in the past, or move Jest's fake timers forward. Then call the endpoint and expect 401.
 
 ### NEST-199 — Securing Swagger
 
@@ -992,13 +992,13 @@ How do you document auth in Swagger and protect the docs themselves?
 
 **Answer:**
 
-Document with `new DocumentBuilder().addBearerAuth()` (or `addCookieAuth`, `addApiKey`) and mark routes with `@ApiBearerAuth()` so the Authorize button works. To protect the docs: disable Swagger in production, or serve `/docs` behind basic auth (`express-basic-auth`) middleware, a VPN, an IP allowlist, or admin-only access. Apply the protection as middleware before `SwaggerModule.setup`, since those routes live on the HTTP adapter outside normal guard handling.
+To document auth, use `new DocumentBuilder().addBearerAuth()`, or `addCookieAuth` or `addApiKey`. Then mark routes with `@ApiBearerAuth()` so the Authorize button works. To protect the docs, disable Swagger in production, or put `/docs` behind basic auth (`express-basic-auth`), a VPN, an IP allowlist, or admin-only access. Add this protection as middleware before `SwaggerModule.setup`, because the docs routes sit on the HTTP adapter, outside normal guards.
 
 **Follow-up:**
 
 What risk does a public OpenAPI JSON create in production?
 
-Answer: It hands attackers a complete map of endpoints, parameters, and schemas, including internal or admin routes, which eases reconnaissance.
+Answer: It gives attackers a full map of your endpoints, parameters, and schemas, including internal or admin routes. That makes reconnaissance much easier.
 
 ### NEST-200 — Auth module boundaries
 
@@ -1012,14 +1012,14 @@ Where should auth logic live, and what are good module boundaries?
 
 **Answer:**
 
-`AuthModule` owns credentials, token issuing, strategies, and guards, and exports `AuthService` and the guards/decorators others need. `UsersModule` owns user data and exports `UsersService`; `AuthModule` imports it, giving a one-way dependency. Authorization rules (policies, abilities) can live in an `AuthzModule` or next to each domain. Controllers stay thin: guards and decorators plus service calls. Use `@Global()` only for truly cross-cutting pieces.
+`AuthModule` owns credentials, token issuing, strategies, and guards. It exports `AuthService` and the guards and decorators other modules need. `UsersModule` owns user data and exports `UsersService`. `AuthModule` imports it, so the dependency goes one way. Authorization rules, like policies and abilities, can live in an `AuthzModule` or next to each domain. Keep controllers thin: guards, decorators, and service calls. Use `@Global()` only for truly cross-cutting pieces.
 
 **Trade-offs:**
 
-Centralizing auth keeps rules consistent but can make one module a bottleneck; domain-local policies are flexible but risk inconsistent enforcement.
+Centralized auth keeps rules consistent, but one module can become a bottleneck. Domain-local policies are flexible, but risk inconsistent enforcement.
 
 **Follow-up:**
 
 How do you avoid a circular dependency between `AuthModule` and `UsersModule`?
 
-Answer: Keep the dependency one-way (`Auth` → `Users`); if users need auth events, use an event emitter or move shared logic to a third module instead of `forwardRef`.
+Answer: Keep the dependency one-way, from Auth to Users. If users need to react to auth events, use an event emitter or move shared logic into a third module, instead of reaching for `forwardRef`.

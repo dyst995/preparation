@@ -1,8 +1,9 @@
 # NEST03 — Dependency injection
 
-NestJS 10, Express adapter unless noted. Questions NEST-101–NEST-150.
+NestJS 10, Express adapter unless a question says otherwise. Questions NEST-101–NEST-150.
 
-Scopes and bubbling, custom providers, tokens, `ModuleRef`/`ContextId`, durable providers, circular dependencies, dynamic modules and `ConfigurableModuleBuilder`, exports/`@Global`, test overrides, DI in enhancers, and `LazyModuleLoader`. Request pipeline order is NEST02.
+Scopes, custom providers, tokens, `ModuleRef` and `ContextId`, durable providers, circular dependencies, dynamic modules, exports, test overrides, dependency injection in enhancers, and `LazyModuleLoader`. Request pipeline order is the previous file.
+
 
 ### NEST-101 — The DEFAULT provider scope
 
@@ -12,17 +13,17 @@ Scopes and bubbling, custom providers, tokens, `ModuleRef`/`ContextId`, durable 
 
 **Question:**
 
-What is the default provider scope in NestJS, and what does it imply for how you write the class?
+What is the default provider scope in NestJS, and what does that imply for how you write the class?
 
 **Answer:**
 
-`Scope.DEFAULT` is a singleton: Nest creates one instance at bootstrap and shares it with every consumer and every request. It is the cheapest option, but the class must not keep per-request mutable state in fields.
+`Scope.DEFAULT` means one shared instance. Nest creates that instance while the application is starting and hands the same object to every consumer, on every request, for the life of the process. It is the cheapest scope because nothing is constructed again per request. The class has to be safe to share, so fields must not hold data that belongs to one request, such as the current user or a request id. Pass that kind of data as a method argument, or choose a different scope on purpose.
 
 **Follow-up:**
 
-If a provider is exported to five modules, how many instances exist?
+If a provider is exported and imported by five modules, how many instances exist?
 
-Answer: One. Module boundaries control visibility, not instance count; every importing module receives the same singleton.
+Answer: One. A module boundary decides who may inject the provider, and every importer receives that same singleton.
 
 ### NEST-102 — Declaring a REQUEST-scoped provider
 
@@ -36,13 +37,13 @@ What is `Scope.REQUEST`, and how do you declare it on a class and on a custom pr
 
 **Answer:**
 
-A new instance is created for each incoming request and discarded afterwards. Use `@Injectable({ scope: Scope.REQUEST })`, or `{ provide: X, useClass: X, scope: Scope.REQUEST }` for a custom provider. It fits per-request state such as tenant, user, or correlation id.
+`Scope.REQUEST` means Nest creates a new instance for each incoming request and drops it when that request is finished. Declare it on the class with `@Injectable({ scope: Scope.REQUEST })`. On a custom provider, set the same field on the provider object: `{ provide: X, useClass: X, scope: Scope.REQUEST }`. Use it when the instance itself must remember something about this request, such as the tenant, the user, or a correlation id. A singleton that merely receives those values as method arguments does not need this scope.
 
 **Follow-up:**
 
 Is `onModuleInit` called for each request-scoped instance?
 
-Answer: No. Lifecycle hooks are not triggered for request-scoped providers, so per-instance setup belongs in the constructor or an explicit method.
+Answer: No. Lifecycle hooks run for instances created at startup. A request-scoped instance does not exist yet, so put per-instance setup in the constructor or in a method you call yourself.
 
 ### NEST-103 — TRANSIENT scope
 
@@ -56,13 +57,13 @@ What is `Scope.TRANSIENT`, and how does it differ from `Scope.REQUEST`?
 
 **Answer:**
 
-Each consumer that injects a transient provider gets its own private instance. It is not tied to the HTTP request lifecycle, so a singleton consumer holds its transient instance for the lifetime of the app. Typical use: a logger that stores the consumer's class name as context.
+`Scope.TRANSIENT` gives each consumer its own private instance of the provider. The instance is not tied to an HTTP request. If a singleton injects a transient logger, Nest creates that logger once, when the singleton is created, and the singleton holds it until the application shuts down. A second singleton gets a second logger. The usual reason is a logger that stores the consumer's class name as its context. Unlike request scope, transient scope does not follow the request and does not force the consumer to become request-scoped.
 
 **Follow-up:**
 
-Is a transient instance re-created on every method call?
+Is a transient instance created again on every method call?
 
-Answer: No. It is created once per consuming provider and is then stable for that consumer's lifetime.
+Answer: No. It is created once for that consumer and then stays stable for the consumer's lifetime.
 
 ### NEST-104 — Scope bubbling
 
@@ -76,13 +77,13 @@ Explain scope bubbling. What happens to a controller that injects a request-scop
 
 **Answer:**
 
-Request scope bubbles up the injection chain: any provider or controller that depends on a request-scoped provider becomes request-scoped itself. Transient scope does not bubble; a singleton that injects a transient provider stays a singleton and just holds a dedicated transient instance.
+Request scope travels up the injection chain. If a provider or a controller depends on a request-scoped provider, directly or through another provider, Nest treats that consumer as request-scoped too and constructs it again for each request. Otherwise one singleton would hold a service that is supposed to change per request. Transient scope does not travel up. A singleton that injects a transient provider stays a singleton and simply keeps its own dedicated instance. The bubble is why a small request-scoped leaf can change the cost of a large part of the graph.
 
 **Follow-up:**
 
-Why can one small request-scoped service be dangerous in a large app?
+Why can one small request-scoped service be dangerous in a large application?
 
-Answer: Everything that depends on it, directly or transitively, is re-instantiated per request. A leaf service injected into a core service can silently make most of the graph request-scoped.
+Answer: Every provider that depends on it, directly or through other providers, is created again per request. A leaf injected into a core service can quietly make most of the graph request-scoped.
 
 ### NEST-105 — Making a controller request-scoped
 
@@ -96,13 +97,13 @@ How can a controller end up request-scoped, and what else in the pipeline is aff
 
 **Answer:**
 
-Either implicitly through bubbling (it injects a request-scoped provider) or explicitly with `@Controller({ path: 'cats', scope: Scope.REQUEST })`. A new controller instance then handles each request.
+A controller becomes request-scoped in two ways. It happens implicitly when the controller injects a request-scoped provider, because request scope bubbles up to the controller. It happens explicitly when you set the scope on the controller itself: `@Controller({ path: 'cats', scope: Scope.REQUEST })`. In both cases Nest constructs a new controller instance for each request, and that instance's injected subtree is built with it. The route registration does not change. What changes is that the object handling the route is no longer the one singleton created at startup.
 
 **Follow-up:**
 
 Do guards, interceptors, and pipes follow the same rule?
 
-Answer: Yes. If an enhancer depends on a request-scoped provider, it is also instantiated per request.
+Answer: Yes. An enhancer that depends on a request-scoped provider is instantiated per request as well.
 
 ### NEST-106 — Performance cost of request scope
 
@@ -116,17 +117,17 @@ What is the performance cost of request-scoped providers, and how do you reduce 
 
 **Answer:**
 
-Nest has to instantiate the dependency subtree on every request, which adds latency, allocations, and GC pressure. Keep the request-scoped subtree tiny, avoid bubbling into large services, and consider `AsyncLocalStorage` (for example `nestjs-cls`) or durable providers instead.
+On every request Nest walks the request-scoped part of the graph and constructs it. That adds latency, allocations, and garbage-collection pressure, and the cost grows with the size of the bubbled subtree rather than with the one class you marked. Keep that subtree small. Do not inject a request-scoped leaf into a large shared service. Pass per-request data as a method argument where you can. When many services only need to read the same request context, `AsyncLocalStorage` (for example `nestjs-cls`) or a durable provider avoids rebuilding the whole graph.
 
 **Trade-offs:**
 
-Request scope gives clean, explicit per-request state through DI, but costs throughput. `AsyncLocalStorage` keeps services as singletons but makes the request context implicit and harder to test.
+Request scope makes per-request state explicit in the constructor, which is easy to test and expensive under load. Async local storage keeps the services as singletons and makes the context implicit, so tests have to set it up.
 
 **Follow-up:**
 
-What is your default scope choice, and when do you deviate?
+What is your default scope, and when do you leave it?
 
-Answer: Default to singleton. Use request scope only when the instance really needs per-request state that cannot be passed as a method argument or kept in async local storage.
+Answer: Singleton. Use request scope only when the instance itself must hold per-request state that you cannot pass as an argument or keep in async local storage.
 
 ### NEST-107 — Accessing the request in a provider
 
@@ -140,15 +141,15 @@ How do you access the underlying request object inside a provider, and what does
 
 **Answer:**
 
-Inject the `REQUEST` token from `@nestjs/core`: `constructor(@Inject(REQUEST) private req: Request) {}`. The provider becomes request-scoped automatically. For GraphQL use the `CONTEXT` token; for microservices `REQUEST` holds the pattern and data of the message.
+Inject the `REQUEST` token from `@nestjs/core`: `constructor(@Inject(REQUEST) private readonly req: Request) {}`. `REQUEST` is itself request-scoped, so this provider becomes request-scoped by bubbling, even if you never set `scope` on the class. Inside an HTTP application the value is the current request. In a GraphQL application the matching token is `CONTEXT`. In a microservice the `REQUEST` token carries the incoming message, including its pattern and data, rather than an HTTP request.
 
 **Follow-up:**
 
-How do you get request data in a singleton provider or at bootstrap?
+How do you read request data from a singleton, or during bootstrap?
 
-Answer: You cannot inject it there. Pass it as an argument, use `AsyncLocalStorage`, or resolve a request-scoped provider through `ModuleRef.resolve()` with a `ContextId`.
+Answer: You cannot inject `REQUEST` there. Pass the data as an argument, store it in `AsyncLocalStorage`, or resolve a request-scoped provider with `ModuleRef.resolve()` and a `ContextId`.
 
-### NEST-108 — `useClass`
+### NEST-108 — useClass
 
 **Difficulty:** Junior
 
@@ -160,15 +161,15 @@ What does `useClass` do in a custom provider, and when is it useful?
 
 **Answer:**
 
-`{ provide: TOKEN, useClass: Impl }` makes the container instantiate `Impl`, with its own dependencies injected, whenever `TOKEN` is requested. It is useful for swapping implementations, such as `useClass: isProd ? SmtpMailer : FakeMailer`.
+`useClass` tells Nest which class to construct when someone injects a token. You write `{ provide: TOKEN, useClass: Impl }`. Nest instantiates `Impl` through the normal path, so `Impl`'s own constructor dependencies are injected too. The useful case is swapping the implementation behind a stable token, for example `useClass: isProd ? SmtpMailer : FakeMailer`. Callers depend on `TOKEN`. They do not need to change when the class behind it changes.
 
 **Follow-up:**
 
 Are the class's constructor dependencies still injected?
 
-Answer: Yes. `useClass` goes through the normal instantiation path, so `Impl` resolves its dependencies like any other provider.
+Answer: Yes. `useClass` uses the same instantiation path as a provider listed by its class, so `Impl` resolves its dependencies normally.
 
-### NEST-109 — `useValue`
+### NEST-109 — useValue
 
 **Difficulty:** Junior
 
@@ -180,15 +181,15 @@ What does `useValue` do, and what is it typically used for?
 
 **Answer:**
 
-It binds a token to an existing value, such as a constant, config object, or test mock: `{ provide: 'CONFIG', useValue: { retries: 3 } }`. Nest does not instantiate or inject anything into it.
+`useValue` binds a token to an object you already have. Nest does not construct it and does not inject anything into it. `{ provide: 'CONFIG', useValue: { retries: 3 } }` is the usual shape. It fits a constant, a configuration object, or a mock you built in a test. Because the value is stored as-is, every consumer receives that same reference for the life of the process.
 
 **Follow-up:**
 
 What risk comes from sharing a `useValue` object?
 
-Answer: Every consumer gets the same reference, so mutation by one consumer is visible to all. Freeze it or treat it as read-only.
+Answer: Mutation is shared. If one consumer changes a field, every other consumer sees the change. Freeze the object, or treat it as read-only.
 
-### NEST-110 — `useFactory` and `inject`
+### NEST-110 — useFactory and inject
 
 **Difficulty:** Senior
 
@@ -200,15 +201,15 @@ How does `useFactory` work, and how do you give the factory its dependencies?
 
 **Answer:**
 
-`{ provide: DB, useFactory: (cfg: ConfigService) => new Client(cfg.get('DB_URL')), inject: [ConfigService] }`. Nest calls the factory with the `inject` entries in order, and the factory may return a value or a Promise. Use it for conditional creation or for wrapping third-party objects.
+`useFactory` is a function Nest calls to produce the provider. Dependencies are listed separately in `inject`, in the same order as the function's parameters, because a factory function has no class metadata for Nest to read. A typical registration is `{ provide: DB, useFactory: (cfg: ConfigService) => new Client(cfg.get('DB_URL')), inject: [ConfigService] }`. The function may return a value or a Promise. Use it when creation is conditional, or when you are wrapping a third-party client that is not an `@Injectable()` class.
 
 **Follow-up:**
 
 What happens if you forget `inject`, and how do you mark a dependency optional?
 
-Answer: The factory parameters are `undefined`. For an optional dependency use `inject: [{ token: X, optional: true }]`.
+Answer: The factory parameters are `undefined`. Mark one dependency optional with `inject: [{ token: X, optional: true }]`.
 
-### NEST-111 — `useExisting`
+### NEST-111 — useExisting
 
 **Difficulty:** Junior
 
@@ -220,13 +221,13 @@ What does `useExisting` do, and how does it differ from `useClass`?
 
 **Answer:**
 
-It creates an alias: `{ provide: 'AliasedService', useExisting: RealService }` resolves to the same instance as `RealService`. `useClass` would build a second instance. It is useful for exposing one provider under an alternative token.
+`useExisting` creates an alias. `{ provide: 'AliasedService', useExisting: RealService }` means a lookup of `AliasedService` returns the same instance Nest already created for `RealService`. Nothing new is constructed. `useClass: RealService` would construct a second instance, with its own state and its own connections. The alias is how you expose one provider under a second token, often so a library token and your concrete class stay in sync.
 
 **Follow-up:**
 
-What breaks if you used `useClass: RealService` instead of `useExisting`?
+What breaks if you write `useClass: RealService` where you meant `useExisting`?
 
-Answer: Two separate instances would exist, so state, caches, and connections are no longer shared between the two tokens.
+Answer: Two instances exist. State, caches, and connections are no longer shared between the two tokens.
 
 ### NEST-112 — Async providers
 
@@ -240,13 +241,13 @@ How do async providers work, and how do they affect application startup?
 
 **Answer:**
 
-An async `useFactory` returns a Promise, and Nest awaits it before resolving dependents, so consumers receive the resolved value. Bootstrap does not finish until every async provider has settled.
+An async provider is a `useFactory` that returns a Promise. Nest awaits that Promise before it hands the value to anything that depends on the token, so consumers see the resolved client rather than the Promise itself. Startup does not finish until every async provider has settled. A database connection or a remote config load belongs here when the rest of the graph cannot run without it. The cost is that a slow factory delays `listen()`.
 
 **Follow-up:**
 
 What happens if the factory rejects?
 
-Answer: Application startup fails. Put timeouts and retries inside the factory if you want it to tolerate a slow or flaky dependency.
+Answer: Application startup fails. Put a timeout and any retry inside the factory if a slow or flaky dependency should not take the process down immediately.
 
 ### NEST-113 — Injection tokens
 
@@ -260,13 +261,13 @@ What can be used as an injection token, and when do you need `@Inject()`?
 
 **Answer:**
 
-A class, a string, or a `Symbol`. Classes carry constructor type metadata, so no `@Inject()` is required; string and symbol tokens need `@Inject(TOKEN)` because there is no runtime type to infer.
+A token is a class, a string, or a symbol. Nest matches the token a consumer asks for with the token a provider registered. A class parameter usually needs no `@Inject()`, because with `emitDecoratorMetadata` TypeScript records the class as `design:paramtypes` and Nest reads that list. A string or a symbol has no runtime type, so the parameter must be marked `@Inject(TOKEN)`. An explicit `@Inject()` also wins when you want a different token than the emitted class.
 
 **Follow-up:**
 
-Why prefer exported constants or symbols over inline strings?
+Why prefer an exported constant or a symbol over a string written at each injection site?
 
-Answer: They prevent typos and collisions between modules, and give you a single symbol to find usages of.
+Answer: One exported token prevents typos and collisions between modules, and it gives you a single place to find every usage.
 
 ### NEST-114 — Injecting an interface
 
@@ -276,21 +277,21 @@ Answer: They prevent typos and collisions between modules, and give you a single
 
 **Question:**
 
-How do you inject something typed as an interface, and why can't you do it directly?
+How do you inject something typed as an interface, and why can you not use the interface itself as the token?
 
 **Answer:**
 
-Interfaces are erased at runtime, and `emitDecoratorMetadata` emits `Object` for them. Register a token, `{ provide: MAILER, useClass: SmtpMailer }`, and inject with `@Inject(MAILER) private mailer: IMailer`.
+A TypeScript interface is erased when the code is compiled. With `emitDecoratorMetadata`, the emitted type for an interface parameter is `Object`, so Nest cannot tell which provider you meant. Define a token, register the implementation against it with `{ provide: MAILER, useClass: SmtpMailer }`, and inject with `@Inject(MAILER) private readonly mailer: IMailer`. The interface remains the compile-time type. The token is what exists at runtime. Callers stay decoupled from `SmtpMailer`.
 
 **Trade-offs:**
 
-A symbol token plus interface keeps contracts lightweight but needs `@Inject` everywhere. An abstract class works as both type and token with no `@Inject`, at the cost of a runtime class.
+A symbol plus an interface stays a light contract, and every injection site needs `@Inject()`. An abstract class can be both the type and the token, so `@Inject()` is unnecessary, at the cost of a real runtime class.
 
 **Follow-up:**
 
 Can an abstract class replace the token?
 
-Answer: Yes. Provide `{ provide: AbstractMailer, useClass: SmtpMailer }` and type the constructor parameter as `AbstractMailer`.
+Answer: Yes. Register `{ provide: AbstractMailer, useClass: SmtpMailer }` and type the constructor parameter as `AbstractMailer`.
 
 ### NEST-115 — Constructor vs property injection
 
@@ -304,19 +305,19 @@ When would you use property injection instead of constructor injection?
 
 **Answer:**
 
-Constructor injection is the default: explicit, easy to test, and fields can be `readonly`. Property injection (`@Inject(TOKEN) private dep: Dep`) helps when a subclass extends a provider and you do not want to thread dependencies through `super(...)`.
+Constructor injection is the default. The dependencies are visible, the fields can be `readonly`, and a unit test can pass them to `new`. Property injection assigns the dependency to a field after the object is constructed: `@Inject(TOKEN) private dep: Dep`. It is useful when a subclass extends a provider and you do not want to thread every base dependency through `super(...)`. The dependency is not available inside the constructor, because Nest assigns properties only after construction finishes.
 
 **Trade-offs:**
 
-Property injection hides dependencies from the constructor signature and makes manual instantiation in unit tests harder.
+Property injection hides the dependency from the constructor signature. A unit test that does `new Subclass()` then has to remember that the field is still unset.
 
 **Follow-up:**
 
 Is a property-injected dependency available inside the constructor?
 
-Answer: No. Properties are assigned after construction, so use them only in methods or lifecycle hooks.
+Answer: No. Properties are assigned after the constructor returns. Use them in methods or in lifecycle hooks.
 
-### NEST-116 — `@Optional()`
+### NEST-116 — @Optional()
 
 **Difficulty:** Junior
 
@@ -328,15 +329,15 @@ What does `@Optional()` do on a constructor parameter?
 
 **Answer:**
 
-If no provider is registered for the dependency, Nest injects `undefined` instead of throwing at bootstrap: `constructor(@Optional() @Inject('HTTP_OPTIONS') private opts?: Opts) {}`. It suits library code where host applications may not supply configuration.
+`@Optional()` tells Nest that a missing provider is allowed. If nothing is registered for that token, Nest injects `undefined` instead of failing startup. The usual form is `constructor(@Optional() @Inject('HTTP_OPTIONS') private readonly opts?: Opts) {}`. It belongs in library code, where the host application might not supply a configuration object. Your class then has to handle `undefined`. It does not make a required application service optional just to hide a wiring mistake.
 
 **Follow-up:**
 
-Does `@Optional()` also swallow errors thrown while creating the provider?
+Does `@Optional()` also swallow an error thrown while the provider is being created?
 
-Answer: No. It only covers a missing provider; if the provider exists and its factory throws, bootstrap still fails.
+Answer: No. It only covers a token that was never registered. If the provider exists and its factory throws, startup still fails.
 
-### NEST-117 — Defaults with `@Optional()`
+### NEST-117 — Defaults with @Optional()
 
 **Difficulty:** Intermediate
 
@@ -348,15 +349,15 @@ How do you provide a default value when an optional dependency is absent?
 
 **Answer:**
 
-Fall back in code: `this.opts = opts ?? DEFAULTS`, or use a default parameter value. In a dynamic module you can also register a default provider that the host can override.
+You can fall back at the use site: `this.opts = opts ?? DEFAULTS`, or give the constructor parameter a default value. You can also register a default provider inside a dynamic module, and let the host replace that provider when it wants different options. The class-level fallback is local and easy to miss. The module-level default is visible in the module definition, and a test or a host application can override the token through dependency injection instead of editing the class.
 
 **Follow-up:**
 
 Which approach is safer for a reusable library?
 
-Answer: Registering a default provider in the module, because the fallback is visible in the module definition and replaceable via DI rather than hidden in one class.
+Answer: Register the default provider in the module. The fallback is visible in the module definition and can be replaced through dependency injection.
 
-### NEST-118 — `ModuleRef.get()`
+### NEST-118 — ModuleRef.get()
 
 **Difficulty:** Intermediate
 
@@ -368,15 +369,15 @@ What does `ModuleRef.get()` return, and what does the `strict` option control?
 
 **Answer:**
 
-It synchronously returns an existing static (singleton) provider instance: `this.moduleRef.get(Service)`. By default `strict` is `true`, so lookup is limited to the current module; `{ strict: false }` searches the whole application.
+`ModuleRef.get()` synchronously returns a provider that already exists as a singleton: `this.moduleRef.get(Service)`. It does not create a request-scoped or transient instance. `strict` defaults to `true`, which limits the lookup to the module that owns this `ModuleRef`. Pass `{ strict: false }` when the provider lives in another module and you intentionally want an application-wide search. Strict mode is the safer default, because a wide search can hide a missing import.
 
 **Follow-up:**
 
 What happens if you call `get()` on a request-scoped or transient provider?
 
-Answer: Nest throws an error saying the provider is scoped. Use `ModuleRef.resolve()` instead.
+Answer: Nest throws and tells you the provider is scoped. Use `ModuleRef.resolve()` for those.
 
-### NEST-119 — `ModuleRef.resolve()` vs `get()`
+### NEST-119 — ModuleRef.resolve() vs get()
 
 **Difficulty:** Senior
 
@@ -388,7 +389,7 @@ How does `ModuleRef.resolve()` differ from `get()`?
 
 **Answer:**
 
-`get()` is synchronous and returns static instances. `resolve()` returns a Promise of an instance of a scoped (transient or request) provider. Each call creates a new instance unless you pass the same `contextId`.
+`get()` is synchronous and returns the singleton already created at startup. `resolve()` returns a Promise and is how you obtain a transient or request-scoped instance, including the providers that had to bubble up with it. Each `resolve()` call creates a new instance unless you pass the same `ContextId`. Use `get()` when you know the provider is static. Use `resolve()` when the scope is per request or per consumer and you are outside the normal constructor injection path, such as in a cron job.
 
 **Follow-up:**
 
@@ -396,7 +397,7 @@ How do you get the same transient instance from two `resolve()` calls?
 
 Answer: Create one `ContextId` with `ContextIdFactory.create()` and pass it to both calls: `await moduleRef.resolve(Svc, contextId)`.
 
-### NEST-120 — `ContextId`
+### NEST-120 — ContextId
 
 **Difficulty:** Senior
 
@@ -408,13 +409,13 @@ What is a `ContextId`, and who creates it?
 
 **Answer:**
 
-It identifies one DI sub-tree. Providers resolved under the same `ContextId` share their scoped instances; different ids get separate instances. Nest creates one per HTTP request internally, and you create your own with `ContextIdFactory.create()`.
+A `ContextId` identifies one dependency-injection sub-tree. Providers resolved under the same id share their scoped instances. A different id gets a separate set of instances. Nest creates one id for each HTTP request and uses it for the request-scoped graph of that request. You create your own with `ContextIdFactory.create()` when there is no HTTP request to borrow. The id is the unit of sharing. It is not a scope by itself.
 
 **Follow-up:**
 
 When do you create a `ContextId` yourself?
 
-Answer: When resolving request-scoped providers outside an HTTP request, such as in cron jobs, queue consumers, or event handlers.
+Answer: When you resolve request-scoped providers outside an HTTP request, such as in a cron job, a queue consumer, or an event handler.
 
 ### NEST-121 — Reusing the request's context
 
@@ -424,19 +425,19 @@ Answer: When resolving request-scoped providers outside an HTTP request, such as
 
 **Question:**
 
-How do you reuse the current request's DI context when calling `resolve()` manually?
+How do you reuse the current request's dependency-injection context when you call `resolve()` yourself?
 
 **Answer:**
 
-Use `const contextId = ContextIdFactory.getByRequest(request)`, then `moduleRef.resolve(Svc, contextId)`. To make the real request object available to injected `REQUEST` in that sub-tree, call `moduleRef.registerRequestByContextId(request, contextId)`.
+Take the id Nest already attached to this request with `ContextIdFactory.getByRequest(request)`, then pass it to `moduleRef.resolve(Svc, contextId)`. Scoped providers resolved with that id are the same instances the rest of this request is using. If something in that sub-tree injects `REQUEST`, also call `moduleRef.registerRequestByContextId(request, contextId)` so the request object is registered for that id. Skipping the resolve-time id and calling `resolve()` with a fresh id builds a second, unrelated sub-tree.
 
 **Follow-up:**
 
-What is injected as `REQUEST` if you skip `registerRequestByContextId`?
+What is injected as `REQUEST` if you skip `registerRequestByContextId` on a context you created yourself?
 
-Answer: With a manually created context, `REQUEST` is `undefined`, because Nest has no request object bound to that id.
+Answer: `undefined`. A manually created context has no request object until you register one.
 
-### NEST-122 — `ModuleRef.create()`
+### NEST-122 — ModuleRef.create()
 
 **Difficulty:** Senior
 
@@ -448,13 +449,13 @@ What does `ModuleRef.create()` do, and when would you use it?
 
 **Answer:**
 
-It instantiates a class with DI at runtime without registering it in the module: `const inst = await moduleRef.create(MyClass)`. It suits plugin or factory patterns where classes are chosen dynamically.
+`ModuleRef.create()` constructs a class through dependency injection without registering that class as a provider. `const inst = await moduleRef.create(MyClass)` resolves the constructor's dependencies from the module and returns the instance. It fits a plugin or a strategy that you choose at runtime, when the class is not known at module-definition time. The instance is not part of the module graph. Nest will not call its lifecycle hooks, and disposal is yours.
 
 **Follow-up:**
 
-Does Nest manage the created instance's lifecycle?
+Does Nest manage the lifecycle of the instance `create()` returned?
 
-Answer: No. The class is not part of the module graph, so lifecycle hooks are not managed for it and you own its disposal.
+Answer: No. The class is outside the module graph, so lifecycle hooks are not called for it and you own disposal.
 
 ### NEST-123 — Durable providers
 
@@ -468,17 +469,17 @@ What are durable providers, and what problem do they solve?
 
 **Answer:**
 
-With `durable: true` on a request-scoped provider, Nest reuses one instance for every request that maps to the same durable sub-tree (for example one tenant) instead of creating one per request. A custom `ContextIdStrategy` decides the mapping, which removes per-request DI cost in multi-tenant apps.
+A durable provider is request-scoped and marked `durable: true`. Nest does not build a new instance for every request. It reuses one instance for every request that your strategy maps onto the same sub-tree, typically one tenant. A `ContextIdStrategy` performs that mapping. Multi-tenant applications use this when a per-tenant cache or connection would be far too expensive to rebuild on every request, and a single process-wide singleton would mix tenants. The instance is shared by concurrent requests of that tenant.
 
 **Trade-offs:**
 
-You trade the isolation of a fresh instance per request for lower overhead. The instance is now shared by all requests of that tenant.
+You give up the isolation of a fresh instance per request and gain a much smaller construction cost. Anything stored on the instance is visible to every request in that tenant.
 
 **Follow-up:**
 
 What must never be stored on a durable provider?
 
-Answer: Request-specific data such as the current user or a request id, because concurrent requests of the same tenant share the instance.
+Answer: Data that belongs to one request, such as the current user or a request id. Concurrent requests of the same tenant share the instance.
 
 ### NEST-124 — Registering a durable provider
 
@@ -488,17 +489,17 @@ Answer: Request-specific data such as the current user or a request id, because 
 
 **Question:**
 
-How do you wire up a durable provider with a `ContextIdStrategy`?
+How do you register a durable provider and a `ContextIdStrategy`?
 
 **Answer:**
 
-Mark the provider `@Injectable({ scope: Scope.REQUEST, durable: true })`. Implement `ContextIdStrategy.attach(contextId, request)` to return `{ resolve: (info) => info.isTreeDurable ? tenantSubTreeId : contextId, payload: { tenantId } }`, caching one sub-tree id per tenant. Register it once with `ContextIdFactory.apply(new TenantStrategy())` in `main.ts`.
+Mark the class with `@Injectable({ scope: Scope.REQUEST, durable: true })`. Implement `ContextIdStrategy.attach(contextId, request)` so it returns a `resolve` function and a `payload`. `resolve` receives info about the provider being looked up. When `info.isTreeDurable` is true, return the sub-tree id you cached for that tenant. Otherwise return the per-request `contextId`. Register the strategy once, before the application handles traffic, with `ContextIdFactory.apply(new TenantStrategy())` in `main.ts`.
 
 **Follow-up:**
 
 What does the injected `REQUEST` contain for a durable provider?
 
-Answer: The `payload` returned from `attach()`, not the raw HTTP request, because the instance outlives any single request.
+Answer: The `payload` returned from `attach()`, not the raw HTTP request. The instance outlives any single request, so Nest will not inject one request object into it.
 
 ### NEST-125 — Circular provider dependencies
 
@@ -512,17 +513,17 @@ What is a circular provider dependency, and how does `forwardRef()` address it?
 
 **Answer:**
 
-A needs B and B needs A, so one class is `undefined` while the other is being constructed. Use `@Inject(forwardRef(() => B)) private b: B` on both sides to defer resolution until both providers exist.
+A circular provider dependency means A needs B in its constructor and B needs A. While the first class is being constructed, the other class can still be `undefined`, because JavaScript has not finished evaluating the module. `forwardRef` delays reading the class until both providers exist: `@Inject(forwardRef(() => B)) private readonly b: B`. Nest then resolves the pair after both registrations are in the container. The cycle still couples the two classes. `forwardRef` only makes construction possible.
 
 **Trade-offs:**
 
-`forwardRef` is a quick fix that keeps tight coupling. Extracting shared logic or using events removes the cycle but needs a design change.
+`forwardRef` is a small change and leaves the coupling in place. Extracting the shared work, or publishing an event, removes the cycle and requires a design change.
 
 **Follow-up:**
 
-Can you put `forwardRef` on only one side?
+Can you put `forwardRef` on only one side of the cycle?
 
-Answer: No. Both sides of the cycle need it; otherwise the side without it can still receive `undefined`.
+Answer: No. Both sides need it. The side without it can still receive `undefined`.
 
 ### NEST-126 — Circular module imports
 
@@ -532,19 +533,19 @@ Answer: No. Both sides of the cycle need it; otherwise the side without it can s
 
 **Question:**
 
-How do you resolve circular imports between two modules?
+How do you resolve a circular import between two modules?
 
 **Answer:**
 
-Use `forwardRef` in both modules: `imports: [forwardRef(() => CatsModule)]`. Separate from DI, circular TypeScript file imports can also leave a class `undefined` at decoration time.
+Wrap each side's import in `forwardRef`: `imports: [forwardRef(() => CatsModule)]` in one module and the same pattern pointing back from the other. Nest then finishes registering both modules before it wires the imports. That is separate from a cycle between files. If two TypeScript files import each other, the class can be `undefined` at the moment a decorator runs, and `forwardRef` in `@Module()` does not fix a class that was never initialized.
 
 **Follow-up:**
 
-Which file-level pattern commonly causes accidental cycles?
+Which file-level pattern commonly creates an accidental cycle?
 
-Answer: Barrel files (`index.ts`) that re-export everything. Importing from a barrel inside the same feature can create a file-level cycle; import directly from the source file instead.
+Answer: A barrel file, `index.ts`, that re-exports everything in the feature. Importing that barrel from inside the same feature can cycle. Import the source file directly.
 
-### NEST-127 — Alternatives to `forwardRef`
+### NEST-127 — Alternatives to forwardRef
 
 **Difficulty:** Senior
 
@@ -556,17 +557,17 @@ What alternatives to `forwardRef` would you consider for a circular dependency?
 
 **Answer:**
 
-Extract the shared logic into a third service or module that both depend on, communicate through events (`EventEmitter2` or CQRS), merge tightly coupled providers, or look up one side lazily with `ModuleRef.get()`.
+Move the shared behavior into a third provider or module that both sides depend on, so the arrow points one way. Or stop calling each other and publish an event through `EventEmitter2` or a CQRS bus. If the two classes are always used together, merge them. A last resort is to inject `ModuleRef` and call `get()` at the moment you need the other side, so the constructor does not require it. Each option removes the cycle from construction. The right one depends on whether the two sides actually need a direct call.
 
 **Trade-offs:**
 
-Events decouple modules but make control flow harder to trace. A shared third module is explicit, but adds another unit to maintain.
+Events remove the constructor cycle and make the flow harder to follow in a debugger. A third module is explicit and adds another unit to maintain.
 
 **Follow-up:**
 
 Why treat a circular dependency as a design smell?
 
-Answer: It usually means two units share responsibilities that belong in a third, and cycles make initialization order and testing fragile.
+Answer: It usually means two units share a responsibility that belongs in a third. Cycles also make initialization order and tests fragile.
 
 ### NEST-128 — Debugging "can't resolve dependencies"
 
@@ -576,19 +577,19 @@ Answer: It usually means two units share responsibilities that belong in a third
 
 **Question:**
 
-How do you debug "Nest can't resolve dependencies of X (?)"?
+How do you debug Nest's "can't resolve dependencies of X (?)" error?
 
 **Answer:**
 
-The `?` marks the failing parameter index. Check that the provider is in `providers`, that the owning module exports it and the consumer's module imports that module, that the `@Inject` token matches, that no circular import yields `undefined`, and that scopes are consistent.
+The `?` is the constructor parameter Nest could not resolve, counted from the left. Check that parameter's token in order. The class or custom provider must appear in some `providers` array. If it is provided by another module, that module must export it and this module must import that module. The `@Inject()` token must be the same value that was registered. A circular file import can make the token `undefined` at decoration time. A request-scoped dependency also changes the consumer's scope, which is worth confirming when the graph is large.
 
 **Follow-up:**
 
-What tooling helps visualize the module graph?
+What tooling shows the module graph?
 
-Answer: Nest Devtools (`@nestjs/devtools-integration`) shows modules, providers, and their dependencies as a graph.
+Answer: Nest Devtools, through `@nestjs/devtools-integration`, draws modules, providers, and their dependencies as a graph.
 
-### NEST-129 — The `forRoot()` convention
+### NEST-129 — The forRoot() convention
 
 **Difficulty:** Junior
 
@@ -600,15 +601,15 @@ What is the `forRoot()` convention for dynamic modules?
 
 **Answer:**
 
-A static method returning a `DynamicModule` that configures the module once at the application root, for example `ConfigModule.forRoot({ isGlobal: true })` or `TypeOrmModule.forRoot(...)`.
+`forRoot()` is a static method that returns a `DynamicModule` and is called once from the application root. `ConfigModule.forRoot({ isGlobal: true })` and `TypeOrmModule.forRoot(...)` are the familiar examples. The method closes over the options and registers the providers those options imply. The name is a convention, not a Nest feature. It tells the next reader that this configuration is application-wide and should appear in one place, usually `AppModule`.
 
 **Follow-up:**
 
-How does it differ from `register()`?
+How does `forRoot()` differ from `register()`?
 
-Answer: `register()` configures the module per importing module, so different consumers can have different options. `forRoot()` is meant for a single app-wide configuration.
+Answer: `register()` is meant to be called by each feature that imports the module, so those features can pass different options. `forRoot()` is meant to run once for the whole application.
 
-### NEST-130 — `forRootAsync()`
+### NEST-130 — forRootAsync()
 
 **Difficulty:** Senior
 
@@ -620,15 +621,15 @@ What is `forRootAsync()`, and why does it exist?
 
 **Answer:**
 
-It is the async variant of `forRoot` supporting `useFactory`, `useClass`, and `useExisting`, plus `imports` and `inject`. Options can then depend on other providers such as `ConfigService`: `forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (cfg) => ({ url: cfg.get('DB') }) })`.
+`forRootAsync()` is the form of `forRoot()` that can wait for other providers. It accepts `useFactory`, `useClass`, or `useExisting`, plus `imports` and `inject`, and returns a dynamic module whose options provider is async. A factory can then read `ConfigService`: `forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (cfg) => ({ url: cfg.get('DB') }) })`. It exists because the options are often not known as literals in `AppModule`. They come from the environment through a provider that Nest has to construct first.
 
 **Follow-up:**
 
-Why can't you just pass `ConfigService` values to `forRoot()`?
+Why can you not pass `ConfigService` values into the synchronous `forRoot()`?
 
-Answer: `forRoot()` runs when the module metadata is evaluated, before the DI container exists, so providers like `ConfigService` are not available yet.
+Answer: `forRoot()` runs while the module metadata is being evaluated, before the container has created any providers. `ConfigService` does not exist yet.
 
-### NEST-131 — `forFeature()`
+### NEST-131 — forFeature()
 
 **Difficulty:** Junior
 
@@ -640,15 +641,15 @@ What does `forFeature()` conventionally do?
 
 **Answer:**
 
-It registers feature-scoped providers on top of a root configuration, such as `TypeOrmModule.forFeature([User])` creating the `User` repository or `MongooseModule.forFeature([...])` creating models.
+`forFeature()` registers the providers a single feature needs on top of a connection or client that `forRoot()` already configured. `TypeOrmModule.forFeature([User])` creates the `User` repository provider. `MongooseModule.forFeature([...])` does the same for models. The feature module imports that dynamic module and injects the repository. It does not open another database connection. The split keeps connection setup in one root module and lets each feature declare only the entities it uses.
 
 **Follow-up:**
 
-How do `forRoot` and `forFeature` usually split responsibility?
+How do `forRoot` and `forFeature` usually split the work?
 
-Answer: `forRoot` sets up the shared resource, like the connection, once. `forFeature` adds per-feature slices that use it.
+Answer: `forRoot` creates the shared resource, such as the connection, once. `forFeature` adds the per-feature pieces that use it.
 
-### NEST-132 — `register` vs `forRoot` vs `forFeature`
+### NEST-132 — register vs forRoot vs forFeature
 
 **Difficulty:** Intermediate
 
@@ -656,19 +657,19 @@ Answer: `forRoot` sets up the shared resource, like the connection, once. `forFe
 
 **Question:**
 
-What naming conventions distinguish `register`, `forRoot`, and `forFeature` on dynamic modules?
+What naming conventions distinguish `register`, `forRoot`, and `forFeature` on a dynamic module?
 
 **Answer:**
 
-`register*` configures the module separately for each consumer, `forRoot*` configures it once app-wide, and `forFeature*` adds feature-specific providers. These are conventions, not enforced by Nest, and each has an `*Async` form.
+These names are conventions Nest does not enforce. `register` and `registerAsync` mean each importing module can pass its own options. `forRoot` and `forRootAsync` mean the module is configured once for the application. `forFeature` and `forFeatureAsync` mean "add the providers this feature needs," usually after a root configuration. The `Async` suffix means the options come from `useFactory`, `useClass`, or `useExisting` rather than from a literal object. Pick the name that matches how many times the method should be called.
 
 **Follow-up:**
 
-Which would you pick for an HTTP client module with different base URLs per feature?
+Which would you pick for an HTTP client used with a different base URL in each feature?
 
-Answer: `register()` (as with `HttpModule.register`), because each importing module needs its own options.
+Answer: `register()`, the same idea as `HttpModule.register`. Each importing module needs its own options.
 
-### NEST-133 — Shape of a `DynamicModule`
+### NEST-133 — Shape of a DynamicModule
 
 **Difficulty:** Senior
 
@@ -676,19 +677,19 @@ Answer: `register()` (as with `HttpModule.register`), because each importing mod
 
 **Question:**
 
-What does a `DynamicModule` object contain, and how does it combine with `@Module()` metadata?
+What does a `DynamicModule` object contain, and how does it combine with the metadata already on `@Module()`?
 
 **Answer:**
 
-It has a required `module` class and optional `imports`, `providers`, `controllers`, `exports`, and `global`. The dynamic metadata extends, not overrides, whatever the `@Module()` decorator already declares.
+A `DynamicModule` must include `module`, the module class, and it may include `imports`, `providers`, `controllers`, `exports`, and `global`. Nest merges that object with the metadata already declared by `@Module()` on the class. The dynamic fields extend the static ones. They do not wipe them out. A provider listed on the class and a provider returned from `forRoot()` are both registered. `global: true` is the dynamic equivalent of `@Global()`.
 
 **Follow-up:**
 
 How do you re-export a dynamic module from another module?
 
-Answer: Export the module class itself, for example `exports: [DatabaseModule]`, not the `DatabaseModule.forRoot(...)` call.
+Answer: Put the module class in `exports`, for example `exports: [DatabaseModule]`. Do not call `DatabaseModule.forRoot(...)` again in the exports array.
 
-### NEST-134 — `ConfigurableModuleBuilder`
+### NEST-134 — ConfigurableModuleBuilder
 
 **Difficulty:** Senior
 
@@ -696,17 +697,17 @@ Answer: Export the module class itself, for example `exports: [DatabaseModule]`,
 
 **Question:**
 
-What does `ConfigurableModuleBuilder` generate, and why use it?
+What does `ConfigurableModuleBuilder` generate, and why would you use it?
 
 **Answer:**
 
-`new ConfigurableModuleBuilder<Opts>().build()` returns `ConfigurableModuleClass`, `MODULE_OPTIONS_TOKEN`, `OPTIONS_TYPE`, and `ASYNC_OPTIONS_TYPE`. Your module extends the class and gets `register` and `registerAsync` (with `useFactory`, `useClass`, `useExisting`) without hand-written boilerplate.
+`ConfigurableModuleBuilder` writes the dynamic-module boilerplate for you. `new ConfigurableModuleBuilder<Options>().build()` returns a `ConfigurableModuleClass`, a `MODULE_OPTIONS_TOKEN`, and the types `OPTIONS_TYPE` and `ASYNC_OPTIONS_TYPE`. Your module class extends `ConfigurableModuleClass`. Callers then get `register` and `registerAsync`, including `useFactory`, `useClass`, and `useExisting`, without you hand-writing those methods. Use it when you are publishing a module that other applications configure. The builder keeps the options token and the method names consistent.
 
 **Follow-up:**
 
-How does a service read the options?
+How does a service read the options the caller passed?
 
-Answer: Inject them with `@Inject(MODULE_OPTIONS_TOKEN) private options: typeof OPTIONS_TYPE`.
+Answer: Inject the generated token: `@Inject(MODULE_OPTIONS_TOKEN) private readonly options: typeof OPTIONS_TYPE`.
 
 ### NEST-135 — Customizing the builder
 
@@ -716,17 +717,17 @@ Answer: Inject them with `@Inject(MODULE_OPTIONS_TOKEN) private options: typeof 
 
 **Question:**
 
-How do you change the generated method names or add extra module-level options such as `isGlobal`?
+How do you change the generated method names, or add an extra module-level option such as `isGlobal`?
 
 **Answer:**
 
-Use `.setClassMethodName('forRoot')` to get `forRoot`/`forRootAsync`, and `.setFactoryMethodName('createOptions')` to rename the factory method for `useClass`. `.setExtras({ isGlobal: false }, (def, extras) => ({ ...def, global: extras.isGlobal }))` adds options that shape the module definition rather than the injected options.
+`.setClassMethodName('forRoot')` renames the generated methods to `forRoot` and `forRootAsync`. `.setFactoryMethodName('createOptions')` renames the method `useClass` will call when building options. `.setExtras({ isGlobal: false }, (definition, extras) => ({ ...definition, global: extras.isGlobal }))` adds fields that change the module definition itself. `isGlobal` is a common extra because it belongs on the dynamic module, as `global: true`, and not inside the options object your service injects.
 
 **Follow-up:**
 
 Are extras part of `MODULE_OPTIONS_TOKEN`?
 
-Answer: No. Extras only feed the transform function that builds the dynamic module and are excluded from the injected options.
+Answer: No. Extras are passed only to the transform that builds the dynamic module. They are left out of the injected options.
 
 ### NEST-136 — Sync and async options with one token
 
@@ -736,19 +737,19 @@ Answer: No. Extras only feed the transform function that builds the dynamic modu
 
 **Question:**
 
-How does the builder-generated module support both `register()` and `registerAsync()` with a single injection token?
+How does a module generated by the builder support both `register()` and `registerAsync()` with a single injection token?
 
 **Answer:**
 
-Both paths provide `MODULE_OPTIONS_TOKEN`. `register({...})` registers a `useValue`; `registerAsync({ useFactory | useClass | useExisting, inject, imports })` registers a factory-based provider. Consumers inject the same token either way.
+Both methods provide the same `MODULE_OPTIONS_TOKEN`. `register({ ... })` registers that token with `useValue` set to the object the caller passed. `registerAsync({ useFactory, useClass, or useExisting, plus inject and imports })` registers a factory-based provider for the same token and awaits it during startup. A service injects `MODULE_OPTIONS_TOKEN` and does not care which method the host used. That is why one constructor works for both the sync and the async setup.
 
 **Follow-up:**
 
-Which types give you typed options in each case?
+Which types describe the options in each case?
 
-Answer: `typeof OPTIONS_TYPE` for sync options and `typeof ASYNC_OPTIONS_TYPE` for the async registration shape.
+Answer: `typeof OPTIONS_TYPE` is the synchronous options object. `typeof ASYNC_OPTIONS_TYPE` is the shape of the async registration, not the resolved options.
 
-### NEST-137 — `exports`
+### NEST-137 — exports
 
 **Difficulty:** Junior
 
@@ -760,13 +761,13 @@ What does the `exports` array in `@Module()` do?
 
 **Answer:**
 
-It makes the module's providers, or re-exported modules, visible to any module that imports it. Providers are encapsulated by default, so non-exported providers stay private to their module.
+Providers are private to the module that declares them. `exports` is the public list. Anything you name there, a provider token or a module you are re-exporting, becomes injectable in modules that import this one. A provider that is not exported can still be injected by controllers and providers inside its own module. It stays invisible outside. Export the token you registered, the class, symbol, or string, rather than an instance you constructed yourself.
 
 **Follow-up:**
 
 What exactly do you put in `exports`?
 
-Answer: The provider token you registered (class, symbol, or string), not an instance.
+Answer: The provider token you registered, a class, a symbol, or a string. Not an instance.
 
 ### NEST-138 — Re-exporting modules
 
@@ -776,19 +777,19 @@ Answer: The provider token you registered (class, symbol, or string), not an ins
 
 **Question:**
 
-Can a module re-export a module it imports, and why would you?
+Can a module re-export another module it imports, and why would you?
 
 **Answer:**
 
-Yes: `exports: [CommonModule]` passes through everything `CommonModule` exports to modules that import this one. It is used for shared or barrel modules such as `CoreModule`.
+Yes. `exports: [CommonModule]` forwards everything `CommonModule` exports to any module that imports yours. Your module does not have to re-list those providers. This is how a shared module such as `CoreModule` gathers logging, config, and similar imports and presents them as one import. The consumer depends on `CoreModule`. It does not need to know which inner module provided each token.
 
 **Follow-up:**
 
-Does re-exporting expose the inner module's private providers?
+Does re-exporting expose providers that the inner module kept private?
 
-Answer: No. Only what the inner module itself exports is re-exported.
+Answer: No. Only the tokens the inner module itself exports are forwarded.
 
-### NEST-139 — `@Global()` modules
+### NEST-139 — @Global() modules
 
 **Difficulty:** Senior
 
@@ -800,17 +801,17 @@ What does `@Global()` do, and when is it appropriate?
 
 **Answer:**
 
-A global module's exports are injectable everywhere without importing the module in each consumer. The module must still be imported once, usually in the root module. It fits cross-cutting infrastructure such as config, logging, or database access.
+`@Global()` makes a module's exports injectable in every module without a further import. The global module still has to be imported once, almost always by the root module, so that Nest actually registers it. It fits infrastructure that truly is application-wide, such as configuration, logging, or the database connection. Feature services should stay behind a normal import, because an import is the documentation of the dependency.
 
 **Trade-offs:**
 
-Global modules cut import boilerplate but hide dependencies and weaken encapsulation, so features appear to need nothing yet silently rely on the global.
+A global module removes repeated imports and hides the dependency. A feature looks self-contained while it silently relies on the global provider, which makes the graph harder to test and to move.
 
 **Follow-up:**
 
-Is making every shared module global a good shortcut?
+Is marking every shared module `@Global()` a good shortcut?
 
-Answer: No. It makes the dependency graph implicit and harder to reason about and test. Keep `@Global()` for a small number of truly app-wide providers.
+Answer: No. The dependency graph becomes implicit and harder to test. Keep `@Global()` for a few providers that really are application-wide.
 
 ### NEST-140 — Global dynamic modules
 
@@ -824,13 +825,13 @@ How do you make a dynamic module global?
 
 **Answer:**
 
-Return `global: true` in the `DynamicModule`, which is equivalent to `@Global()`. With `ConfigurableModuleBuilder`, expose it via `setExtras({ isGlobal })`, giving the familiar `ConfigModule.forRoot({ isGlobal: true })`.
+Return `global: true` on the `DynamicModule`. That flag is the dynamic form of `@Global()`. With `ConfigurableModuleBuilder`, you usually expose it through `setExtras`, so the caller writes `ConfigModule.forRoot({ isGlobal: true })` and the extras transform copies that flag onto the module definition. The module is still imported once. After that, its exports can be injected anywhere without another import.
 
 **Follow-up:**
 
 Where do you import a global module?
 
-Answer: Once, typically in `AppModule`. After that its exports are available application-wide.
+Answer: Once, typically in `AppModule`. After that import, its exports are available across the application.
 
 ### NEST-141 — Provider visibility across modules
 
@@ -844,13 +845,13 @@ How does Nest decide whether a provider is visible to a consumer in another modu
 
 **Answer:**
 
-A provider is injectable inside its declaring module and in any module that imports a module exporting it. Controllers and providers resolve dependencies from their own module's scope; global modules are the exception.
+A provider is visible in the module that declares it. It is also visible in a module that imports some module which exports that provider. Controllers and providers look up dependencies in their own module's context, so a provider that exists somewhere else in the process is still invisible until that chain is in place. `@Global()` is the exception: after the global module is imported once, its exports skip the per-module import. Visibility is about the module graph, not about whether the class file was imported in TypeScript.
 
 **Follow-up:**
 
-What are the two most common causes of "can't resolve" across modules?
+What are the two most common causes of "can't resolve dependencies" across modules?
 
-Answer: The providing module does not export the provider, or the consuming module does not import the providing module.
+Answer: The providing module never exported the token, or the consuming module never imported the providing module.
 
 ### NEST-142 — Overriding providers in tests
 
@@ -864,15 +865,15 @@ How do you replace a provider with a mock in an integration test?
 
 **Answer:**
 
-`Test.createTestingModule({ imports: [AppModule] }).overrideProvider(CatsService).useValue(mock).compile()`. You can also chain `.useClass(Fake)` or `.useFactory({ factory, inject })`.
+Build the testing module, override the token, and compile: `Test.createTestingModule({ imports: [AppModule] }).overrideProvider(CatsService).useValue(mock).compile()`. The same override accepts `.useClass(Fake)` or `.useFactory({ factory, inject })` when the fake needs real dependencies. The rest of the graph is the real application. Only that token is replaced, wherever it was provided. The override has to be registered before `compile()`, because compile is when Nest builds the container.
 
 **Follow-up:**
 
 When must the override be declared?
 
-Answer: Before `compile()`. The rest of the graph is real, so only the overridden token is replaced.
+Answer: Before `compile()`. After that the container is already built. Everything except the overridden token stays real.
 
-### NEST-143 — Overriding guards, modules, and global enhancers
+### NEST-143 — Overriding guards and modules
 
 **Difficulty:** Staff
 
@@ -880,17 +881,17 @@ Answer: Before `compile()`. The rest of the graph is real, so only the overridde
 
 **Question:**
 
-Beyond providers, what can you override in a testing module, and how do you handle a global guard?
+Beyond providers, what can a testing module override, and how do you replace a global guard?
 
 **Answer:**
 
-`overrideGuard`, `overrideInterceptor`, `overridePipe`, and `overrideFilter` (each with `useValue`, `useClass`, or `useFactory`), plus `overrideModule(M).useModule(Fake)`. For a global guard, register `{ provide: APP_GUARD, useExisting: AuthGuard }` with `AuthGuard` as a normal provider, then override `AuthGuard`.
+`overrideGuard`, `overrideInterceptor`, `overridePipe`, and `overrideFilter` each accept `useValue`, `useClass`, or `useFactory`. `overrideModule(RealModule).useModule(FakeModule)` swaps a whole module. A global guard is harder, because `APP_GUARD` is the token Nest actually registered. Provide `{ provide: APP_GUARD, useExisting: AuthGuard }` and list `AuthGuard` as a normal provider, then `overrideProvider(AuthGuard)`. Overriding the class replaces the instance the global token points at.
 
 **Follow-up:**
 
-Can you override a guard added with `app.useGlobalGuards(new G())`?
+Can you override a guard that was added with `app.useGlobalGuards(new Guard())`?
 
-Answer: No. It is created outside DI, so the testing module has no token to replace; use the `APP_GUARD` provider approach instead.
+Answer: No. That instance was created outside the container, so the testing module has no token to replace. Register `APP_GUARD` instead.
 
 ### NEST-144 — Testing request-scoped providers
 
@@ -900,19 +901,19 @@ Answer: No. It is created outside DI, so the testing module has no token to repl
 
 **Question:**
 
-How do you obtain a request-scoped provider in a unit test?
+How do you obtain a request-scoped provider inside a unit test?
 
 **Answer:**
 
-`get()` does not work for scoped providers; use `await moduleRef.resolve(Service)`, optionally with a `contextId`. To supply a fake request, call `moduleRef.registerRequestByContextId({ headers }, contextId)` before resolving.
+`moduleRef.get()` only returns singletons, so a request-scoped provider has to be loaded with `await moduleRef.resolve(Service)`. Pass a `ContextId` when several resolves must share one sub-tree. If the provider injects `REQUEST`, create an id, register a fake request with `moduleRef.registerRequestByContextId({ headers }, contextId)`, and then resolve with that id. The fake request is what `@Inject(REQUEST)` receives. Without it, a context you created yourself has no request object.
 
 **Follow-up:**
 
 What error do you get if you call `get()` anyway?
 
-Answer: Nest throws that the provider is marked as scoped and cannot be retrieved with `get()`, pointing you to `resolve()`.
+Answer: Nest throws that the provider is marked as scoped and cannot be retrieved with `get()`, and it points you at `resolve()`.
 
-### NEST-145 — DI in middleware
+### NEST-145 — Dependency injection in middleware
 
 **Difficulty:** Senior
 
@@ -924,15 +925,15 @@ How does dependency injection work for middleware?
 
 **Answer:**
 
-Class middleware implementing `NestMiddleware` is `@Injectable()` and receives constructor dependencies from its module when applied with `consumer.apply(LoggerMiddleware).forRoutes(...)`. Functional middleware has no DI.
+Class middleware that implements `NestMiddleware` is marked `@Injectable()`. When a module applies it with `consumer.apply(LoggerMiddleware).forRoutes(...)`, Nest constructs it from that module's injector, so constructor dependencies are resolved the same way as any other provider. The module that calls `apply` must be able to see those dependencies, which means it provides them or imports a module that exports them. A function passed to `apply` has no constructor, so it receives no injection. It can close over a service that `configure` already injected.
 
 **Follow-up:**
 
-Does middleware registered with `app.use()` get DI?
+Does middleware registered with `app.use()` get dependency injection?
 
-Answer: No. `app.use()` registers a plain function or instance outside the container; use `consumer.apply()` in a module for DI.
+Answer: No. `app.use()` registers a function or an instance you already constructed, outside the container. Use `consumer.apply()` when the middleware needs injection.
 
-### NEST-146 — Guards and `APP_GUARD`
+### NEST-146 — Guards and APP_GUARD
 
 **Difficulty:** Senior
 
@@ -940,19 +941,19 @@ Answer: No. `app.use()` registers a plain function or instance outside the conta
 
 **Question:**
 
-How do guards receive dependencies, and how do you make a global guard injectable?
+How do guards receive their dependencies, and how do you register a global guard that still gets dependency injection?
 
 **Answer:**
 
-With `@UseGuards(AuthGuard)` Nest instantiates the guard in the module context, so constructor DI works. `app.useGlobalGuards(new G())` bypasses DI; instead register `{ provide: APP_GUARD, useClass: AuthGuard }` in any module.
+`@UseGuards(AuthGuard)` passes the class. Nest instantiates that class in the module that declared the controller or the method, so constructor injection works, including `Reflector`. `app.useGlobalGuards(new AuthGuard())` passes an instance you built, and that instance never enters the container. To keep a global guard injectable, register `{ provide: APP_GUARD, useClass: AuthGuard }` in any module. Nest constructs it during startup and runs it for every route.
 
 **Follow-up:**
 
-Do other enhancers have equivalent tokens?
+Do interceptors, pipes, and exception filters have the same kind of token?
 
-Answer: Yes: `APP_INTERCEPTOR`, `APP_PIPE`, and `APP_FILTER`.
+Answer: Yes. The tokens are `APP_INTERCEPTOR`, `APP_PIPE`, and `APP_FILTER`.
 
-### NEST-147 — DI in interceptors, pipes, and filters
+### NEST-147 — Dependency injection in interceptors, pipes, and filters
 
 **Difficulty:** Senior
 
@@ -960,17 +961,17 @@ Answer: Yes: `APP_INTERCEPTOR`, `APP_PIPE`, and `APP_FILTER`.
 
 **Question:**
 
-How do interceptors, pipes, and exception filters use DI?
+How do interceptors, pipes, and exception filters receive dependencies?
 
 **Answer:**
 
-When referenced by class in decorators they are instantiated by the container with dependencies from the declaring module. Instances created with `new X()` skip DI. Global versions need the `APP_*` provider tokens.
+When a decorator names the class, `@UseInterceptors(LoggingInterceptor)` and the equivalent for pipes and filters, Nest constructs that class from the module that declared the controller. Constructor dependencies are resolved there. An object you pass in, or an instance you create with `new`, is used as-is and receives nothing. The same split applies globally. `APP_INTERCEPTOR`, `APP_PIPE`, and `APP_FILTER` are constructed by the container. `useGlobalInterceptors(new LoggingInterceptor())` and its pipe and filter equivalents are not.
 
 **Follow-up:**
 
 What happens if an interceptor depends on a request-scoped provider?
 
-Answer: The interceptor becomes request-scoped and is created for each request that uses it.
+Answer: The interceptor becomes request-scoped and is created again for each request that uses it.
 
 ### NEST-148 — Scope of global enhancers
 
@@ -980,21 +981,21 @@ Answer: The interceptor becomes request-scoped and is created for each request t
 
 **Question:**
 
-How does scope affect `APP_GUARD`, `APP_INTERCEPTOR`, and similar global enhancers?
+What does scope mean for `APP_GUARD`, `APP_INTERCEPTOR`, and the other global enhancers?
 
 **Answer:**
 
-If the enhancer provider is request-scoped, or depends on a request-scoped provider, Nest instantiates it per request. Otherwise it is a singleton.
+A global enhancer registered with `useClass` or `useFactory` follows ordinary scope rules. If that provider is request-scoped, or if it depends on a request-scoped provider, Nest constructs it per request and stores it on the per-request enhancer list. Otherwise it is one singleton on the static global list, created at startup and reused for every route. A request-scoped global guard does not pull controllers into request scope. Bubbling follows who injects whom, and a controller does not inject the guard.
 
 **Trade-offs:**
 
-Per-request access to context in a global guard is convenient, but it adds instantiation cost to every route, so it is better to read from the `ExecutionContext` or a singleton lookup.
+A request-scoped global guard can hold per-request collaborators, and it pays construction cost on every route. Reading the `ExecutionContext`, or looking up context from a singleton, keeps the guard shared.
 
 **Follow-up:**
 
 Does a request-scoped global guard make every controller request-scoped?
 
-Answer: No. The guard is created per request, but controllers stay singletons unless they depend on request-scoped providers themselves.
+Answer: No. The guard is created per request. A controller stays a singleton unless it depends on a request-scoped provider itself.
 
 ### NEST-149 — Lifecycle hooks and scoped providers
 
@@ -1004,19 +1005,19 @@ Answer: No. The guard is created per request, but controllers stay singletons un
 
 **Question:**
 
-What lifecycle-hook caveat applies to request-scoped providers?
+Which lifecycle hooks run for a request-scoped provider, and which do not?
 
 **Answer:**
 
-`onModuleInit`, `onApplicationBootstrap`, and `onModuleDestroy` are not invoked for request-scoped providers, because those instances are not created during bootstrap. Do initialization in the constructor or an explicit method.
+`onModuleInit`, `onApplicationBootstrap`, and `onModuleDestroy` run for providers Nest creates while the application is starting and shutting down. A request-scoped instance does not exist at startup, so those hooks are not called on it, and there is no per-request destroy hook either. Put work that must happen for each instance in the constructor, or in a method the owner of the request calls. A singleton that collaborates with request-scoped services can still use the normal hooks, because the singleton itself is created at startup.
 
 **Follow-up:**
 
-Where do you release resources held by a request-scoped provider?
+Where do you release a resource held by a request-scoped provider?
 
-Answer: Call an explicit cleanup from the code that owns the request flow (for example an interceptor's `finalize`) or hook into the response `close` event, since no destroy hook runs.
+Answer: Call a cleanup method from the code that owns the request, such as an interceptor's `finalize`, or listen for the response `close` event. No destroy hook runs for that instance.
 
-### NEST-150 — `LazyModuleLoader`
+### NEST-150 — LazyModuleLoader
 
 **Difficulty:** Senior
 
@@ -1024,18 +1025,18 @@ Answer: Call an explicit cleanup from the code that owns the request flow (for e
 
 **Question:**
 
-What is `LazyModuleLoader`, and what are its limitations?
+What is `LazyModuleLoader`, and what can it not do?
 
 **Answer:**
 
-It loads a module on demand at runtime, which helps cold starts in serverless or for rarely used features: `const { LazyModule } = await import('./lazy.module'); const ref = await this.lazyModuleLoader.load(() => LazyModule); const svc = ref.get(LazyService);`. Controllers, gateways, and resolvers cannot be lazy-loaded, global enhancers from lazy modules are not applied, and lifecycle hooks are not invoked.
+`LazyModuleLoader` loads a module when you ask, instead of during bootstrap. That shortens a cold start in serverless, or defers a feature that most requests never touch. The call is `const { LazyModule } = await import('./lazy.module')`, then `const ref = await this.loader.load(() => LazyModule)`, then `ref.get(LazyService)`. Controllers, gateways, and resolvers inside the lazy module are not registered as entry points. Global enhancers from that module are not applied. Lifecycle hooks on its providers are not invoked. You get a `ModuleRef` and the providers you can look up from it.
 
 **Trade-offs:**
 
-Lazy loading shortens startup but moves the module's initialization cost to its first use, so that first call is slower.
+Startup gets shorter, and the first call pays the initialization cost that bootstrap would have paid. That first call is slower than the ones after it.
 
 **Follow-up:**
 
 Is the module loaded again on every `load()` call?
 
-Answer: No. Nest caches the loaded module, so later calls return the existing `ModuleRef`.
+Answer: No. Nest caches the loaded module. Later calls return the existing `ModuleRef`.

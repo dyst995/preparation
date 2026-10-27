@@ -21,17 +21,46 @@ See [STUDY_GUIDE.md](./STUDY_GUIDE.md). Section map and per-question links: [IND
 
 ## Answer length and formatting — mandatory
 
-Keep every interview answer concise and focused. This is a **compact senior-level interview reference**, not a textbook. Every answer should be easy to read, remember, and explain aloud.
+This is a **senior-level interview reference**. Answers must be easy to understand, remember, and say aloud—not expert shorthand.
+
+### Clarity and readability (mandatory)
+
+1. **Use natural, conversational English.** Write the way an experienced senior engineer explains ideas in a real interview.
+2. **Prioritize understanding over terminology.** Say what it is, how it works, and why it matters. Use technical terms only when they help.
+3. **Avoid compressed technical shorthand.** Do not pack several complex ideas into dense jargon-heavy sentences.
+4. **Keep answers concise but understandable.** Aim for 50–100 words; use fewer when enough. Never sacrifice clarity just to be shorter.
+5. **Explain complex internals progressively.** Simple definition → mechanism → practical significance.
+6. **Avoid unnecessary repetition.** Every sentence should add useful information.
+7. **Preserve senior-level accuracy.** Plain language is not an excuse for superficial or wrong explanations.
+8. **Optimize for spoken interviews.** Easy to read aloud and explain naturally.
+
+**Goal:** as easy to understand as possible while remaining concise and accurate—not as short as possible.
+
+#### Bad vs good
+
+**Question:** What is React Fiber?
+
+**Bad (compressed shorthand):**
+> A fiber is the mutable work node for one instance (type, props, hook list, child/sibling/return, commit flags). Elements are cheap per-render descriptions. Fiber lets React pause/resume/abandon work instead of a recursive stack walk.
+
+**Good (clear interview answer):**
+> React Fiber is React's internal architecture for managing rendering and updates. Each Fiber node represents part of the UI and stores information about its state, props, and relationships to other nodes.
+>
+> Fiber lets React divide rendering into smaller units, prioritize important updates, and interrupt rendering work when necessary.
+>
+> React maintains a current tree and a work-in-progress tree. Once the new work is ready, React commits the changes.
+
+### Structure
 
 | Section | Rule |
 |---|---|
 | **Question** | 1–3 sentences. Fold essential constraints into the question; no long “Context” block. |
-| **Answer** | 50–100 words maximum, preferably shorter. |
+| **Answer** | 50–100 words, clear and spoken-friendly. Prefer clarity over minimum length. |
 | **Code** | Only when necessary; ideally under 10 lines. Omit otherwise. |
-| **Follow-up** | One short question with a 1–3 sentence answer. |
+| **Follow-up** | One short question with a 1–3 sentence answer (same clarity rules). |
 | **Trade-offs** | Only when they materially affect the decision. Omit otherwise. |
 
-Do **not** use separate Context, Practical Implementation, Common Mistakes, or multi-paragraph essay sections. Do not sacrifice technical accuracy or omit critical qualifications just to meet the word limit. Avoid repetitive explanations, unnecessary background, and lengthy sections.
+Do **not** use separate Context, Practical Implementation, Common Mistakes, or multi-paragraph essay sections.
 
 ### Per-question template
 

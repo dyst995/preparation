@@ -18,7 +18,7 @@ A candidate says "everything in Node runs in the global scope, like a browser sc
 
 **Answer:**
 
-An execution context is the ECMAScript record for code under evaluation: realm, lexical environment, and (for calls) `this`. Spec kinds: global, module, function, and eval. Node wraps CommonJS in a function, so the file top is a function context—top-level `var` is not on `globalThis`. An ES module runs as a module context; top-level `var` stays in the module environment. The realm's global context still exists (`globalThis`); your file is not that context. Direct `eval` uses the caller's environment; indirect `eval` / `new Function` use the global.
+An execution context is the record ECMAScript uses to track the code that is currently running. It holds the realm, the lexical environment, and, for function calls, the value of `this`. The spec defines global, module, function, and eval contexts. Node wraps each CommonJS file in a function, so the top of a CommonJS file is a function context, and a top-level `var` does not land on `globalThis`. An ES module runs in a module context, where `var` also stays local. The global context exists, but your file does not run in it.
 
 **Code:**
 
@@ -30,7 +30,7 @@ An execution context is the ECMAScript record for code under evaluation: realm, 
 
 Why does `'use strict'` at the top of a CommonJS file make an undeclared assignment throw?
 
-Answer: the wrapper is sloppy unless the file opts in; sloppy undeclared assignment creates a global. The directive makes the wrapper strict (`ReferenceError`). ES modules are strict by definition.
+Answer: The wrapper function is sloppy mode unless the file opts in, and in sloppy mode assigning to an undeclared name creates a global. With `'use strict'`, the same assignment throws a `ReferenceError`. ES modules are strict by definition, so they always throw.
 
 ### NODE-002 — One call stack per isolate, and where an async callback actually runs
 
@@ -44,7 +44,7 @@ Explain the JavaScript call stack in Node 20/22 (main thread only). A teammate s
 
 **Answer:**
 
-One agent has one execution-context stack; one V8 isolate has one JS heap and one JS stack. `fs.readFile` returns while the handler is still on the stack; libuv may run the OS read on the thread pool (native C stacks, no JS). The callback is queued and later pushed as a new turn on the main isolate's single stack when it is clear. ECMAScript runs one job to completion; the host schedules the next. A second JS stack needs `worker_threads` (new isolate). The pool never runs your closures.
+A V8 isolate has one heap and one JavaScript call stack, and the main thread has exactly one isolate. When you call `fs.readFile`, the function returns right away. libuv may do the actual disk read on a thread pool thread, but that thread runs only native code, never your JavaScript. When the read finishes, the callback is queued and later runs as a fresh turn on the main stack, once that stack is empty. A second JavaScript stack would need `worker_threads`, which creates a separate isolate.
 
 **Code:**
 
@@ -57,7 +57,7 @@ readFile(url, () => JSON.parse(/* later, main stack only */));
 
 What does `new Promise(executor)` do with the stack versus a `.then` callback?
 
-Answer: the executor runs synchronously on the current stack before `new Promise` returns. A `.then` reaction is a promise job (microtask) on a later turn of the same stack—not the libuv pool.
+Answer: The executor passed to `new Promise` runs synchronously, on the current stack, before the constructor returns. A `.then` callback is different: it runs later as a microtask on the same stack, after the current code finishes. Neither uses the libuv thread pool.
 
 ### NODE-003 — Why a synchronous loop stalls callbacks that are already finished
 
@@ -71,7 +71,7 @@ A handler calls `fs.readFile`, then runs a tight synchronous loop for tens of ms
 
 **Answer:**
 
-One agent runs a job to completion. While the handler frame is on the stack, Node starts no other JS turn—not the file callback, not promise reactions. libuv can finish the native read and queue the completion during the loop; the callback still waits until the stack clears. `readFileSync` never leaves the current frame: the thread blocks inside the call with no callback. Both delay other JS; async frees the stack only after your sync work ends, then delivers the already-finished read.
+JavaScript runs each job to completion. While your handler is on the stack, Node will not start any other JavaScript, including the file callback and promise reactions. libuv can finish the read in the background and queue the completion, but the callback waits until your loop ends and the stack is clear. `readFileSync` is different: the thread blocks inside the call and there is no callback at all. Both delay other work, but the async version simply delivers the finished result afterward.
 
 **Trade-offs:**
 
@@ -81,7 +81,7 @@ Chunk CPU work, use a Worker, or keep `readFileSync` for small startup reads—n
 
 Would `await` inside the loop let the file callback run between iterations?
 
-Answer: yes if the async function suspends and the caller returns so the stack can unwind. A bare `while` never suspends. Awaiting every iteration yields microtasks; it does not create a second stack.
+Answer: Only if each `await` waits on something that finishes in a later loop turn, such as `setImmediate`. Awaiting an already settled value runs only microtasks, and the file callback is not one. A plain `while` loop never yields.
 
 ### NODE-004 — Closures capture bindings, and the bindings stay live
 
@@ -95,7 +95,7 @@ Explain what a closure captures. A reviewer says the inner function "snapshots t
 
 **Answer:**
 
-A function stores `[[Environment]]`—the lexical environment where it was created—and resolves free identifiers there, not on the caller's chain. A binding is a location, not a copied value: `n += 1` mutates that location; every closure that closed over it sees the write. A real copy is `const snapshot = n` (second binding) or passing a primitive. Object mutation through a shared reference is visible without reassigning the binding. The outer frame pops; the environment stays while any capturing function remains reachable.
+A closure remembers the lexical environment where the function was created, and it looks up free variables there. A variable binding is a storage location, not a copied value. So when `n += 1` runs, every closure sharing that binding sees the new value. A real copy happens only when you make one, such as `const snapshot = n`. The outer function's frame disappears after it returns, but its environment stays alive as long as any closure that uses it is reachable.
 
 **Code:**
 
@@ -111,7 +111,7 @@ function makeCounter() {
 
 Why are ESM imports and closures both called "live bindings"?
 
-Answer: both read a binding at use time and see later writes. Mechanisms differ: closures hold a lexical environment; ESM imports are linked to the export binding by the loader.
+Answer: Both read the current value of a binding at the moment you use it, so they see later writes. The mechanisms differ. A closure holds a lexical environment, while an ES module import is linked to the exporting module's binding by the loader.
 
 ### NODE-005 — The loop closure is one binding or a binding per iteration
 
@@ -132,13 +132,13 @@ const values = reads.map((read) => read());
 
 **Answer:**
 
-`values` is `[3, 3, 3, 0, 1, 2]`. `var i` is one binding in the enclosing function/module/wrapper; every arrow shares it, so after the loop all read `3`. `for (let j)` creates a fresh declarative environment and `j` per iteration; each arrow captures that iteration's environment, so they read `0`, `1`, `2`. Nothing copied a number into the arrow—three locations, each left at that iteration's value. Delay (timers) is irrelevant; the shared `var` binding is.
+`values` is `[3, 3, 3, 0, 1, 2]`. With `var i`, there is one binding for the whole loop, so all three arrows read the same location, which ends at 3. With `for (let j ...)`, each iteration gets its own fresh binding, and each arrow captures its own. So `let` is not copying a number; it creates three separate locations, each holding the value from its iteration. Timers are irrelevant here. What matters is whether the binding is shared.
 
 **Follow-up:**
 
 If the `let` body is `reads.push(() => j++)` and each function is called twice, what happens?
 
-Answer: each function has its own `j`. First round returns `0,1,2` leaving `1,2,3`; second round returns those. With `var`, every function would share one location's writes.
+Answer: Each function owns its own `j`. On the first round they return 0, 1, and 2, and leave 1, 2, and 3 behind. The second round returns those. With `var`, all the functions would share one location and keep incrementing it.
 
 ### NODE-006 — A closure retained by module scope is a process-lifetime leak
 
@@ -152,7 +152,7 @@ A Node 22 HTTP service's `heapUsed` grows with traffic and does not fall after t
 
 **Answer:**
 
-Collection is reachability. A module-level array holding functions whose environments hold buffers keeps those buffers alive for the process (`require.cache` / ESM module map). The GC is not behind—it correctly retains reachable objects. `global.gc()` (only with `--expose-gc`) cannot make reachable buffers unreachable. Compare heap snapshots after quiet periods; expect module → array → closure → `Buffer`/backing store. Also watch `arrayBuffers`/`external`. Fix: drop references (bounded ring buffer or log and retain nothing), then re-snapshot.
+Garbage collection works on reachability: if something is still reachable, it stays. Here a module-level array holds functions, and each function's environment holds a large `Buffer`. The module lives for the whole process, so those buffers do too. The GC is not behind; it is correctly keeping reachable data, and `global.gc()` cannot help. Compare heap snapshots after quiet periods and look for the path from module to array to closure to `Buffer`, and watch `arrayBuffers` and `external`. The fix is to drop the references, for example with a bounded buffer or by logging instead of retaining.
 
 **Trade-offs:**
 
@@ -162,7 +162,7 @@ Ring buffer caps diagnostic memory; a log stream moves retention to the transpor
 
 The array was removed; snapshots still show request buffers. What next?
 
-Answer: other strong retainers—per-request listeners never removed, timers/sockets closing over the payload, pending promise maps, APM/logger args. Check `arrayBuffers` if wrappers are gone but stores remain.
+Answer: Look for other strong references: per-request listeners that were never removed, timers or sockets whose closures hold the payload, maps of pending promises, or logger and APM arguments. If the wrapper objects are gone but memory stays high, check the `arrayBuffers` number too.
 
 ### NODE-007 — Garbage collection at interview depth
 
@@ -176,7 +176,7 @@ How should a senior talk about GC in Node 20/22 for a long-lived HTTP process? C
 
 **Answer:**
 
-An object is collectable when unreachable from roots (stack, global, Node C++ handles: sockets, timers, modules). V8 is generational: most objects die young (minor collections); survivors promote to the old generation (major, less often). Large allocations may go old immediately—thresholds are versioned; measure, don't recite. Collection work can pause the isolate's JS thread; concurrent/incremental marking means majors aren't one giant pause. `--max-old-space-size` caps old space (MB); default depends on version/machine—quote from the binary you ship. Hitting the limit is fatal heap exhaustion; `try/catch` is not an OOM strategy.
+An object can be collected once nothing reachable points to it. Roots include the stack, globals, and Node's native handles such as sockets and timers. V8 is generational: most objects die young and are cleaned in frequent, cheap minor collections, while survivors move to the old generation, which is collected less often. Some of that work runs concurrently or incrementally, so major collections are not always one long pause. `--max-old-space-size` caps old space, and the default depends on version and machine. Hitting it is a fatal crash, not something `try/catch` can handle.
 
 **Trade-offs:**
 
@@ -186,7 +186,7 @@ Raising the limit delays exhaustion and can lengthen majors; neither removes a r
 
 Is a multi-megabyte `Buffer` collected like a small object?
 
-Answer: the wrapper is a heap object; the backing store is external (`arrayBuffers`) and frees when all views are unreachable. RSS can move without matching `heapUsed`. Confirm with `memoryUsage()` and snapshots.
+Answer: The `Buffer` wrapper is a small heap object, but its bytes live outside the V8 heap and are counted under `arrayBuffers`. They are freed once no view of them is reachable. That is why RSS can change without `heapUsed` changing, so check with `process.memoryUsage()` and heap snapshots.
 
 ### NODE-008 — What process.memoryUsage is actually counting
 
@@ -200,13 +200,13 @@ Answer: the wrapper is a heap object; the backing store is external (`arrayBuffe
 
 **Answer:**
 
-All five are bytes. `heapTotal` is V8-reserved heap; `heapUsed` is live JS objects (falls after reclaim). `external` is C++ memory bound to JS objects; `arrayBuffers` (buffers/SABs) is included in `external`—don't add them. `rss` is OS resident set for the whole process, not a V8 number; it can stay high after heap free (fragmentation). One sample cannot prove a leak—series after idle, then snapshots. In a Worker, `rss` is process-wide; heap/external/arrayBuffers are that isolate only.
+All values are in bytes. `heapTotal` is the heap V8 has reserved, and `heapUsed` is the part holding live objects. `external` is native memory tied to JavaScript objects, and `arrayBuffers` is the buffer portion of that, so it is already included in `external`; do not add them. `rss` is the operating system's resident memory for the whole process, not a V8 figure, and it can stay high after the heap shrinks. One sample proves nothing about a leak; look at a series after idle time, then take snapshots. In a Worker, `rss` stays process-wide while the others describe that isolate.
 
 **Follow-up:**
 
 `heapUsed` and `arrayBuffers` returned to baseline after traffic; RSS did not. Conclude?
 
-Answer: JS heap and tracked buffer stores were released; resident pages remain (allocator retention, native addon, or OS not reclaiming). Not by itself proof of a closure graph still holding those buffers.
+Answer: It means the JavaScript heap and tracked buffers were released, but the operating system still counts those pages as resident. Causes include allocator retention, a native addon, or the OS not reclaiming yet. It does not prove by itself that a closure is still holding the buffers.
 
 ### NODE-009 — Heap objects, small integers, and Buffer backing stores
 
@@ -220,7 +220,7 @@ Where do values live in Node 20/22? Cover ordinary objects, numbers, strings, cl
 
 **Answer:**
 
-Objects, arrays, functions, and environments are heap-allocated; closures retain environments (shared activation ⇒ shared slots). Numbers are IEEE-754; V8 stores small integers as Smis (immediate)—range depends on pointer compression (`process.config.variables.v8_enable_pointer_compression`). Outside that range or non-integers → heap numbers. Strings are heap objects; whether `slice` frees the parent is engine-dependent—snapshot if unsure. A `Buffer` is a `Uint8Array`: small wrapper + external backing (`arrayBuffers`). `alloc` zeroes; `allocUnsafe` may expose leftover bytes; small unsafe allocs can slice a shared pool (`poolSize` default 8192).
+Objects, arrays, functions, and closure environments live on the V8 heap. In the language, numbers are IEEE-754 doubles, but V8 stores small integers directly as Smis and other numbers as heap objects. Strings are heap objects too. A `Buffer` is a `Uint8Array`: a small wrapper on the heap with its bytes stored outside it. `Buffer.alloc` zeroes memory, while `allocUnsafe` may expose leftover bytes, and small unsafe allocations are cut from a shared 8 KiB pool by default.
 
 **Trade-offs:**
 
@@ -230,7 +230,7 @@ Prefer `alloc`/`allocUnsafeSlow` when the buffer may leave partly unwritten or m
 
 Why can two closures from one call retain a multi-MB buffer when only one mentions it?
 
-Answer: the environment is per activation, not per name. One function using only `id` typically still retains `payload` in the same environment—split scopes or copy the small field; confirm with a snapshot.
+Answer: A closure's environment belongs to one call, not to individual variables. If two closures come from the same call, both keep that environment alive, so a closure that uses only `id` can still retain `payload`. Split the scopes or copy out the small field, and confirm with a heap snapshot.
 
 ### NODE-010 — What V8 does, what Node adds, and where libuv starts
 
@@ -244,13 +244,13 @@ Answer: the environment is per activation, not per name. One function using only
 
 **Answer:**
 
-V8 parses/compiles/runs JS, owns the heap and GC. An isolate is one engine instance: one heap, one JS stack while a thread is inside it. Node embeds V8 and adds host APIs (`process`, loaders, `Buffer`, `net`/`fs`/`http`), plus OpenSSL, c-ares, llhttp, zlib. libuv: (1) event loop on the isolate's thread for non-blocking sockets—blocked while JS occupies the stack; (2) thread pool (default 4, `UV_THREADPOOL_SIZE`) for blocking native work (many fs ops, `dns.lookup`)—no JS, posts completions back. Accurate claim: JS per isolate is single-threaded; the process is not (main, pool, Workers, native helpers).
+V8 is the JavaScript engine: it parses and runs code, and it manages the heap and garbage collection. An isolate is one engine instance with its own heap and one JavaScript stack. Node embeds V8 and adds APIs like `process`, `Buffer`, `fs`, and `http`. libuv provides the event loop, plus a thread pool, four threads by default, for blocking native work. So the accurate claim is that JavaScript in one isolate is single-threaded, but the process is not: it also has pool threads, Workers, and native helper threads.
 
 **Follow-up:**
 
 Which thread runs a promise reaction queued from a `net` socket `data` handler?
 
-Answer: the isolate that owns the socket (main for a main-thread server). The reaction is a microtask of that agent on that same stack—not the pool, not a Worker unless you message one.
+Answer: The isolate that owns the socket, which is the main thread for a normal server. The reaction is a microtask on that same stack. It never runs on the thread pool or in a Worker unless you explicitly send work to one.
 
 ### NODE-011 — The function Node wraps around every CommonJS file
 
@@ -264,7 +264,7 @@ Where do `exports`, `require`, `module`, `__filename`, and `__dirname` come from
 
 **Answer:**
 
-ECMAScript does not define those names. Node wraps the file and calls roughly `(function (exports, require, module, __filename, __dirname) { … })` with `this === exports` (initially `module.exports`). They are wrapper parameters—local bindings. Top-level `var` lives in the wrapper; top-level `return` returns from it. Top-level `await` is a syntax error (not a module context). Sloppy unless `'use strict'`. `exports.foo =` mutates; `module.exports =` rebinds the export and orphans the `exports`/`this` object—callers get `module.exports`.
+ECMAScript does not define those names. Node wraps each CommonJS file in a function and passes `exports`, `require`, `module`, `__filename`, and `__dirname` as parameters, with `this` set to the original `module.exports`. That explains the behavior: a top-level `var` is local to the wrapper, and a top-level `return` is legal because you are inside a function. Top-level `await` is a syntax error. Also, `exports.foo = ...` adds to the shared object, but `module.exports = ...` replaces it, and callers receive the new one.
 
 **Code:**
 
@@ -276,7 +276,7 @@ module.exports = { label: 'replaced' }; // callers get this; exports/this stay o
 
 What does `require.main === module` test?
 
-Answer: Node sets `require.main` to the entry module object; true only in the entry file. ES module counterpart `import.meta.main` is Node 22.18+/24.2+—absent on Node 20 / early 22.
+Answer: It checks whether the current file is the entry point, because Node sets `require.main` to the entry module. The ES module counterpart, `import.meta.main`, exists only in newer releases such as Node 22.18 and 24.2, not on Node 20 or earlier Node 22 versions.
 
 ### NODE-012 — require.cache is one module object, not a value snapshot
 
@@ -290,13 +290,13 @@ Explain `require.cache` on Node 20/22: key, what is stored, what later `require`
 
 **Answer:**
 
-First load creates a module object keyed by resolved absolute path, runs the wrapper, caches the record. Later `require` returns the same `module.exports` without re-running. Mutations of an exported object are shared; destructuring a primitive copies that moment's value. Cache is inserted before the wrapper finishes (cycles see partial exports). `delete` removes the record so the next `require` re-executes; holders of the old exports keep the old object. ESM uses a separate module map with no supported delete—fresh graph needs a new process (or owned loader hooks).
+The first `require` loads the file, runs its wrapper, and stores the module object in `require.cache`, keyed by the resolved absolute path. Later calls return the same `module.exports` without running the file again, so exported objects behave like singletons. The entry is cached before the wrapper finishes, which is why cycles see partial exports. Deleting the entry makes the next `require` run the file again, but anyone holding the old exports keeps the old object. ES modules use a separate module map with no supported way to delete from it.
 
 **Follow-up:**
 
 Two tests delete the service file's cache but still share a connection count. Why?
 
-Answer: the db module that owns the pool was not deleted; the new service `require`s the cached db. Delete the state owner's id (and anything that captured it), or use a subprocess per file.
+Answer: The database module that owns the pool was not deleted, so the new service file just requires the cached one. Delete the cache entry of the module that owns the state, plus anything holding a reference to it, or run each test file in its own process.
 
 ### NODE-013 — ESM live bindings and the CommonJS exports object are different mechanisms
 
@@ -310,13 +310,13 @@ On Node 22 with the native loader, show the difference between an ESM live bindi
 
 **Answer:**
 
-ESM links import bindings to export bindings (language): exporter writes, importer reads; importer cannot assign. CommonJS `require` returns cached `module.exports`—object property mutations are visible; local `let` reassignment is not unless you expose a getter. Destructuring copies at that moment. Named ESM import of CJS is Node analysis that copies detected export names onto the namespace once—not live bindings. Default import is the exports object and sees later property writes. Missed names → `SyntaxError`; prefer default import unless you've verified named form.
+An ES module import is a live link to the exporter's binding. If the exporter reassigns an `export let`, importers see the change, though they cannot assign to it. That is language behavior. CommonJS `require` returns the cached `module.exports` object, so property changes are visible, but reassigning a local variable is not. Destructuring copies the value at that moment. A named ESM import of a CommonJS module is Node's interop: it copies the detected names once, so it is not live. The default import is the exports object itself.
 
 **Follow-up:**
 
 After ESM named import of CJS copied `n`, CJS does `module.exports.n = 5`; an ESM-to-ESM import does `n = 5`. What does each importer read?
 
-Answer: ESM←ESM reads `5` (linked). Named CJS import keeps the copied number. Default `pkg.n` reads `5` (property). Three mechanisms, three results.
+Answer: The ESM-to-ESM import reads 5 because it is linked. The named import of the CommonJS export keeps the copied number. The default import, reading `pkg.n`, sees 5 because it reads the property each time.
 
 ### NODE-014 — Cycles: partial CommonJS exports, ESM temporal dead zone, and the cross-boundary error
 
@@ -330,13 +330,13 @@ Two modules need each other. Describe observables for a pure CommonJS cycle, a p
 
 **Answer:**
 
-CJS: cache inserts before the wrapper returns, so recursive `require` gets the same partial exports object—no throw, silent stale fields until after both return. ESM: link then evaluate; import bindings exist, export `let`/`const` are in TDZ until initialized—top-level read throws `ReferenceError`; functions called after both evaluate are fine. Cross-boundary: CJS `require` of ESM that cycles back throws `ERR_REQUIRE_CYCLE_MODULE`. Break with lazy `require`/`import()` inside a function after evaluation, or merge files.
+In CommonJS, the module is added to the cache before its code finishes, so a cyclic `require` returns the partially filled exports object without an error; you just see missing fields. In ES modules, bindings are linked first and evaluated afterward. A `let` or `const` export is uninitialized until its line runs, so reading it too early throws a `ReferenceError`, while functions called later work fine. A CommonJS file that requires an ES module that cycles back throws `ERR_REQUIRE_CYCLE_MODULE`. Break cycles by moving a `require` or `import()` into a function, or by merging the files.
 
 **Follow-up:**
 
 Can `export function` on both sides of an ESM cycle call each other from those bodies?
 
-Answer: yes after both modules evaluated—function bindings initialize at instantiation. A top-level call during evaluation is still order-sensitive if the callee reads an uninitialized `let`.
+Answer: Yes, once both modules have finished evaluating, because function declarations are initialized at link time. A call during evaluation is still order-sensitive if the called function reads a `let` or `const` that has not been initialized yet.
 
 ### NODE-015 — How Node decides a file is CommonJS or ESM
 
@@ -350,7 +350,7 @@ Given a path, how does Node 20/22 decide CommonJS vs ESM? Cover extensions, near
 
 **Answer:**
 
-Host classification: `.mjs` → ESM, `.cjs` → CJS, `.js` → nearest `package.json` (`"module"` / `"commonjs"`; absent ⇒ CJS). Nested `package.json` scopes that tree. CJS `require` can omit extensions and resolve directories/`index`; ESM relative imports need extensions and no directory index; package entry uses `exports`/`main`. `NODE_PATH` / `require.extensions` are CJS-only. JSON import (stable on current 20/22) needs `with { type: 'json' }` and exposes a default export.
+Node first looks at the extension: `.mjs` is ESM and `.cjs` is CommonJS. For `.js`, it uses the nearest `package.json`: `"type": "module"` means ESM, and `"commonjs"` or no field means CommonJS. When you move from `require` to `import`, resolution gets stricter. CommonJS lets you omit extensions and load a directory's `index`, but ESM relative imports need the full file name. Package entry points come from `exports` or `main`. JSON imports need `with { type: 'json' }`.
 
 **Trade-offs:**
 
@@ -360,7 +360,7 @@ Host classification: `.mjs` → ESM, `.cjs` → CJS, `.js` → nearest `package.
 
 Root `"type": "module"` and `tools/package.json` with `"type": "commonjs"`—both `.js` styles work. Why?
 
-Answer: nearest parent `package.json` wins per file path, not `cwd`. Nested scope does not leak upward; root does not override nested.
+Answer: Node uses the nearest `package.json` above each file, not the working directory. The nested `tools/package.json` applies to files under `tools/`, and the root setting applies everywhere else. Neither overrides the other.
 
 ### NODE-016 — __dirname, import.meta.url, and import.meta.dirname
 
@@ -374,13 +374,13 @@ A library needs the directory of the current file for `./templates/email.txt` be
 
 **Answer:**
 
-CJS: `__dirname` / `__filename` are wrapper params—file path, not `cwd`. ESM: no those params; `import.meta.url` is the module URL (`file:` on disk). Portable: `new URL('./templates/email.txt', import.meta.url)` or `fileURLToPath` + `dirname`. `import.meta.dirname` / `.filename` are Node-only from 20.11.0 / 21.2.0, `file:` only; no longer experimental as of 22.16.0 / 24.0.0 (still experimental mark on 20 line). Prefer `fileURLToPath` when engines include pre-20.11. Avoid `process.cwd()` for package assets.
+In CommonJS, `__dirname` and `__filename` are wrapper parameters that give the file's own location, not the working directory. ES modules do not have them. Instead, `import.meta.url` is the module's URL, so `new URL('./templates/email.txt', import.meta.url)` works portably, or you can use `fileURLToPath` with `dirname`. Node also offers `import.meta.dirname` and `import.meta.filename`, available from 20.11 and 21.2, for `file:` modules only. Use the portable form if you support older Node, and avoid `process.cwd()` for package assets.
 
 **Follow-up:**
 
 If this helper is imported from three directories up, whose directory does `import.meta.url` use?
 
-Answer: the module that contains the expression (the helper's file), not the entry or importer—same per-file idea as `__dirname`.
+Answer: The helper's own file. `import.meta.url` always refers to the module that contains the expression, not the entry file or the importer. It works the same way as `__dirname`.
 
 ### NODE-017 — require() of an ES module on Node 20.19 and 22.12
 
@@ -394,7 +394,7 @@ On which Node 20/22 versions can CJS `require` an ES module, what does it return
 
 **Answer:**
 
-Node feature, not ECMAScript. On by default from 20.19.0 and 22.12.0 (earlier: flag or `ERR_REQUIRE_ESM`). Still experimental on those lines; stable in docs from 25.4.0. Success returns the namespace (or the `module.exports` interop export if present). Throws `ERR_REQUIRE_ASYNC_MODULE` if the graph has top-level await; `ERR_REQUIRE_CYCLE_MODULE` on CJS↔ESM cycles. Detect with `process.features.require_module`. Older escape hatch: dynamic `import()`.
+This is a Node feature, not part of ECMAScript. From Node 20.19 and 22.12, CommonJS can `require` an ES module without a flag; earlier versions throw `ERR_REQUIRE_ESM` or need a flag. It returns the module's namespace object. It throws `ERR_REQUIRE_ASYNC_MODULE` if the graph contains top-level await, and `ERR_REQUIRE_CYCLE_MODULE` for cycles that cross from CommonJS into ESM. You can detect support with `process.features.require_module`. The older fallback is dynamic `import()`, which returns a promise.
 
 **Trade-offs:**
 
@@ -404,7 +404,7 @@ Node feature, not ECMAScript. On by default from 20.19.0 and 22.12.0 (earlier: f
 
 `require('./codec.mjs')` then `codec.encode`—module has `export function encode`, no `module.exports` interop export. What is `codec`?
 
-Answer: the namespace object, so `codec.encode` works. Default-only export would be `codec.default`. Adding `export { value as 'module.exports' }` changes `require` to return `value` and breaks `codec.encode`.
+Answer: `codec` is the module namespace object, so `codec.encode` works. A default export would be `codec.default`. If the ES module exports a name called `'module.exports'`, `require` returns that value instead, and `codec.encode` would stop working.
 
 ### NODE-018 — How this is chosen, including at the top of a Node module
 
@@ -418,13 +418,13 @@ State ECMAScript rules that set `this` for a call, then apply to top-level Commo
 
 **Answer:**
 
-Call-site rules: `obj.method()` → `this` is `obj`; bare `fn()` → `undefined` (strict) or global (sloppy); `call`/`apply`/`bind`/`new` as usual; arrows take lexical `this`. Class bodies are always strict—detached method → `this === undefined` even in sloppy CJS. CJS top-level: wrapper `this === exports` (original object even after `module.exports =`). ESM top-level `this` is `undefined`. Timers do not restore a receiver—use `() => obj.method()` or `bind`.
+For a regular call, `this` is chosen by how you call the function. `obj.method()` sets `this` to `obj`. A bare `fn()` gives `undefined` in strict code and the global object in sloppy code. `call`, `apply`, `bind`, and `new` set it explicitly, and arrow functions use the surrounding `this`. Class bodies are always strict, so a detached method sees `undefined`. At the top of a CommonJS file, `this` is the original `module.exports` object, and at the top of an ES module it is `undefined`. Timers do not restore a receiver, so use an arrow function or `bind`.
 
 **Follow-up:**
 
 An arrow nested in a sloppy CJS function called as a bare call—what `this` does the arrow see?
 
-Answer: the outer sloppy call set `this` to `globalThis`; the arrow sees that lexically. Making the outer strict/ESM makes both see `undefined`.
+Answer: The arrow uses the outer function's `this`. Since that sloppy function was called bare, its `this` is `globalThis`, so the arrow sees that too. If the outer function were strict, both would see `undefined`.
 
 ### NODE-019 — A vm context shares the isolate; a Worker does not
 
@@ -438,7 +438,7 @@ A plugin system must run user JS without host globals and without stalling the H
 
 **Answer:**
 
-`vm.createContext` is another realm (new global/intrinsics) in the same isolate: same heap, same JS thread. Docs: not a security boundary—leaked host objects escape; a sync loop stalls the server. `timeout` on `runInContext` is not a sandbox. `Worker` is a new OS thread, isolate, heap, stack, and libuv loop; communicate via structured clone (`postMessage`). `SharedArrayBuffer` + `Atomics.wait` on the main thread blocks that thread (browsers reject on the window agent). Neither is a complete sandbox—CPU, RSS, network still need OS/policy; `resourceLimits` caps worker old space, not RSS, and does not stop infinite loops (`terminate()` does).
+`vm.createContext` creates a new global object and a new set of built-ins, but it runs on the same isolate, with the same heap and thread. Node's docs say it is not a security boundary, and a synchronous infinite loop would still stall your server. A `Worker` is a separate thread with its own isolate, heap, and event loop, and it communicates through structured-clone messages. `resourceLimits` caps its V8 heap but does not stop infinite loops; `terminate()` does. Neither is a full sandbox, since CPU, network, and files still need operating-system controls.
 
 **Trade-offs:**
 
@@ -448,7 +448,7 @@ Separate process for strongest blast radius; Worker for second isolate in-proces
 
 `resourceLimits` on a Worker you forgot to use—can `vm` on the main isolate still exhaust the heap?
 
-Answer: yes—allocation is on the main heap; `resourceLimits` is a Worker option only.
+Answer: Yes. `resourceLimits` applies only to a Worker. Code running in `vm` allocates on the main heap, so it can still exhaust the host's memory.
 
 ### NODE-020 — Object shapes: why two { id, status } objects are not the same to V8
 
@@ -462,7 +462,7 @@ V8 uses hidden classes (maps/shapes) and inline caches. Explain at a level that 
 
 **Answer:**
 
-ECMAScript objects are property bags; V8 assigns shapes (names, add order, value offsets). Inline caches specialize on seen shapes; many shapes → megamorphic fallback. Different add order, conditional properties, or `delete` create new shapes / dictionary mode. Same fields, order, prototype ⇒ same shape for the cache. Construct records in one place with fixed fields (assign `null` instead of deleting). Class instances and literals do not share shapes. Stabilize shapes, then profile—don't promise speedups.
+In the language, objects are just bags of properties. V8 tracks each object's layout with a hidden class, also called a shape, and uses inline caches to speed up property access for shapes it has seen. If a site sees many different shapes, V8 falls back to slower generic lookups. Different property order, conditionally added fields, or `delete` all produce different shapes. So create hot records in one place, with the same fields in the same order, and use `null` instead of deleting. Then profile; do not promise a specific speedup.
 
 **Code:**
 
@@ -476,7 +476,7 @@ function createRequestRecord(id) {
 
 Do TypeScript interfaces give V8 the shape?
 
-Answer: no—types erase. V8 sees runtime objects. A shared constructor helps; an `as` cast does not.
+Answer: No. TypeScript types are erased at compile time, so V8 only sees runtime objects. A shared constructor or factory function keeps shapes consistent, but an `as` cast does nothing.
 
 ### NODE-021 — Microtasks, process.nextTick, and the end of a turn
 
@@ -490,13 +490,13 @@ After the current JS stack unwinds on Node 20/22, in what order do promise react
 
 **Answer:**
 
-Promise reactions and `queueMicrotask` share the microtask queue (queue order). `process.nextTick` is a separate Node queue drained fully after the current operation, then microtasks—so from ordinary sync/CJS top/`setTimeout` turns: nextTick before promises. Exception: during microtask processing (including ESM evaluation), Node does not jump back to nextTick first—so ESM top-level order is promise/microtask then nextTick. Recursive nextTick can starve I/O. Marked Legacy in 20.18.0 / 22.7.0—prefer `queueMicrotask` for new "after I return" code; keep nextTick when you need its specific before-I/O/before-microtasks constructor pattern.
+After the current JavaScript stack finishes, Node drains the `process.nextTick` queue first, then the microtask queue, which holds promise reactions and `queueMicrotask` callbacks in the order they were queued. That gives tick-before-promise order at the top of a CommonJS file or inside a timer callback. ES modules are the exception: module evaluation already runs inside microtask processing, so promises and microtasks come first, then `nextTick`. A recursive `nextTick` can starve I/O. Node 20.18 and 22.7 mark `nextTick` as legacy and recommend `queueMicrotask` for new code.
 
 **Follow-up:**
 
 Which queue does `await` use, and does top-level await change the nextTick story?
 
-Answer: continuation is a promise reaction (microtask). Top-level await stays in module-evaluation microtask processing, so nextTick queued there still doesn't jump ahead of that drain.
+Answer: `await` continues as a promise reaction, so it is a microtask. Top-level await stays inside module-evaluation microtask processing, so a `nextTick` queued there still does not jump ahead of the microtasks that are draining.
 
 ### NODE-022 — What async and await do to the one call stack
 
@@ -521,13 +521,13 @@ console.log('end');
 
 **Answer:**
 
-An `async` function always returns a promise and runs synchronously until return/throw/`await`. `await` PromiseResolves the operand (wraps non-promises), schedules the continuation as a reaction, suspends, and returns the function's promise. Order: `start`, `A before`, `end`, then `A after` (microtask). Throw before first `await` rejects that promise—not a sync throw to the caller. Sync work between awaits occupies the one stack like any function.
+An `async` function always returns a promise, and it runs synchronously until it hits `await`, a return, or a throw. At `await`, the operand is wrapped in a promise if it is not one, the rest of the function is scheduled as a reaction, and the function returns its promise to the caller. So the log is `start`, `A before`, `end`, then `A after` from a microtask. A throw before the first `await` rejects the promise rather than throwing to the caller. Work between awaits uses the one stack like any other function.
 
 **Follow-up:**
 
 Can `B after` run before `main`'s next line after `await label('B')`, and can a `readFile` callback run between `B before` and `B after`?
 
-Answer: `main`'s next line runs after `B after` settles `label`'s promise (later microtasks, no overlapping frames). A file callback is an I/O turn, not a microtask—it runs after already-queued microtasks of the current checkpoint; `B after` (from `await null`) runs before later I/O turns.
+Answer: Yes, `B after` runs first, because `main` resumes only after `label`'s promise settles, which happens in a later microtask. And no, a file callback cannot run between `B before` and `B after`: it is an I/O callback, and the microtask queue drains first.
 
 ### NODE-023 — Stack overflow, --stack-size, and proper tail calls
 
@@ -541,13 +541,13 @@ A recursive tree walk throws `RangeError: Maximum call stack size exceeded` on N
 
 **Answer:**
 
-Each call pushes a frame into a finite V8 stack region; overflow throws `RangeError`. Limit depends on stack size and frame size—not an ECMAScript constant. Spec requires proper tail calls in strict mode; V8 does not implement them—Node will not eliminate tail recursion. `--stack-size` (KB) / worker `stackSizeMb` raise the ceiling for bounded depth; they are not a fix for unbounded data. Fix: explicit heap stack (array) or trampoline so JS call depth stays constant. `async` recursion may avoid stack overflow but can build a promise chain as deep as the tree.
+Each call adds a frame to a fixed-size V8 stack. When it fills up, you get `RangeError: Maximum call stack size exceeded`. The limit depends on stack size and frame size, not on a fixed ECMAScript number. The spec requires proper tail calls in strict mode, but V8 does not implement them, so tail recursion still grows the stack. `--stack-size` can raise the limit, but it does not fix unbounded depth. The real fix is an explicit stack stored in an array, or a trampoline, so call depth stays constant.
 
 **Follow-up:**
 
 Tail-position recursive call plus `'use strict'`—why still `RangeError`?
 
-Answer: the call is in the position the spec would reuse; V8 still pushes a frame. ESM strictness does not enable PTC. Use the heap walk.
+Answer: Strict mode and ES modules do not turn on tail-call optimization in V8. The call is in tail position, but V8 still pushes a new frame each time. Use an explicit array-based walk instead.
 
 ### NODE-024 — WeakRef and FinalizationRegistry do not close resources
 
@@ -561,7 +561,7 @@ Explain `WeakRef` and `FinalizationRegistry` for a Node 20/22 service. What is g
 
 **Answer:**
 
-`WeakRef` holds without keeping alive; `deref()` returns the object or `undefined`—no timing promise, and a later turn can collect after an `await`. `FinalizationRegistry` may call your callback with the held value after collection—not the object; no when; Node won't delay exit for it. Never close sockets/locks/files only in a finalizer. Use explicit `open`/`close`/`finally`; finalizers are at most diagnostics. `WeakRef`/`WeakMap` for caches that must not extend lifetime; delete dead `Map`+`WeakRef` entries or the map grows. Module scope remains a strong root for the map itself.
+A `WeakRef` points to an object without keeping it alive. `deref()` returns the object or `undefined`, with no promise about when. A `FinalizationRegistry` may call your callback after an object is collected, passing a held value rather than the object, and it also gives no timing guarantee. So never rely on a finalizer to close sockets, files, or locks. Use explicit `close()` or `try/finally`. Weak references suit caches that should not extend object lifetime, but remove dead entries from the map, or it keeps growing.
 
 **Trade-offs:**
 
@@ -571,7 +571,7 @@ LRU with strong refs for predictable caches; `WeakRef` only when you must not ke
 
 Module `Map` of `WeakRef(Buffer)`; all other refs dropped. What about `arrayBuffers`, and can a finalizer use the buffer?
 
-Answer: eligible after last strong ref; collected later. Finalizer gets the held token, not the buffer. Flat `arrayBuffers` means a strong ref remains—snapshot it.
+Answer: Once the last strong reference is gone, the buffer becomes eligible for collection and is freed later. The finalizer receives only the held token, never the buffer. If `arrayBuffers` stays flat, something still holds a strong reference, so take a heap snapshot.
 
 ### NODE-025 — One package, both import and require, without two copies of the state
 
@@ -585,13 +585,13 @@ A library has a process-wide connection counter and a class used with `instanceo
 
 **Answer:**
 
-Two resolved files ⇒ two module records: two counters, `instanceof` false across paths. Put state in one record. On 20.19+/22.12+, `"type": "module"` with one sync ESM file for both (no TLA); set `engines`. Older Node: state in one CJS file; ESM entry only re-exports that object—no second class/counter. `module-sync` before `default` helps migrate; never put state in both wrappers. Test `import` and `require` in one process for counter/`instanceof` identity. Node does not unwrap bundler `__esModule`.
+If `exports` points `import` and `require` at two different files, Node loads two separate modules, so you get two counters and `instanceof` fails across them. The state must live in one module record. On Node 20.19+ and 22.12+, publish a single synchronous ES module for both, with no top-level await, and set `engines`. On older versions, keep the state in one CommonJS file and have the ESM entry only re-export from it. Then test, in one process, that `import` and `require` share the same counter and class.
 
 **Follow-up:**
 
 Identity test passes, but `import { connections }` stays `0` after `require(...).opened()` where ESM re-exports a CJS number property. Why?
 
-Answer: named CJS→ESM interop copied the number once; `opened` mutates the exports object. Re-export a function/getter and assert that, not a copied primitive.
+Answer: A named import of a CommonJS number copies it once, so later changes to the exports object are invisible. Re-export a function or getter and test that, rather than a copied primitive.
 
 ### NODE-026 — Strict mode is how an ES module is defined to run
 
@@ -605,13 +605,13 @@ A library author says strict mode is a linter setting, and CJS/ESM follow the sa
 
 **Answer:**
 
-Strict mode is ECMAScript parse/runtime rules for a script, module, or function—not a linter. ES modules and class bodies are always strict; nested functions cannot opt out. CJS is sloppy unless the directive prologue (leading string literals) contains `'use strict'`. Mode is lexical; `new Function` / indirect `eval` parse fresh (sloppy unless their source has the directive). Strict parse failures: `with`, legacy octals (`010`), duplicate params, future-reserved bindings. Runtime: undeclared assignment → `ReferenceError`; no `arguments`/parameter aliasing; bare call → `this === undefined`.
+Strict mode is a set of ECMAScript parsing and runtime rules, not a linter setting. ES modules and class bodies are always strict. CommonJS files are sloppy unless a `'use strict'` directive appears at the start of the file or function. The mode is lexical, so code created with `new Function` or indirect `eval` is parsed fresh and is sloppy unless it has its own directive. Strict mode rejects things like `with`, legacy octal literals, and duplicate parameters, and it makes undeclared assignment throw a `ReferenceError`. A bare function call gets `this` as `undefined`.
 
 **Follow-up:**
 
 `'use strict'` inside one function of a sloppy CJS file—what else changed?
 
-Answer: only that function and nests. Sibling functions stay sloppy. A class in the same file is strict anyway.
+Answer: Only that function, and the functions nested inside it, become strict. Sibling functions stay sloppy. A class in the same file is strict regardless.
 
 ### NODE-027 — The temporal dead zone is a ReferenceError at run time
 
@@ -625,13 +625,13 @@ A candidate says "`let` is not hoisted, so reading it early is a syntax error." 
 
 **Answer:**
 
-On context creation, `var`/function bindings are initialized; `let`/`const`/`class` are created uninitialized—TDZ until the initializer finishes. Reading/writing early throws `ReferenceError` while the program is already running (lines before may have run). `typeof notYet` throws in the TDZ; `typeof` of a truly undeclared name is `"undefined"`. Default params evaluate L→R in their own environment (`f(a = b, b = 1)` throws at call). Syntax errors (missing brace, illegal token) prevent the file from running at all.
+When a scope is created, `var` and function bindings are initialized, but `let`, `const`, and `class` bindings exist uninitialized until their declaration runs. That gap is the temporal dead zone. Reading or writing a binding inside it throws a `ReferenceError` at run time, so earlier lines may already have executed. Even `typeof` throws there, unlike `typeof` on a name that was never declared, which returns the string `undefined`. Default parameters are evaluated left to right, so `f(a = b, b = 1)` throws. A syntax error is different: it stops the file from running at all.
 
 **Follow-up:**
 
 `switch (n) { case 1: let x = 1; case 2: let x = 2; }`—what fails?
 
-Answer: parse error—duplicate lexical binding in one switch block. Wrap cases in blocks; then early read is the runtime TDZ `ReferenceError`.
+Answer: That is a parse error, because both `let x` declarations are in the same switch block. Wrap each case in its own braces. Then reading `x` before its declaration becomes the runtime TDZ `ReferenceError`.
 
 ### NODE-028 — unhandledRejection and uncaughtException decide whether the process dies
 
@@ -645,7 +645,7 @@ On Node 20/22 (default flags), a floating `async` function throws and a `setTime
 
 **Answer:**
 
-Async throw rejects the returned promise (ECMAScript). Unhandled after the turn → Node `unhandledRejection`. Default `--unhandled-rejections=throw` (since Node 15): no listener ⇒ raised as uncaught, exit 1. A listener counts as handling (even empty—still rejected; later `.catch` → `rejectionHandled`). Same-turn `.catch` prevents the event. Sync throw in a timer → `uncaughtException`; no listener ⇒ print and exit 1. A listener suppresses default exit—document cleanup then terminate; undefined state if you keep serving. `uncaughtExceptionMonitor` observes without suppressing. Module-eval throw is load failure, not later-turn uncaught.
+An `async` function that throws gives you a rejected promise, not a synchronous throw. If nothing handles it by the end of that turn, Node emits `unhandledRejection`. Since Node 15, the default mode treats that as an uncaught exception and exits with code 1, unless you install a listener. A throw inside a `setTimeout` callback triggers `uncaughtException`, which also exits by default. Adding a listener suppresses the exit, but the process may be in an unknown state, so log, clean up, and exit. `uncaughtExceptionMonitor` observes without suppressing.
 
 **Trade-offs:**
 
@@ -655,7 +655,7 @@ Crash-and-restart is the safe default. Log listeners should set non-zero `exitCo
 
 Reject, then `.catch` inside `setTimeout(0)`. Events? Exit?
 
-Answer: `unhandledRejection` at end of create turn; later `.catch` → `rejectionHandled`. With a rejection listener, no default crash; without it, default throw may exit 1 before the timer runs.
+Answer: `unhandledRejection` fires at the end of the turn where the promise was created, and the later `.catch` triggers `rejectionHandled`. If you have an `unhandledRejection` listener, the process does not crash. Without one, the default behavior can exit the process before the timer ever runs.
 
 ### NODE-029 — process is one Node global, shared with node:process
 
@@ -669,13 +669,13 @@ A teammate says `process` is an ECMAScript built-in like `Math`, and an ES modul
 
 **Answer:**
 
-`process` is a Node host object on the realm's global (`globalThis.process` / `global`), a non-enumerable accessor. Free identifier `process` resolves there in CJS and ESM—no import required. `import process from 'node:process'` (and named `env`, etc.) is the same live object—makes the dependency explicit. Locals/parameters can shadow the name without changing the global. Workers get their own `process` object.
+`process` is a Node host object, not part of ECMAScript. It lives on the global object as `globalThis.process`, and the bare name `process` resolves there in both CommonJS and ES modules, so no import is needed. `import process from 'node:process'` gives you the same object; it just makes the dependency explicit. A local variable or parameter named `process` can shadow it without changing the global. Each Worker gets its own `process` object.
 
 **Follow-up:**
 
 Why is `pid` still readable after deleting a local named `process`, and what do `Object.keys(globalThis)` say?
 
-Answer: free `process` resolves on `globalThis`. It is non-enumerable, so `Object.keys` omits it; get the descriptor to see the getter.
+Answer: A free `process` name resolves to the global object, so deleting a local does not matter. It is non-enumerable, so `Object.keys(globalThis)` omits it. Use `Object.getOwnPropertyDescriptor` to see the getter.
 
 ### NODE-030 — Buffer.alloc zeroes; allocUnsafe can expose leftover bytes
 
@@ -689,13 +689,13 @@ Review a helper that uses `Buffer.allocUnsafe` and sometimes returns before ever
 
 **Answer:**
 
-`alloc` zeroes (or fills)—defined contents, not pooled. `allocUnsafe` leaves memory uninitialized—may contain prior process data (tokens, other requests). Safe only if you overwrite every byte you expose; short `write` leaves a dirty tail. Small unsafe sizes (`size < poolSize >>> 1`, default < 4096) share a slab; `.buffer` is the whole pool—neighboring views leak. `allocUnsafeSlow` skips the pool but still doesn't zero—use for small long-lived buffers you fully fill. Prefer `alloc` for anything logged/sent. `new Buffer` is deprecated (`DEP0005`).
+`Buffer.alloc` zero-fills memory, so its contents are always defined. `Buffer.allocUnsafe` skips that, so the buffer can contain leftover data from earlier use, such as tokens or other requests. It is safe only if you overwrite every byte before exposing it; a short write leaves a dirty tail. Small unsafe allocations, below half the pool size (4096 bytes by default), are slices of a shared pool, so `.buffer` exposes neighboring data too. `allocUnsafeSlow` skips the pool but is still not zeroed. Prefer `alloc` for anything logged or sent.
 
 **Follow-up:**
 
 Why do `allocUnsafe(4096)` and `allocUnsafe(4095)` differ under default pool size for `.buffer` disclosure?
 
-Answer: pool only when `size < poolSize >>> 1` (4096). 4095 is a pooled view whose `.buffer` includes neighbors; 4096 is its own `ArrayBuffer`. Both uninitialized. Read live `Buffer.poolSize`.
+Answer: Under the default pool size, only allocations smaller than 4096 bytes come from the shared pool. So 4095 bytes is a view into the pool whose `.buffer` includes neighbors, while 4096 gets its own `ArrayBuffer`. Both are uninitialized. Read the live `Buffer.poolSize` value instead of assuming it.
 
 ### NODE-031 — JSON.parse allocates the whole value before it returns
 
@@ -709,13 +709,13 @@ A handler `JSON.parse`s a large body on the main thread. What appears on the hea
 
 **Answer:**
 
-`JSON.parse` is synchronous: whole input → whole JS value before return (objects/arrays/strings/numbers—not a Buffer alias). Peak includes input and output together; `JSON.parse(buf)` effectively needs UTF-8 text while the buffer lives, then the graph. Numbers are float64—beyond `MAX_SAFE_INTEGER` silently lose precision; no `BigInt`. Reviver runs bottom-up after values exist; returning `undefined` deletes a property but children were still allocated—it is not streaming. Bound body size before parse; don't catch OOM and keep serving.
+`JSON.parse` is synchronous: it reads the whole input and builds the whole JavaScript value before returning. At peak, memory holds both the input text and the resulting object graph. Numbers become float64, so integers beyond `Number.MAX_SAFE_INTEGER` silently lose precision. A reviver runs afterward, bottom-up, on values that already exist, so it does not make parsing streaming; returning `undefined` just deletes a property after its children were allocated. Limit the body size before parsing, and do not catch an out-of-memory crash and keep serving.
 
 **Follow-up:**
 
 Success path keeps the original `Buffer` in a module-level debug array. What stays alive?
 
-Answer: every body buffer (and backing store) for the process. The temp string can go if uncaptured; the array turns success into a lifetime leak—store bounded metadata or only on throw.
+Answer: Every body buffer, with its backing memory, stays alive for the life of the process. The temporary string can be freed. A success-path debug array turns normal traffic into a leak, so keep bounded metadata or capture only failures.
 
 ### NODE-032 — Read the upload handler and name what stays alive
 
@@ -740,13 +740,13 @@ export function handleUpload(name, bytes) {
 
 **Answer:**
 
-Non-`.tmp` path: `bus.on` stores `audit`; `audit` closes over `copy`; module-level `bus` is a process root ⇒ `copy` (and treat activation locals as retained) stays after return. Snapshot path: module → bus → listeners → audit → copy. `.tmp` path `off`s before return—if the caller drops `bytes`, that call's `copy` can be collected. Each non-tmp adds a listener (default max 10 warning). `once` still retains until the event fires.
+On the non-`.tmp` path, `bus.on` stores `audit`, `audit` closes over the call's environment, which holds `copy`, and `bus` is module-level, so it lives for the whole process. That keeps `copy` reachable after the function returns. The chain is module, bus, listeners, `audit`, `copy`. On the `.tmp` path, the listener is removed before returning, so if the caller drops `bytes`, that `copy` can be collected. Each retained listener also counts toward the default limit of 10, which triggers a warning.
 
 **Follow-up:**
 
 `audit` only closes over `name`—is `copy` collectible?
 
-Answer: not by inspection—same activation environment often retains all locals. Build the listener in an inner scope without `copy`, or don't allocate `copy`.
+Answer: Not safely. Closures from one call usually share a single environment, so `audit` can still keep `copy` alive. Create the listener in a separate scope that never sees `copy`, or avoid creating `copy`.
 
 ### NODE-033 — Which module body runs first
 
@@ -760,13 +760,13 @@ For an acyclic graph on Node 20/22 (native loader), when do ESM module bodies ru
 
 **Answer:**
 
-ESM: link, then evaluate dependencies depth-first in `import` source order; a body runs only after its imports finish; already-evaluated modules don't re-run. `import` declarations are hoisted for evaluation—a log above an `import` still runs after the imported body. CJS: `require` is a call mid-wrapper—statements before it already ran; the dependency runs to completion, then the caller continues; body runs once (cache). Sibling order: ESM finishes deps before the entry body; CJS prints the entry prefix first.
+For ES modules, Node first links the whole graph, then evaluates dependencies depth-first in import order. A module's body runs only after its imports finish, and each module runs once. Imports are hoisted, so a log above an `import` line still runs after the imported module's body. CommonJS is different: `require` is an ordinary call in the middle of the file, so code before it has already run, then the dependency runs fully, and then your file continues. Source order matters in CommonJS, but not for ESM imports.
 
 **Follow-up:**
 
 Entry also imports `b` above `a`, and `a` imports `b`. What changes?
 
-Answer: `b` still once. Entry's first unfinished dep runs first (`b`, then `a`, then entry). Entry body still cannot run in the middle.
+Answer: `b` still runs only once. The entry's first unfinished dependency goes first, so the order is `b`, then `a`, then the entry. The entry body cannot run in the middle of its dependencies.
 
 ### NODE-034 — Top-level await is an ES module syntax
 
@@ -780,13 +780,13 @@ Someone wants `await fetchConfig()` at the top of a CommonJS file. Where is top-
 
 **Answer:**
 
-TLA is ESM-only (unflagged since 14.8)—parse error in CJS; `'use strict'` doesn't help. `async function` + inner `await` in CJS is fine (returns a promise). Top-level `await` suspends that module's evaluation; static importers wait before their bodies. The loop isn't frozen—already-started modules' timers can fire. Async-ness is a graph property. `require` of a TLA graph: `ERR_REQUIRE_ASYNC_MODULE` on 20.19+/22.12+; older 20 throws `ERR_REQUIRE_ESM` earlier. Libraries that must be `require`d should export `async function init()` instead. Mutual TLA can deadlock.
+Top-level await is valid only in ES modules. In a CommonJS file it is a parse error, and `'use strict'` does not help, though you can still use an `async` function there. When an ES module uses top-level await, its importers wait for it to finish before running their bodies, but the event loop is not frozen. A graph that contains top-level await cannot be loaded with `require`: on 20.19+ and 22.12+ it throws `ERR_REQUIRE_ASYNC_MODULE`. Libraries meant to be required should export an async `init()` instead.
 
 **Follow-up:**
 
 Importer has no await; it imports `config` which imports `plugin` with TLA. `require` of the importer on 22.12?
 
-Answer: `ERR_REQUIRE_ASYNC_MODULE`—the whole graph is async. `--experimental-print-required-tla` shows where.
+Answer: It throws `ERR_REQUIRE_ASYNC_MODULE`, because the whole graph counts as async if any dependency uses top-level await. The `--experimental-print-required-tla` flag shows where it comes from.
 
 ### NODE-035 — What keeps the process from exiting
 
@@ -800,7 +800,7 @@ A script schedules `setTimeout`, calls `.unref()`, prints, then exits without fi
 
 **Answer:**
 
-The process stays up while the loop has active ref'd work (listening servers, sockets, timers, in-flight fs/DNS). Empty ⇒ `beforeExit`, then exit if nothing new is scheduled. Timers are ref'd by default; `unref()` clears that vote—callback runs only if something else keeps the process up. Same for `server.unref()` / `socket.unref()`. `getActiveResourcesInfo()` lists active resource type names (e.g. `'Timeout'`). Stdin resumed is also a handle.
+A Node process stays alive while the event loop has active referenced work, such as listening servers, open sockets, timers, and in-flight file or DNS requests. When there is none, Node emits `beforeExit` and then exits. Timers are referenced by default; calling `unref()` removes that vote, so the callback runs only if something else keeps the process alive. The same applies to servers and sockets. `process.getActiveResourcesInfo()` lists what is currently active. Use `unref` for background helpers like metrics, not for the main server.
 
 **Trade-offs:**
 
@@ -810,7 +810,7 @@ The process stays up while the loop has active ref'd work (listening servers, so
 
 `server.listen(0)`, unref'd `setInterval`, then `server.close()`. When does the process exit?
 
-Answer: after close drops the listen handle, if no ref'd connections remain and the interval is unref'd, the loop is empty and the process exits—interval may never fire.
+Answer: After `close()` drops the listening handle, and no referenced connections remain, the loop has nothing left to wait for and the process exits. The unref'd interval may never fire.
 
 ### NODE-036 — Where the event-loop phase diagram belongs
 
@@ -824,13 +824,13 @@ A candidate starts drawing libuv phases to answer which of `setTimeout(fn, 0)` a
 
 **Answer:**
 
-Both schedule a later turn on the same stack; the caller runs to completion first. Neither is a microtask or `nextTick`. Which wins depends on where the loop is when they are scheduled—that is the phase diagram in the event-loop section, not a universal language rule or a one-laptop claim (timer clamping). Foundations: both are host timers; current-turn promise reactions run before either. For I/O-scheduled ordering, open the next section.
+A foundations answer should only commit to this: both calls schedule work for a later turn, so the current code finishes first, and promise reactions from the current turn run before either one. Neither is a microtask or `nextTick`. Which of the two runs first depends on where the event loop is when you schedule them, which is a question about event-loop phases, covered in the next section. It is not a universal language rule, and at the top level it can vary by machine because of timer rounding.
 
 **Follow-up:**
 
 Can a `queueMicrotask` scheduled just before these two run after either?
 
-Answer: no—microtasks drain when the current turn finishes; both timers are later turns. Phases order the timers relative to each other/I/O, not ahead of this turn's microtasks.
+Answer: No. Microtasks drain as soon as the current turn finishes, and both timers belong to later turns. Phases decide how the timer and immediate are ordered relative to each other and to I/O, not relative to this turn's microtasks.
 
 ### NODE-037 — process.exit, exitCode, beforeExit, and the exit event
 
@@ -844,13 +844,13 @@ Explain how a Node 20/22 process finishes: natural end of the loop, `process.exi
 
 **Answer:**
 
-Empty ref'd work ⇒ `beforeExit` (may schedule more and repeat) ⇒ `exit` ⇒ OS status. `exitCode` sets graceful status (`undefined` ⇒ 0); Node 20+ accepts number or integer string. `process.exit(code)` runs `exit` listeners synchronously and ends immediately—no `beforeExit`; abandons pending async I/O (stdout may lose a line). `exit` listeners must be sync; assigning `exitCode` there changes OS status; the listener's `code` argument stays the start value. Uncaught/`process.exit` skip `beforeExit`. Prefer set `exitCode`, close servers, drain the loop.
+When the loop has no referenced work left, Node emits `beforeExit`, which can schedule more work and repeat, and then it emits `exit` and the process ends. `process.exitCode` sets the status for a graceful finish, and Node 20 accepts a number or an integer string. `process.exit(code)` skips `beforeExit`, runs `exit` listeners synchronously, and ends immediately, so pending async output such as the last stdout line can be lost. `exit` listeners must be synchronous, and assigning `exitCode` there changes the final status. The better pattern is to set `exitCode`, close servers, and let the loop drain.
 
 **Follow-up:**
 
 `exitCode = 3`, then in `exit` set `exitCode = 7` and schedule a timer. Print? OS status?
 
-Answer: natural path: `beforeExit` with 3, `exit` with 3, timer never runs, OS status 7.
+Answer: On the natural path, `beforeExit` sees 3 and `exit` sees 3. The timer scheduled in `exit` never runs, and the operating system gets status 7.
 
 ### NODE-038 — process.env values are strings
 
@@ -864,13 +864,13 @@ A service compares `process.env.PORT` to number `3000` and takes the wrong branc
 
 **Answer:**
 
-Reads are strings or `undefined`—never numbers/booleans. `'3000' === 3000` is false. Default with `??`, then `Number` + validate. Assignment `ToString`s (still on Node 20; deprecated since 10—may throw later for non-string/number/boolean). Changes don't affect the parent shell. `delete process.env.NAME` unsets; `''` is set-but-empty. Windows env names are case-insensitive on the main thread; POSIX is case-sensitive. Workers get a copy unless `SHARE_ENV` (since 11.14).
+`process.env` values are always strings, or `undefined` if unset, so `'3000' === 3000` is false. Read the value with a default, then convert and validate it, for example with `Number`. Assigning a value converts it to a string, and changes do not affect the parent shell. `delete process.env.NAME` unsets a variable, while an empty string means set but empty. On Windows, names are case-insensitive, but on POSIX they are case-sensitive. Workers get a copy of the environment unless you pass `SHARE_ENV`.
 
 **Follow-up:**
 
 Is `const snapshot = { ...process.env }` at startup the same as later reads? Safe to log?
 
-Answer: ordinary object copy—neither side tracks the other later. Still may hold secrets; log allowlisted keys or lengths, not the whole bag.
+Answer: No. The spread makes an ordinary object copy, and neither side tracks later changes. It may also contain secrets, so log only an allowlist of keys or just their lengths, not the whole object.
 
 ### NODE-039 — emit runs listeners on the current stack, and error is special
 
@@ -884,13 +884,13 @@ Explain `EventEmitter` on Node 20/22: when listeners run, what `'error'` does wi
 
 **Answer:**
 
-`emit` calls listeners synchronously in registration order (`prependListener` front; `once` removes after first) and returns before async work finishes. Sync throw propagates from `emit`. `'error'` with no listener throws the error (→ uncaught if it escapes). Default: async listener rejection is not routed to `'error'`—unhandled-rejection rules apply; `captureRejections: true` routes to `'error'`. Listeners are strong refs—`on` per request without `off` retains environments (upload-handler pattern). MaxListeners (default 10) is a tripwire, not a budget.
+`emit` calls listeners synchronously, in the order they were registered, and returns only after all of them have run. A synchronous throw propagates out of `emit`. If you emit `'error'` with no listener, the error is thrown. By default, an `async` listener's rejection is not sent to `'error'`; it follows the normal unhandled-rejection rules, unless you set `captureRejections: true`. Listeners are strong references, so adding one per request on a long-lived emitter without removing it retains each request's data. The default limit of 10 is a warning tripwire, not a budget.
 
 **Follow-up:**
 
 `{ captureRejections: true }` on one emitter—what changes for async throws, and for other emitters?
 
-Answer: that emitter's rejected listeners become `'error'` (no listener ⇒ throw). Others stay on promise-rejection behavior unless the module default is flipped.
+Answer: On that emitter, a rejected async listener is routed to `'error'`, and without an `'error'` listener it throws. Other emitters keep the default rejection behavior unless you change the module-wide default.
 
 ### NODE-040 — Which clock to use for a duration
 
@@ -904,13 +904,13 @@ You need handler duration on Node 20/22. Someone logs `Date.now()` at start and 
 
 **Answer:**
 
-`Date.now()` is a wall clock—NTP can step it; deltas can be negative or inflated. Use it for human/external timestamps. Durations need a monotonic clock: `performance.now()` (ms float from `timeOrigin`) or `process.hrtime.bigint()` (ns bigint; prefer over the tuple form). Timeout budgets and histograms use monotonic; log `time` as wall and `durationMs` as monotonic.
+`Date.now()` reads the wall clock, which NTP or the user can adjust, so the difference between two readings can be negative or inflated. Use it for timestamps meant for humans or other systems. To measure durations, use a monotonic clock, one that only moves forward. `performance.now()` returns milliseconds as a float, and `process.hrtime.bigint()` returns nanoseconds as a bigint. A good log line records the wall-clock time and a separate monotonic `durationMs`.
 
 **Follow-up:**
 
 Can `performance.now()` and `hrtime.bigint()` disagree which of two non-overlapping handlers was slower?
 
-Answer: each clock's own deltas are valid; don't mix clocks/conversions in one histogram. Both include await wait time—user latency, not CPU time.
+Answer: Each clock is valid for its own measurements, so the real risk is mixing them. Pick one clock per histogram and don't convert between them. Both include time spent waiting in `await`, so they show user-visible latency, not CPU time.
 
 ### NODE-041 — structuredClone copies a graph JSON cannot
 
@@ -924,7 +924,7 @@ A cache holds objects with `Date`s, `Map`s, cycles, and sometimes functions/clas
 
 **Answer:**
 
-JSON drops functions/`undefined` keys, stringifies `Date`, fails on cycles/`BigInt`, loses `Map`/`Set`/`RegExp` as themselves—returns plain JSON types. `structuredClone` (global since 17) preserves cycles, `Date`/`Map`/`Set`/`RegExp`/typed arrays; keeps `undefined` own props; throws `DOMException` on functions. `Buffer` becomes `Uint8Array` (bytes copied, not `Buffer`). Class instances become plain objects (no methods). Clone does not share children—peak is both graphs.
+JSON round-tripping loses a lot: functions and `undefined` values are dropped, `Date` becomes a string, `Map` and `Set` become empty objects, and cycles and `BigInt` throw. `structuredClone`, global since Node 17, preserves cycles, `Date`, `Map`, `Set`, `RegExp`, and typed arrays. It throws a `DOMException` for functions. Class instances become plain objects without methods, and a `Buffer` becomes a `Uint8Array`. The clone is a deep copy, so peak memory includes both graphs.
 
 **Trade-offs:**
 
@@ -934,7 +934,7 @@ Hand-written copy when you need class/`Buffer` identity; JSON when the contract 
 
 Clone an object holding a small pooled `allocUnsafe` view—does the clone share the slab?
 
-Answer: new `Uint8Array` with a copy of the view's own bytes only—not the whole slab. Original still shares the pool; cloning doesn't sanitize uninitialized source bytes.
+Answer: It creates a new `Uint8Array` containing only the view's own bytes, not the whole slab. The original still shares the pool. Cloning does not clean any uninitialized bytes in the source.
 
 ### NODE-042 — AbortController marks a signal; it does not unwind the stack
 
@@ -948,13 +948,13 @@ Explain `AbortController` on Node 20/22. A teammate expects `abort()` to stop a 
 
 **Answer:**
 
-`abort(reason)` sets `signal.aborted`, stores reason (or AbortError `DOMException`), fires `'abort'` sync; second abort is a no-op. It does not throw into or preempt a running stack—callers must `throwIfAborted()` / check between chunks. Host APIs that take `{ signal }` (`fetch`, timers/promises, etc.) reject on abort. `AbortSignal.timeout(ms)` / `AbortSignal.any` (20.3+) compose signals. Abort listeners are strong until fire/remove—same retention risk as other long-lived subscriptions.
+`abort()` sets `signal.aborted`, stores a reason, and fires the `'abort'` event synchronously. A second call does nothing. It does not interrupt running code the way a thread interrupt would, so a loop must check `signal.aborted` or call `throwIfAborted()` between chunks. APIs that accept `{ signal }`, such as `fetch` and the `timers/promises` functions, reject when aborted. `AbortSignal.timeout(ms)` creates a signal that aborts after a delay, and `AbortSignal.any`, added in Node 20.3, combines signals. Abort listeners stay strongly referenced until they fire or you remove them.
 
 **Follow-up:**
 
 `abort('stopped')` then `throwIfAborted`; then `abort(new Error('other'))`?
 
-Answer: throws the string `'stopped'` (not wrapped). Second abort ignored—reason unchanged, no second `'abort'`.
+Answer: `throwIfAborted()` throws the string `'stopped'` itself, not wrapped in an error. The second `abort` is ignored, so the reason stays the same and no second event fires.
 
 ### NODE-043 — node:fs and fs are one builtin, and some builtins require the prefix
 
@@ -968,13 +968,13 @@ How does Node 20/22 load builtins? When are `fs` and `node:fs` the same? Which A
 
 **Answer:**
 
-Builtins live in the binary. Bare historical names (`fs`, `path`, …) and `node:` forms resolve to the same module; `node:` cannot be shadowed by `node_modules`. Some modules are prefix-only (`node:test` ≠ `test`). `process.getBuiltinModule(id)` (20.16.0 / 22.3.0) sync-loads a builtin or returns `undefined`, ignoring a stubbed `require.cache` entry. Feature-detect for older 20. `fs` vs `fs/promises` are different entries. Prefer static `import 'node:…'` in apps; `getBuiltinModule` for Node-only optional deps without async `import()`.
+Built-in modules are compiled into the Node binary. `fs` and `node:fs` resolve to the same module, but the `node:` prefix cannot be shadowed by a package in `node_modules`. A few modules, such as `node:test`, work only with the prefix. `process.getBuiltinModule(id)`, added in Node 20.16 and 22.3, loads a built-in synchronously and returns `undefined` if there is no such module. It ignores any stub placed in `require.cache`. `fs` and `fs/promises` are separate entries. In normal application code, prefer a static `import 'node:fs'`.
 
 **Follow-up:**
 
 Cache stub for `fs`, then `getBuiltinModule('fs')` vs `require('fs')` on 22.3?
 
-Answer: `require` returns the stub; `getBuiltinModule` returns the real builtin.
+Answer: `require('fs')` returns your stub, while `getBuiltinModule('fs')` returns the real built-in module.
 
 ### NODE-044 — dynamic import() loads on a later turn, once
 
@@ -988,13 +988,13 @@ Explain dynamic `import()` on Node 20/22: when the body runs, what a second `imp
 
 **Answer:**
 
-`import(specifier)` returns a promise; evaluation of a not-yet-loaded graph happens on a later turn—not inside the call. Fulfills with the namespace; TLA keeps it pending until async evaluation finishes. Same resolved URL reuses the record (body once)—shared with static imports. Failures reject (`ERR_MODULE_NOT_FOUND`, eval errors)—`try/catch` without `await` misses them. From CJS, this is how you load ESM/TLA graphs without sync `require(esm)`.
+`import()` returns a promise, and a module that has not been loaded yet runs on a later turn, not inside the call. The promise fulfills with the module namespace; if the module uses top-level await, it stays pending until that finishes. A second `import()` of the same resolved URL reuses the same module record, so the body runs once, and that record is shared with static imports. Failures reject the promise, so a `try/catch` without `await` misses them. From CommonJS, `import()` is how you load ES modules, or graphs with top-level await.
 
 **Follow-up:**
 
 Two back-to-back `import('./plugin.mjs')` without awaiting—how many body runs?
 
-Answer: once; both join the same in-flight module record.
+Answer: The body runs once. Both calls join the same in-flight module record.
 
 ### NODE-045 — error.code, error.cause, and AggregateError
 
@@ -1008,13 +1008,13 @@ Answer: once; both join the same in-flight module record.
 
 **Answer:**
 
-OS failures are `Error`s with Node properties: `code` (e.g. `'ENOENT'`), `syscall`, `path`—branch on `code`, not `message`. `cause` is ECMAScript (`new Error(msg, { cause })`)—keeps the original stack/code chain. `AggregateError` has `errors[]` (`Promise.any` when all reject)—codes live on elements, not the aggregate. Retry intentional codes; let `SyntaxError` from `JSON.parse` through. Don't rethrow `new Error(err.message)` and drop `code`.
+Operating-system failures are `Error` objects with Node-specific properties such as `code`, for example `'ENOENT'`, plus `syscall` and `path`. Branch on `code`, not on the message text. `cause` is part of ECMAScript: `new Error(msg, { cause })` links the original error and keeps its stack. `AggregateError` has an `errors` array, and `Promise.any` throws one when everything rejects; the codes are on the elements, not on the aggregate itself. Do not rethrow with `new Error(err.message)`, since that drops `code` and the original stack.
 
 **Follow-up:**
 
 Catch the `readConfig` wrapper—ENOENT vs permission without parsing strings?
 
-Answer: walk `cause` until `code` appears; compare `'ENOENT'` vs `'EACCES'`. Or copy `code` onto the wrapper and test both.
+Answer: Walk the `cause` chain until you find an error with a `code`, then compare it to `'ENOENT'` or `'EACCES'`. Or copy `code` onto the wrapper error and test that.
 
 ### NODE-046 — console.log writes to stdout, and the write may block
 
@@ -1028,13 +1028,13 @@ Explain `console.log` / `console.error` on Node 20/22: when writes are sync vs a
 
 **Answer:**
 
-`console.log`/`info` → stdout; `error`/`warn` → stderr. Write mode: files sync (both OS); TTYs async on Windows / sync on POSIX; pipes/sockets sync on Windows / async on POSIX. Sync writes block the loop; async may return before consume (`write` false → wait `'drain'`). `process.exit` can drop a pending async stdout line (common under supervisors/pipes)—prefer `exitCode` and drain. Keep diagnostics on stderr so redirecting stdout doesn't hide stacks.
+`console.log` and `console.info` write to stdout, while `console.error` and `console.warn` write to stderr. Whether the write is synchronous depends on the destination. Files are synchronous. TTYs are asynchronous on Windows but synchronous on POSIX. Pipes and sockets are synchronous on Windows but asynchronous on POSIX. Synchronous writes block the loop, while async writes may still be queued when you call `process.exit`, so the last line can be lost. Prefer setting `exitCode` and letting output drain, and keep diagnostics on stderr so redirecting stdout does not hide stack traces.
 
 **Follow-up:**
 
 Stdout redirected to a file; stderr on a POSIX TTY. Which can block? Which can be lost on `process.exit`?
 
-Answer: both sync here (file + POSIX TTY)—both can block; neither is the async-pipe loss case. Pipe stderr and the last `console.error` before `exit` can vanish.
+Answer: Both are synchronous here, since stdout is a file and stderr is a POSIX TTY, so both can block, and neither can be lost on exit. The lost-line case applies to asynchronous pipes: if stderr were a pipe, the last `console.error` before `exit` could vanish.
 
 ### NODE-047 — Atomics.wait blocks the thread it is called on
 
@@ -1048,13 +1048,13 @@ A teammate wants to pause the main thread of a Node 20/22 server until another t
 
 **Answer:**
 
-`Atomics.wait` on a shared `Int32Array`/`BigInt64Array` blocks the calling thread until notify/value change/timeout (`'ok'`/`'timed-out'`/`'not-equal'`). Timeout `0` returns immediately when matched. While blocked, that thread runs no JS/timers/I/O. Browsers throw on the main/window agent; Node allows main-thread wait—and a server that does it stops serving. Use `Atomics.waitAsync`, promises, or wait on a worker. Needs `SharedArrayBuffer`.
+`Atomics.wait` blocks the thread that calls it until another thread notifies it, the value changes, or a timeout expires. It returns `'ok'`, `'not-equal'`, or `'timed-out'`. While blocked, that thread runs no JavaScript, timers, or I/O. Browsers forbid it on the main thread, but Node allows it, so a server that does this stops serving. A live server should use `Atomics.waitAsync` or promises, or do the blocking wait on a worker. It requires a `SharedArrayBuffer`.
 
 **Follow-up:**
 
 `Atomics.wait(view, 0, 0)` with no timeout inside an HTTP handler—next request?
 
-Answer: main JS thread is stuck; OS may accept the socket, but the next request's JS doesn't run until notify. Use `waitAsync` or a worker + message.
+Answer: The main JavaScript thread is stuck until a notification arrives. The operating system may accept connections, but no JavaScript handles the next request. Use `waitAsync`, or a worker and a message.
 
 ### NODE-048 — Read the shutdown script: what prints, and what status the OS sees
 
@@ -1078,13 +1078,13 @@ process.exitCode = 3;
 
 **Answer:**
 
-Prints `before 3` then `exit 3`. `late` never prints. OS status is 7. Setting `exitCode` alone doesn't exit; with no ref'd work Node takes the natural path so `beforeExit` runs. The `exit` listener receives 3 but assigns 7 afterward—Node uses the final `exitCode` for the OS. Timers scheduled in `exit` never run.
+It prints `before 3`, then `exit 3`. `late` never prints, and the operating system sees status 7. Setting `exitCode` does not exit by itself; with no referenced work left, Node takes the natural path, so `beforeExit` runs with 3, then `exit` runs with 3. Inside `exit`, the code assigns 7 afterward, and Node uses the final `exitCode` for the process status. Timers scheduled in an `exit` listener never run, because the loop does not run again.
 
 **Follow-up:**
 
 `setTimeout(() => {}, 0)` at the top of `beforeExit`—output?
 
-Answer: first `beforeExit` 3 keeps the process; after the timer, second `beforeExit` 3, then `exit` 3, status 7; `late` still never prints. `beforeExit` may postpone; `exit` may not.
+Answer: The first `beforeExit` prints 3, and the timer keeps the process alive. After it fires, `beforeExit` runs again with 3, then `exit` runs with 3, and the status is 7. `late` still never prints, because `beforeExit` may postpone exit, but `exit` cannot.
 
 ### NODE-049 — Error.stack is the stack from when the error was created
 
@@ -1098,13 +1098,13 @@ A helper builds `new Error('early')`; a timer throws that object later. The log 
 
 **Answer:**
 
-ECMAScript defines `Error`/`throw`, not `stack` format. V8 captures the stack string at construction; later `throw` of the same object does not recapture—timer frames are missing. `stackTraceLimit` caps frames (Node default 10), process-wide. `captureStackTrace(target, constructorOpt)` writes a stack and can omit the helper frame. `--enable-source-maps` remaps printed text, not capture time. Need the throw site → construct there or wrap with `{ cause }`.
+ECMAScript defines `Error` and `throw`, but not the format of `stack`. V8 captures the stack when the error object is constructed, not when it is thrown, so throwing the same object later from a timer does not add the timer's frames. `Error.stackTraceLimit` caps how many frames are captured, ten by default. `Error.captureStackTrace` writes a stack onto an object and can hide a helper frame. If you need the throw site, create the error there, or wrap it with `{ cause }`. `--enable-source-maps` only remaps the printed text.
 
 **Follow-up:**
 
 Subclass of `Error` forgets `super` / `captureStackTrace`—why empty/useless `stack`?
 
-Answer: V8 capture runs via `Error` constructor or explicit `captureStackTrace`. Assigning only `this.message` skips it. Call `super(message)`; pass the subclass as `constructorOpt` to hide its frame.
+Answer: V8 records the stack only when `Error`'s constructor runs, or when you call `captureStackTrace`. Setting `this.message` alone does not do it. Call `super(message)`, and pass your subclass as the second argument to `captureStackTrace` to hide its constructor frame.
 
 ### NODE-050 — Read the patch function: what JSON.parse changed, and what the assignment changed
 
@@ -1132,10 +1132,10 @@ function applyPatch(target, json) {
 
 **Answer:**
 
-`({}).admin` is `true`—prototype pollution for ordinary objects. `JSON.parse` creates an own data property named `__proto__`; it does not invoke the setter—`({}).admin` is still undefined after parse alone. The walk does: `target['__proto__']` returns `Object.prototype`, recursion assigns `admin` there. Also block `constructor`/`prototype` paths. Fix: skip those keys before any get/set; prefer `Object.create(null)` / `Object.hasOwn` / `defineProperty` carefully—still skip blocked keys before recursing through a get.
+`({}).admin` becomes `true`, which is prototype pollution. `JSON.parse` alone is not the culprit: it creates an own data property literally named `__proto__` without calling the setter, so `({}).admin` is still undefined after parsing. The recursive walk causes the damage. `target['__proto__']` returns `Object.prototype`, and the recursive call then assigns `admin` onto it. Also block `constructor` and `prototype`. The fix is to skip those keys before any read or write, and consider `Object.create(null)` or `Object.hasOwn` checks. Ordinary keys like `user` still work.
 
 **Follow-up:**
 
 Change the walk to `Object.defineProperty(...)`—does `__proto__` still pollute?
 
-Answer: `defineProperty` installs an own data property without the setter—this payload stops writing `Object.prototype`. Recursion that `get`s a blocked key before defining can still reach the prototype—skip blocked keys first.
+Answer: That stops the direct assignment, because `defineProperty` creates an own data property without using the setter. But if the recursion first reads a blocked key like `__proto__`, it can still reach the prototype. Skip blocked keys before doing anything with them.

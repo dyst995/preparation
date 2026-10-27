@@ -14,7 +14,9 @@ What is a relation, and what does a PostgreSQL table actually store? Table `read
 
 **Answer:**
 
-A relation is a set of tuples over named attributes: no duplicates, no order, attributes by name. A PostgreSQL table is a bag (multiset), so both rows stay; `COUNT(*)` is 2. `UNION` removes duplicates (one row); `UNION ALL` keeps them (four from the self-union). Column order binds positional `INSERT`. Without `ORDER BY`, result order is undefined.
+A relation, in the relational model, is a set of tuples: no duplicate rows, no defined order, and columns are named. A PostgreSQL table is a bag, so it may store the same row twice.
+
+In `reading`, both copies of `(1, 10)` stay, and `COUNT(*)` is 2. `UNION` builds a set and collapses them to one row. `UNION ALL` keeps every copy, so a self-union returns four rows. A positional `INSERT` still depends on column order. Without `ORDER BY`, PostgreSQL does not promise any display order.
 
 **Code:**
 
@@ -25,13 +27,13 @@ SELECT COUNT(*) FROM (SELECT * FROM reading UNION SELECT * FROM reading) t; -- 1
 
 **Trade-offs:**
 
-Add a key when the fact is unique; leave keyless for repeatable events. Prefer `UNION`/`DISTINCT` for set meaning, not to paper over a multiplying join.
+Add a key when the fact must be unique. Leave the table keyless when the same values can honestly happen twice, such as a repeated event. Use `UNION` or `DISTINCT` when you mean a set. Do not use them to hide a join that multiplied rows by accident.
 
 **Follow-up:**
 
 If two sessions insert the same `(meter, value)` with no key, what is guaranteed?
 
-Answer: Both can commit; the bag holds both. A primary/unique key makes one fail with `23505`; which fails depends on who commits the key first.
+Answer: Both inserts can commit, and the table keeps both rows. A primary key or unique constraint makes the second commit fail with `23505`. Which session fails depends on who records that key first.
 
 ### DB-002 — Superkeys, candidate keys, and the primary key
 
@@ -45,17 +47,19 @@ Define superkey, candidate key, primary key, and alternate key for `room` with `
 
 **Answer:**
 
-A superkey uniquely identifies a row; a candidate key is a minimal superkey. The primary key is the declared candidate; other candidates are alternate keys (`UNIQUE` here). `(building_id, room_no)` and `(name)` are candidates; `(building_id, room_no, name)` is a non-minimal superkey. PK forces `NOT NULL`; `UNIQUE` alone still allows many nulls. FKs target a PK or unique constraint.
+A superkey is any set of columns that identifies at most one row. A candidate key is a superkey you cannot shrink. The primary key is the candidate you declare as the row's main identifier. Every other candidate is an alternate key.
+
+Here `(building_id, room_no)` and `(name)` are both candidate keys. Adding `name` onto the primary key is still a superkey, but it is not minimal. A primary key also forces `NOT NULL`. A plain `UNIQUE` allows many nulls. A foreign key may target a primary key or a unique constraint.
 
 **Trade-offs:**
 
-Pick the PK as what other tables store; keep other candidates as `UNIQUE`. Surrogates help when natural keys are awkward to copy.
+Choose the primary key as the identifier other tables will store. Keep the other candidates as `UNIQUE`. A surrogate key is useful when the natural key is awkward to copy into every child table.
 
 **Follow-up:**
 
 Is `(building_id, name)` a candidate key here?
 
-Answer: It is a superkey (name alone is unique) but not a candidate, because dropping `building_id` still leaves a superkey.
+Answer: It is a superkey, because `name` alone is already unique. It is not a candidate key. You can drop `building_id` and what remains still identifies one row.
 
 ### DB-003 — Choosing the primary key is a contract
 
@@ -69,7 +73,9 @@ Email is unique but can be corrected, and customer ids appear in URLs, exports, 
 
 **Answer:**
 
-No. Uniqueness is necessary but not enough; the PK must stay stable wherever it is stored. `ON UPDATE CASCADE` rewrites local FKs, not URLs or other systems. Use a surrogate PK (`bigint GENERATED ALWAYS AS IDENTITY`) and `email NOT NULL UNIQUE`. Identity gaps after rollback are normal. Prefer a natural PK only when the domain id is immutable (e.g. ISO currency code).
+No. A primary key must be unique, and it must also stay stable everywhere it has been copied. Email can be corrected. `ON UPDATE CASCADE` rewrites foreign keys in this database only. It does not rewrite URLs, exports, or a foreign key that lives in another system.
+
+Give the table a surrogate primary key, `bigint GENERATED ALWAYS AS IDENTITY`, and declare `email text NOT NULL UNIQUE`. Gaps in the identity sequence after a rollback are normal. Use a natural primary key only when the business identifier cannot change, such as an ISO currency code.
 
 **Code:**
 
@@ -82,13 +88,13 @@ CREATE TABLE customer (
 
 **Trade-offs:**
 
-Natural keys are readable; surrogates isolate external copies from corrections. Prefer identity over `serial` on new tables.
+A natural key is readable in a query. A surrogate key protects every external copy from a correction. On a new table, prefer `GENERATED AS IDENTITY` over `serial`.
 
 **Follow-up:**
 
 Should `POST /customers` accept a client-minted id?
 
-Answer: Only on an explicit import path (`OVERRIDING SYSTEM VALUE` or `GENERATED BY DEFAULT`), with uniqueness enforced. Ordinary creates omit `id`.
+Answer: Only on an explicit import path, using `OVERRIDING SYSTEM VALUE` or `GENERATED BY DEFAULT`, with uniqueness still enforced. An ordinary create should omit `id` and let the database assign it.
 
 ### DB-004 — Comparisons with NULL yield unknown
 
@@ -102,17 +108,19 @@ What does `NULL = NULL` return, and which rows does `WHERE n <> 1` keep for valu
 
 **Answer:**
 
-Comparisons with `=`/`<>` yield unknown if either side is null; `NULL = NULL` is unknown. `WHERE` keeps only true—false and unknown drop the row—so the result is just `2`. Use `IS NULL` / `IS NOT DISTINCT FROM` for null-aware tests. `status <> 'closed' OR status IS NULL` keeps null statuses on purpose.
+SQL comparisons use three results: true, false, and unknown. `=` or `<>` is unknown when either side is null, so `NULL = NULL` is unknown. `WHERE` keeps a row only when the test is true. False and unknown both drop it.
+
+For 1, 2, and null, `n <> 1` keeps only 2. The null row is not "not equal" to 1. Test nulls with `IS NULL`, or use `IS NOT DISTINCT FROM` when null should count as a match. If a missing status must still appear, write that on purpose: `status <> 'closed' OR status IS NULL`.
 
 **Trade-offs:**
 
-Prefer real domain values when “missing” and “N/A” differ. Sentinels avoid 3VL but invent values that can pass checks and joins.
+Use a real domain value when "missing" and "not applicable" mean different things. A sentinel such as an empty string avoids three-valued logic, but it can pass checks and joins as if it were real data.
 
 **Follow-up:**
 
 What does `CHECK (amount > 0)` do with a null `amount`?
 
-Answer: `NULL > 0` is unknown; `CHECK` accepts true and unknown, so the row passes. `WHERE amount > 0` would reject it. Use `NOT NULL` to forbid null.
+Answer: `NULL > 0` is unknown. A `CHECK` accepts both true and unknown, so the row is stored. The same test in `WHERE` would drop it. Add `NOT NULL` when null is not allowed.
 
 ### DB-005 — NOT IN drops the whole result when the subquery yields NULL
 
@@ -126,7 +134,9 @@ Applicants: `(1,'a@ex.com')`, `(2,'b@ex.com')`, `(3,NULL)`. Blocked: `'b@ex.com'
 
 **Answer:**
 
-None. `NOT IN` requires `<>` against every subquery value; one null makes every outer row unknown. Prefer `NOT EXISTS` (equality never true for null pairs): that returns 1 and 3; add `email IS NOT NULL` if null applicants must be excluded.
+It returns no ids. `NOT IN` means the outer value must be not-equal to every value in the subquery. One null in `blocked` makes `email <> NULL` unknown for every applicant, and `WHERE` drops unknown. Even `'a@ex.com'` disappears, although it is not the blocked address.
+
+`NOT EXISTS` asks a different question: is there a row where the emails are equal? Equality is never true for a null pair, so the null applicant is not blocked. That query returns ids 1 and 3. Add `email IS NOT NULL` if a null applicant must be excluded too.
 
 **Code:**
 
@@ -137,13 +147,13 @@ WHERE NOT EXISTS (SELECT 1 FROM blocked b WHERE b.email = a.email);
 
 **Trade-offs:**
 
-`NOT IN` is fine for a typed non-null list (`status NOT IN ('draft','void')`). Avoid it on nullable subquery columns.
+`NOT IN` is fine for a list you control that cannot contain null, such as `status NOT IN ('draft', 'void')`. Do not use it on a subquery column that is nullable.
 
 **Follow-up:**
 
 Same applicants: empty `blocked`, then only `'b@ex.com'`. What does `NOT IN` return?
 
-Answer: Empty list → ids 1, 2, 3. Only `'b@ex.com'` → id 1. Id 3 drops because `NULL <> 'b@ex.com'` is unknown.
+Answer: An empty list excludes nobody, so ids 1, 2, and 3 all return. With only `'b@ex.com'`, id 1 returns. Id 3 drops because `NULL <> 'b@ex.com'` is unknown.
 
 ### DB-006 — COUNT(*) counts rows; COUNT(column) skips nulls
 
@@ -157,13 +167,15 @@ Sales: amounts 10, 10, NULL, 5 in regions east/east/west/west. What are `COUNT(*
 
 **Answer:**
 
-One row: 4, 3, 3, 2, 2. `COUNT(*)` counts rows including null amounts. `COUNT(amount)` and `COUNT(*) FILTER (WHERE amount IS NOT NULL)` skip nulls. `COUNT(DISTINCT amount)` ignores null and collapses duplicate 10s. Empty input: `COUNT(*)` is 0; `SUM` is null.
+The query returns one row: 4, 3, 3, 2, 2. `COUNT(*)` counts rows, so the null amount is included and the result is 4. `COUNT(amount)` counts non-null amounts, so it is 3. `COUNT(*) FILTER (WHERE amount IS NOT NULL)` is the same idea written as a filter, and it is also 3.
+
+`COUNT(DISTINCT amount)` ignores the null and collapses the two 10s, leaving 2. `COUNT(DISTINCT region)` is 2 because east and west are the only regions. On an empty input, `COUNT(*)` is 0, but `SUM` of no rows is null, not zero.
 
 **Follow-up:**
 
 `SELECT COUNT(*) FROM sale WHERE amount > 5`?
 
-Answer: 2. Both 10s match; `5 > 5` is false; `NULL > 5` is unknown and dropped.
+Answer: 2. Both 10s match. `5 > 5` is false, and `NULL > 5` is unknown, so those two rows are dropped.
 
 ### DB-007 — An inner join keeps only matched rows
 
@@ -177,17 +189,19 @@ Customers Ada/10, Grace/20, Lin/40; orders (1,10,50), (2,20,80), (3,30,10). Whic
 
 **Answer:**
 
-Ada/1 and Grace/2. Order 3 has no customer; Lin has no order. Inner join is the match intersection. Null keys would not match under `=`. Multiple orders for Ada would duplicate her name—that is the join, not a bug.
+An inner join returns only pairs that satisfy the `ON` condition. Here that is Ada with order 1, and Grace with order 2. Order 3 points at customer 30, who is not in the table, so that order disappears. Lin has no order, so Lin disappears too.
+
+A null key would not match under `=`, because the comparison is unknown. If Ada had two orders, her name would appear twice. That is the join repeating the customer for each match, not a bug in the customer table.
 
 **Trade-offs:**
 
-Prefer explicit `JOIN ... ON` over comma/`WHERE` so a missing condition fails at parse. Avoid `NATURAL JOIN` (shared name here is `id`, which yields no rows).
+Write `JOIN ... ON` rather than a comma in `FROM` plus a `WHERE` condition. A missing condition then fails at parse time instead of silently returning a cross product. Avoid `NATURAL JOIN`: the only shared name here is `id`, and that would match nothing.
 
 **Follow-up:**
 
 How many rows is `customer CROSS JOIN order_header`?
 
-Answer: 9—every customer with every order.
+Answer: 9. Every customer is paired with every order, whether or not the ids match.
 
 ### DB-008 — A left join keeps every left row
 
@@ -201,17 +215,19 @@ Same customers/orders as DB-007. What does `customer LEFT JOIN order_header` ret
 
 **Answer:**
 
-Ada/1, Grace/2, Lin/NULL. Left join preserves every left row; unmatched right columns are null. Order 3 still absent. Inner join would drop Lin.
+A left join starts from every row of the left table and looks for matches on the right. Ada still pairs with order 1, and Grace with order 2. Lin has no order, so Lin is kept and the order columns are null. Order 3 is still absent, because the join preserves customers, not orders.
+
+An inner join would drop Lin, because Lin has no matching order. The nulls on Lin's order columns mean "no match," not an order whose total happens to be null. Later filters have to respect that difference.
 
 **Trade-offs:**
 
-Chain an inner join after a left join and unmatched left rows disappear again (e.g. joining payments on order id drops Lin and Grace with no payment).
+If you left-join orders and then inner-join payments on the order id, the inner join throws away the unmatched left rows. Lin disappears, and so does a customer whose order has no payment.
 
 **Follow-up:**
 
 After left join to orders, `JOIN payment ON invoice_id = o.id` with one payment for order 1—who remains?
 
-Answer: Only Ada. The inner join to payment filters the left join’s output.
+Answer: Only Ada. The inner join to payment filters the output of the left join, so Grace and Lin no longer qualify.
 
 ### DB-009 — A right join is a left join with the inputs swapped
 
@@ -225,7 +241,9 @@ Same data. Rewrite `order_header RIGHT JOIN customer` as a `LEFT JOIN`. Does the
 
 **Answer:**
 
-`RIGHT JOIN` preserves the right input. Equivalent: start from `customer` and `LEFT JOIN order_header`. Same rows: Ada/1, Grace/2, Lin/NULL. Prefer left joins for readability.
+A right join preserves every row of the right-hand input and fills the left side with nulls when there is no match. `order_header RIGHT JOIN customer` therefore keeps every customer. The same result, written the usual way, is `customer LEFT JOIN order_header`.
+
+The pairs are Ada/1, Grace/2, and Lin with a null order id. Swapping the written form does not change that set. Prefer the left-join spelling so the preserved table is the one a reader sees first.
 
 **Code:**
 
@@ -239,7 +257,7 @@ LEFT JOIN order_header o ON o.customer_id = c.id;
 
 Do `USING` or aliases change which side is preserved?
 
-Answer: No. Preservation is join type and input position. `USING` only merges join columns.
+Answer: No. The join type and the position of the inputs decide which side is preserved. `USING` only merges the join columns into one output column.
 
 ### DB-010 — A full outer join keeps unmatched rows from both sides
 
@@ -253,13 +271,15 @@ Same data. When is `FULL OUTER JOIN` the right operator, and what does it return
 
 **Answer:**
 
-Use it when either side can lack a partner and both orphans must appear. Result: Ada/1, Grace/2, Lin/NULL, NULL/3. A left from customers hides order 3; a left from orders hides Lin. If the product only needs every customer, use left from customer.
+A full outer join keeps every row from both sides. When a row has no partner, the other side's columns are null. Use it when either side can lack a match and you need to see both kinds of orphan.
+
+Here the result is Ada/1, Grace/2, Lin with a null order, and a null customer with order 3. A left join from customers hides order 3. A left join from orders hides Lin. If the report only needs every customer, a left join from `customer` is the right operator, and the extra orphan order would be noise.
 
 **Follow-up:**
 
 Adding `AND c.note IS NOT DISTINCT FROM o.note` when all notes are null—what changes?
 
-Answer: Nothing here: nulls match under `IS NOT DISTINCT FROM`, so existing matches stay; four rows remain.
+Answer: Nothing here. `IS NOT DISTINCT FROM` treats two nulls as a match, so the existing pairs stay and you still get four rows.
 
 ### DB-011 — A WHERE on the outer side discards the preserved row
 
@@ -273,13 +293,15 @@ Same data. Query A puts `total >= 80` in `ON` of a left join; Query B puts it in
 
 **Answer:**
 
-A: Ada/NULL, Grace/2, Lin/NULL—filter limits matches; unmatched left rows stay. B: only Grace/2—`WHERE` after the join drops Ada (50) and Lin (null/unknown). Put predicates in `ON` to keep unmatched left rows; in `WHERE` to require a match.
+`ON` decides which right-hand rows match. `WHERE` runs after the join and can throw away a preserved left row. In query A, `total >= 80` only limits matches. Ada's 50 does not match, so Ada stays with null order columns. Grace matches. Lin stays unmatched. The result is Ada/null, Grace/2, Lin/null.
+
+Query B applies `WHERE total >= 80` after the join. Ada's 50 fails, and Lin's null test is unknown, so only Grace/2 remains. Put the test in `ON` to keep unmatched left rows, and in `WHERE` when a match is required.
 
 **Follow-up:**
 
 Query A uses `ON ... AND c.name <> 'Lin'`. Does Lin appear?
 
-Answer: Yes, with null `order_id`. A false predicate on the preserved side only blocks matches; it cannot remove Lin.
+Answer: Yes, with a null order id. A false condition on the preserved side only prevents a match. It does not remove Lin.
 
 ### DB-012 — GROUP BY keys define the groups
 
@@ -293,13 +315,15 @@ Customers Ada/Grace east, Lin west with orders. Is `SELECT region, name, SUM(tot
 
 **Answer:**
 
-Grouping by `region` alone while selecting `name` is illegal—`name` is not aggregated or determined by `region` (two east names). Grouping by primary key `c.id` is legal: PostgreSQL treats other columns of that table as functionally dependent. Ada and Grace each get their own sum; Lin with no orders needs a left join to appear.
+`GROUP BY` names the columns that stay constant inside each group. Every other selected column must be aggregated, or determined by that key. Grouping only by `region` while selecting `name` is illegal. East contains both Ada and Grace, so `name` is not determined by `region`.
+
+Grouping by the primary key `c.id` is legal. PostgreSQL treats the other columns of that table as determined by the key, so `name` is allowed. Ada and Grace each get their own sum. Lin appears only if the join starts from customer and is a left join.
 
 **Follow-up:**
 
 Left join from customer, `GROUP BY c.id`—what is Lin’s sum?
 
-Answer: Lin appears; `SUM(o.total)` is null (sum of only nulls), not 0. Use `COALESCE` only if the report defines “no orders” as zero.
+Answer: Lin appears. `SUM(o.total)` is null, because the only input is null, not 0. Use `COALESCE` only when the report defines "no orders" as zero.
 
 ### DB-013 — WHERE filters rows; HAVING filters groups
 
@@ -313,13 +337,15 @@ Sales east 10/30, west 5/NULL. Query: `WHERE amount > 5 GROUP BY region HAVING S
 
 **Answer:**
 
-`WHERE` runs before grouping (no aggregates); `HAVING` after. Only east 10 and 30 survive the filter; west forms no group. East sum 40 passes `HAVING`. Result: east, 40, n=2. `WHERE SUM(...)` is rejected.
+`WHERE` filters input rows before groups exist, so it cannot contain an aggregate. `HAVING` filters groups after `SUM` has been computed. `WHERE SUM(...)` is a syntax error.
+
+Here `amount > 5` keeps east 10 and east 30. West's 5 fails, and its null is unknown, so west forms no group at all. East's sum is 40, which passes `HAVING SUM(amount) >= 30`. The result is one row: east, 40, with a row count of 2.
 
 **Follow-up:**
 
 Drop `WHERE`, keep `HAVING SUM(amount) >= 30`?
 
-Answer: Still only east (40). West sums to 5 (`SUM` skips null) and fails `HAVING`.
+Answer: Still only east, with sum 40. West's sum is 5 because `SUM` skips the null, and 5 fails the `HAVING`.
 
 ### DB-014 — SUM and AVG skip nulls, and a preserved outer row is still a row
 
@@ -333,13 +359,15 @@ Rep Ada has deals 100, NULL, 50; Lin has none. Left join deals. For each rep: `C
 
 **Answer:**
 
-Ada: 3, 3, 2, 150, 75 (`AVG` is sum of non-nulls / count of non-nulls). Lin: left join emits one row with null deal columns → `COUNT(*)` 1, other counts 0, `SUM`/`AVG` null.
+`COUNT(*)` counts joined rows, including a placeholder row of nulls. `COUNT(column)` skips nulls. `SUM` and `AVG` also skip nulls, and `AVG` is the sum of the non-null amounts divided by how many non-null amounts there are.
+
+Ada has three joined rows: counts 3, 3, and 2, then sum 150 and average 75. Lin has no deals, but the left join still emits one row with null deal columns. Lin's `COUNT(*)` is 1, the other counts are 0, and `SUM` and `AVG` are null because they saw no numbers.
 
 **Follow-up:**
 
 `SUM(amount) WHERE false` vs same with `GROUP BY rep_id`?
 
-Answer: Ungrouped aggregate always returns one row (sum null). Grouped form returns zero rows—no groups formed.
+Answer: An ungrouped aggregate always returns one row, so the sum is null. The grouped form returns zero rows, because no groups were formed.
 
 ### DB-015 — A join changes the grain before COUNT runs
 
@@ -353,7 +381,9 @@ Accounts Ada/Lin; Ada has invoices 1 (two lines) and 2 (one line). Author’s qu
 
 **Answer:**
 
-Returns Ada, 3 (line grain); Lin disappears. Correct: left join invoices only and `COUNT(i.id)` → Ada 2, Lin 0.
+`COUNT(*)` counts the rows that exist after the joins, not the thing named in the comment. Joining through invoice lines changes the grain from accounts to lines. Ada has three lines, so the count is 3. Lin has no invoice, and the inner joins drop Lin entirely. The query is counting lines and missing accounts with no invoices.
+
+Count invoices by left-joining only to `invoice` and using `COUNT(i.id)`. A null invoice id is not counted, so Ada is 2 and Lin is 0. Do not join to line items unless the question is about lines.
 
 **Code:**
 
@@ -368,7 +398,7 @@ GROUP BY a.id;
 
 Second line on invoice 2—author’s `COUNT(*)` vs `COUNT(DISTINCT i.id)`?
 
-Answer: Author becomes 4 for Ada; `COUNT(DISTINCT i.id)` stays 2. Lin still absent on inner joins.
+Answer: The author's count becomes 4 for Ada. `COUNT(DISTINCT i.id)` stays 2. Lin is still absent, because the inner joins never produce a Lin row.
 
 ### DB-016 — Semi-joins and anti-joins ask about existence
 
@@ -382,7 +412,9 @@ Accounts Ada, Lin, Grace; invoices for Ada twice plus one with null `account_id`
 
 **Answer:**
 
-Semi-join with `EXISTS` → Ada once (null FK matches nobody). Anti-join with `NOT EXISTS` → Lin and Grace. An inner join multiplies Ada; `DISTINCT` hides multiplicity but still answers pairs, not existence.
+A semi-join asks whether a match exists, and it returns the left row once. `EXISTS` does that: Ada appears once, even though Ada has two invoices. The invoice with a null `account_id` equals nobody, so it does not attach to an account.
+
+An anti-join asks whether no match exists. `NOT EXISTS` returns Lin and Grace. An inner join answers a different question: it repeats Ada once per invoice. `DISTINCT` can hide that repetition, but it is still starting from pairs rather than from existence.
 
 **Code:**
 
@@ -393,13 +425,13 @@ WHERE EXISTS (SELECT 1 FROM invoice i WHERE i.account_id = a.id);
 
 **Trade-offs:**
 
-`EXISTS`/`NOT EXISTS` (or anti left join) are the right shapes for presence/absence when the FK is nullable.
+Use `EXISTS` or `NOT EXISTS`, or a left join that keeps only null matches, when you mean presence or absence. That shape stays correct when the foreign key is nullable.
 
 **Follow-up:**
 
 Accounts whose invoice totals sum to ≥100?
 
-Answer: Ada (50+70). Aggregate in a grouped subquery/`HAVING`, not `WHERE i.total >= 100` on a join (that filters lines, not account totals).
+Answer: Ada, if the invoices are 50 and 70. Sum in a grouped subquery and filter with `HAVING`. `WHERE i.total >= 100` on a join filters individual invoices, not the account's total.
 
 ### DB-017 — A scalar subquery may return only one row
 
@@ -413,13 +445,15 @@ Agents Ada/Lin; Ada has tickets 10 and 11; one orphan ticket. What happens with 
 
 **Answer:**
 
-Two rows from a scalar subquery → runtime error for the whole statement (no partial Lin result). Zero rows → null. Use `LEFT JOIN LATERAL (... ORDER BY opened_on, id LIMIT 1)` or an equivalent single-row aggregate keyed by date, not bare `MIN(id)`.
+A scalar subquery must return one column and at most one row. It stands where a single value is expected, including the select list. Zero rows become null. Two or more rows raise an error, and the whole statement fails. You do not get Lin's result with Ada omitted.
+
+To return the earliest ticket per agent, and null when there is none, left-join a lateral subquery that orders by `opened_on`, then `id`, and takes `LIMIT 1`. A bare `MIN(id)` answers "smallest id," which is the earliest ticket only while ids happen to follow time.
 
 **Follow-up:**
 
 `LEFT JOIN ticket GROUP BY agent` with `MIN(t.id)`—why is it still a bad “earliest” query?
 
-Answer: It works only while lower id implies earlier date. A later insert with a lower id breaks it; order by `opened_on` (then id).
+Answer: It is right only while a lower id always means an earlier date. A later insert that receives a lower id breaks it. Order by `opened_on`, and use `id` only as a tie-break.
 
 ### DB-018 — A recursive CTE walks a stated edge until the join is empty
 
@@ -433,13 +467,15 @@ Employees: Ada←Grace/Lin, Grace←Edsger. What is a CTE, and what does a recur
 
 **Answer:**
 
-A CTE is a named subquery in the statement (`WITH`), not a catalog table. Recursive form: anchor + recursive term (`UNION`/`UNION ALL`). From Edsger: Edsger depth 1, Grace 2, Ada 3; stop when the join adds nothing. Prefer `UNION` if cycles must collapse duplicates; guard depth or use cycle detection for graphs that can loop.
+A common table expression is a named subquery in one statement, written with `WITH`. It is not a catalog table. A recursive CTE has an anchor, which seeds the rows, and a recursive member, which joins back to that name. Combine them with `UNION` or `UNION ALL`. PostgreSQL repeats the recursive member until the join adds nothing.
+
+Walking up from Edsger returns Edsger at depth 1, Grace at 2, and Ada at 3. Use `UNION` when a cycle should collapse duplicates. Cap the depth, or use the cycle clause, when the graph can loop.
 
 **Follow-up:**
 
 Anchor `manager_id IS NULL`, recurse children—depths?
 
-Answer: Ada@1; Grace and Lin@2; Edsger@3.
+Answer: Ada is depth 1. Grace and Lin are depth 2. Edsger is depth 3.
 
 ### DB-019 — PostgreSQL 16 inlines a CTE only under definite rules
 
@@ -453,17 +489,19 @@ When does PostgreSQL 16 materialize vs inline a CTE? What do a twice-referenced 
 
 **Answer:**
 
-Non-recursive, non-modifying CTE: inlined if referenced once (unless `MATERIALIZED`); materialized by default if referenced more than once (`NOT MATERIALIZED` can force inline). Pre-PG12 “always fence” is outdated. Statement 1 materializes region totals (east 40, west 5) and returns both crossed pairs. Statement 2’s data-modifying CTE always runs: deletes invoice 11, outer select empty, table left with id 10.
+In PostgreSQL 16, a CTE that is not recursive and does not modify data is inlined when it is used once, unless you write `MATERIALIZED`. Used more than once, it is materialized unless you write `NOT MATERIALIZED`. The old rule that a CTE is always an optimization fence applies only before PostgreSQL 12.
+
+A region-total CTE used twice is computed once: east 40 and west 5. The outer join returns both crossed pairs. A data-modifying CTE always runs, even under an outer `WHERE false`. It deletes invoice 11, the outer select is empty, and the table keeps id 10.
 
 **Trade-offs:**
 
-`MATERIALIZED` fixes volatile results once; a plain subquery is the honest “always inline” spelling.
+`MATERIALIZED` computes a volatile expression once and reuses it. If you always want inlining, a plain subquery says that more directly than a CTE.
 
 **Follow-up:**
 
 How do a write CTE and a later CTE in the same `WITH` communicate?
 
-Answer: Via `RETURNING` as the earlier CTE’s result—not by the later clause reading the base table expecting to see the write.
+Answer: The later CTE reads the earlier CTE's `RETURNING` rows. It should not reread the base table and expect to see that write.
 
 ### DB-020 — CHECK accepts true and unknown; NOT NULL is separate
 
@@ -477,13 +515,15 @@ Answer: Via `RETURNING` as the earlier CTE’s result—not by the later clause 
 
 **Answer:**
 
-`CHECK` fails only on false. Null → unknown → accepted; 0 and -1 fail (`23514`); 10 succeeds. Stored: `(1,NULL)`, `(4,10)`. `NOT NULL` is separate (`23502`). Combine both for a required positive amount.
+A `CHECK` constraint fails only when its expression is false. True is stored. Unknown is also stored, which is why a null amount passes `amount > 0`: the comparison is unknown, not false. Zero and negative one are false, so those inserts fail with `23514`. Ten succeeds.
+
+The stored rows are `(1, NULL)` and `(4, 10)`. `NOT NULL` is a separate constraint and fails with `23502`. A required positive amount needs both: `amount numeric NOT NULL CHECK (amount > 0)`.
 
 **Follow-up:**
 
 `CHECK ((status = 'void') = (voided_on IS NOT NULL))`—which rows pass?
 
-Answer: Void with date, and non-void with null date. Void without date or non-void with date fails. Null `status` makes the equality unknown and passes `CHECK`.
+Answer: A void row with a date, and a non-void row with a null date. Void without a date, or non-void with a date, fails. A null `status` makes the equality unknown, and `CHECK` accepts that.
 
 ### DB-021 — UNIQUE allows many nulls unless NULLS NOT DISTINCT
 
@@ -497,13 +537,15 @@ Answer: Void with date, and non-void with null date. Void without date or non-vo
 
 **Answer:**
 
-Default `NULLS DISTINCT`: both nulls and both case variants succeed; second `'a@ex.com'` fails (`23505`). Case-sensitive collation treats `A@` as different. One null: `UNIQUE NULLS NOT DISTINCT (email)` (PG15+).
+By default a unique index is `NULLS DISTINCT`: null is not equal to null, so each null is allowed. Both null inserts succeed. The second `'a@ex.com'` collides with the first and fails with `23505`. The default collation is case-sensitive, so `'A@ex.com'` is a different value and succeeds too.
+
+To allow only one null, declare `UNIQUE NULLS NOT DISTINCT (email)`. That form has existed since PostgreSQL 15, so it is available in 16. Nulls then compare as equal for this constraint. Case-insensitive uniqueness is a separate choice, such as a unique index on `lower(email)`.
 
 **Follow-up:**
 
 Third null insert, then `GROUP BY email` counting nulls?
 
-Answer: Insert succeeds; one group of null email with count 3.
+Answer: The third null succeeds under the default unique rule. `GROUP BY email` puts all nulls in one group, so that group has count 3.
 
 ### DB-022 — Foreign-key actions are a domain rule
 
@@ -517,17 +559,19 @@ Migration wants `ON DELETE CASCADE` from ledger lines to account for support del
 
 **Answer:**
 
-Reject for ledger history; use `RESTRICT`/`NO ACTION` and close via status. CASCADE fits invoice lines that die with the invoice. RESTRICT/NO ACTION fail delete while children exist (`23503`); NO ACTION can be deferred, RESTRICT cannot. SET NULL needs a nullable column; SET DEFAULT must still satisfy the FK. Default `REFERENCES` is NO ACTION, not cascade.
+Do not cascade account deletes into ledger lines. Those lines are history. Close the account with a status instead. `ON DELETE CASCADE` fits children that have no meaning alone, such as invoice lines.
+
+`CASCADE` deletes or updates the children. `RESTRICT` and `NO ACTION` reject the parent change while children exist (`23503`). Only `NO ACTION` can be deferred. `SET NULL` needs a nullable column. `SET DEFAULT` writes the default, which must still satisfy the foreign key. A bare `REFERENCES` means `NO ACTION`, not cascade.
 
 **Trade-offs:**
 
-`ON UPDATE CASCADE` rewrites children when a natural key changes—costly; another reason for immutable surrogates.
+`ON UPDATE CASCADE` rewrites every child when a natural key changes, which is expensive and easy to get wrong across systems. That is another reason to use an immutable surrogate key.
 
 **Follow-up:**
 
 Self-FK managers: delete Ada under CASCADE vs SET NULL?
 
-Answer: CASCADE empties the table (subtree). SET NULL clears Grace/Lin’s manager; Edsger still points at Grace.
+Answer: `CASCADE` follows the tree and empties the table. `SET NULL` clears the manager on Grace and Lin. Edsger still points at Grace.
 
 ### DB-023 — MATCH SIMPLE skips a composite key that is partly null
 
@@ -541,13 +585,15 @@ FK `(building_id, room_no) REFERENCES room`. Inserts full valid, full invalid, a
 
 **Answer:**
 
-Default `MATCH SIMPLE`: check only when all FK columns are non-null. Valid `(1,101)` ok; `(1,999)` fails `23503`; any partial null succeeds without lookup. `MATCH FULL`: all null ok as “no parent”; mixed null/non-null fails; both non-null still must match. PostgreSQL has no `MATCH PARTIAL`.
+The default is `MATCH SIMPLE`. PostgreSQL checks the foreign key only when every foreign-key column is non-null. A valid pair `(1, 101)` succeeds. `(1, 999)` does not exist and fails with `23503`. A row with any foreign-key column null succeeds, and PostgreSQL does not look for a parent.
+
+`MATCH FULL` treats all-null as "no parent" and allows it. A mix of null and non-null fails. If every column is non-null, the pair must still match a parent. PostgreSQL does not implement `MATCH PARTIAL`.
 
 **Follow-up:**
 
 Delete room `(1,101)` with booking 1 referencing it, and booking 3 partly null—what happens?
 
-Answer: Delete fails because of booking 1. Partly null booking 3 does not reference that room under SIMPLE, so it does not block.
+Answer: The delete fails because of booking 1. Under `MATCH SIMPLE`, booking 3 does not reference that room, so it does not block the delete.
 
 ### DB-024 — A self-join pairs a row with another row in the same table
 
@@ -561,7 +607,9 @@ List every employee and manager name; Ada has null `manager_id` and must appear.
 
 **Answer:**
 
-`employee e LEFT JOIN employee m ON m.id = e.manager_id`: Ada/NULL, Grace/Ada, Lin/Ada, Edsger/Grace. Inner join drops Ada (`NULL = m.id` is unknown).
+A self-join uses the same table twice, with two aliases, and pairs a row with another row. To list employees and managers, keep every employee and attach the manager when one exists:
+
+The left join returns Ada with a null manager, Grace and Lin with Ada, and Edsger with Grace. An inner join drops Ada. `NULL = m.id` is unknown, so the top of the tree has no match and disappears.
 
 **Code:**
 
@@ -575,7 +623,7 @@ LEFT JOIN employee m ON m.id = e.manager_id;
 
 Employees who share a manager (exclude self)?
 
-Answer: Join on equal `manager_id` and `peer.id <> e.id`. Grace↔Lin; Ada excluded (null manager).
+Answer: Join the table to itself on equal `manager_id`, and require `peer.id <> e.id`. Grace and Lin pair with each other. Ada is excluded because a null manager never matches.
 
 ### DB-025 — Null-safe equality is IS NOT DISTINCT FROM
 
@@ -589,13 +637,15 @@ Answer: Join on equal `manager_id` and `peer.id <> e.id`. Grace↔Lin; Ada exclu
 
 **Answer:**
 
-`<>` is unknown with nulls, so `WHERE` drops real changes. Use `IS DISTINCT FROM` / `IS NOT DISTINCT FROM`. Here ids 1 and 2 changed; 3 unchanged. `UNION`/`DISTINCT`/`GROUP BY`/`INTERSECT`/`EXCEPT` treat nulls as equal for duplicate removal.
+`<>` is unknown when either side is null, and `WHERE` then drops the row. A real change from null to a value, or from a value to null, is invisible to `<>`. `IS DISTINCT FROM` is the null-safe test: it is true when the values differ, including null on only one side. `IS NOT DISTINCT FROM` is the null-safe equal.
+
+On this input, ids 1 and 2 changed and id 3 did not. Set operations do not use three-valued `=`. `UNION`, `DISTINCT`, `GROUP BY`, `INTERSECT`, and `EXCEPT` treat two nulls as the same value when they remove duplicates.
 
 **Follow-up:**
 
 `WHERE NULL = NULL` vs `IS NOT DISTINCT FROM`, and `NULL EXCEPT NULL`?
 
-Answer: `=` → no rows; `IS NOT DISTINCT FROM` → one row. Plain `EXCEPT` of two nulls → empty.
+Answer: `NULL = NULL` keeps no rows. `IS NOT DISTINCT FROM` keeps one row. `EXCEPT` of a null row against a null row is empty, because the nulls match.
 
 ### DB-026 — UNION returns a set; UNION ALL keeps every row
 
@@ -609,13 +659,15 @@ Answer: `=` → no rows; `IS NOT DISTINCT FROM` → one row. Plain `EXCEPT` of t
 
 **Answer:**
 
-`UNION`: distinct rows—`(1,intake)`, `(2,lab)`, `(3,rounds)`. `UNION ALL`: five rows keeping duplicates. Output names/types come from the first select; later selects must match type (with casts). `ORDER BY` may use output names or positional numbers, not second-select aliases.
+`UNION` returns a set. Duplicate rows disappear, so the result is `(1, intake)`, `(2, lab)`, and `(3, rounds)`. `UNION ALL` concatenates the inputs and keeps duplicates, so the two copies of `(1, intake)` and the two copies of `(2, lab)` all remain: five rows.
+
+The output column names and types come from the first `SELECT`. Later arms must be type-compatible, using casts where needed. `ORDER BY` may use those output names or a column position. It cannot use an alias that exists only in the second `SELECT`.
 
 **Follow-up:**
 
 `SELECT 1 UNION SELECT 1.0`—rows and type?
 
-Answer: One `numeric` row (1). `UNION ALL` yields two numeric 1s.
+Answer: One row, and the type is `numeric`. `UNION ALL` returns two `numeric` rows, both with value 1.
 
 ### DB-027 — INTERSECT and EXCEPT treat null as a matching row
 
@@ -629,13 +681,15 @@ Left tags: a,a,b,null,null; right: a,c,null. What do INTERSECT/EXCEPT and their 
 
 **Answer:**
 
-`INTERSECT`: a and null. `EXCEPT`: b. `INTERSECT ALL`: one a, one null (`min` counts). `EXCEPT ALL`: one a, one b, one null (`max(m-n,0)`). `INTERSECT` binds tighter than `UNION` (like AND vs OR); use parentheses when mixing.
+`INTERSECT` and `EXCEPT` treat null as equal to null. The set forms also remove duplicates. `INTERSECT` returns `a` and null. `EXCEPT` returns `b`, the only left value that is not on the right.
+
+The `ALL` forms keep multiplicity. `INTERSECT ALL` takes the smaller count: one `a` and one null. `EXCEPT ALL` subtracts counts and does not go below zero: one `a` remains, plus `b`, plus one null. `INTERSECT` binds more tightly than `UNION`, the way `AND` binds more tightly than `OR`. Parentheses are required when you mix them and the order matters.
 
 **Follow-up:**
 
 `NULL EXCEPT NULL`, and `EXCEPT ALL` of two left nulls vs one right?
 
-Answer: Plain EXCEPT → empty. EXCEPT ALL → one null remaining.
+Answer: Plain `EXCEPT` returns empty, because the nulls match. `EXCEPT ALL` leaves one null, because two minus one is one.
 
 ### DB-028 — DISTINCT, GROUP BY, and DISTINCT ON answer different questions
 
@@ -649,13 +703,15 @@ Invoices (10,1,40), (11,1,15), (12,2,8), (13,2,8). What do `DISTINCT customer_id
 
 **Answer:**
 
-`DISTINCT`/`GROUP BY customer_id` → 1 and 2. `DISTINCT` on `(customer_id,total)` → three pairs (2,8 once). Sums: customer 1 → 55, customer 2 → 16. `DISTINCT ON (customer_id) ... ORDER BY customer_id, id DESC` keeps ids 11 and 13.
+`DISTINCT` removes duplicate selected rows. `DISTINCT customer_id` returns customers 1 and 2. `DISTINCT` on `(customer_id, total)` returns three pairs, because customer 2's two totals of 8 collapse and customer 1's 40 and 15 do not. `GROUP BY customer_id` can also compute sums: customer 1 totals 55, and customer 2 totals 16.
+
+`DISTINCT ON (customer_id)` keeps the first row of each customer after the `ORDER BY`. With `ORDER BY customer_id, id DESC`, those rows are invoice 11 and invoice 13. The `ORDER BY` must start with the `DISTINCT ON` expressions, then the columns that decide which row wins.
 
 **Follow-up:**
 
 `DISTINCT ON (customer_id) ... ORDER BY customer_id, total DESC`?
 
-Answer: `(1,40)` and `(2,8)`. Ties on total without a further key are unspecified.
+Answer: The kept pairs are `(1, 40)` and `(2, 8)`. Customer 2's two totals tie at 8. Without another sort key, PostgreSQL does not promise which of those two rows it keeps.
 
 ### DB-029 — CASE takes the first true branch
 
@@ -669,13 +725,15 @@ Tickets: null/open, 1/open, 2/closed, 9/open. Simple `CASE priority WHEN 1 … W
 
 **Answer:**
 
-First true branch wins; no match → `ELSE` or null. Simple `CASE` uses `=`, so `WHEN NULL` never matches a null priority. Searched form can use `IS NULL`. Later true branches are skipped.
+`CASE` walks its branches in order and returns the first one that is true. Later true branches are ignored. If none match, the result is the `ELSE` value, or null when there is no `ELSE`.
+
+Simple `CASE priority WHEN ...` compares with `=`. `WHEN NULL` never matches a null priority, because `NULL = NULL` is unknown. A searched `CASE` can test `priority IS NULL` and can also test `status = 'closed'`. Put the more specific test first. A closed ticket with priority 1 would hit whichever of those branches you wrote earlier.
 
 **Follow-up:**
 
 `CASE priority WHEN 1 THEN 'high' ELSE priority::text END` for null priority?
 
-Answer: `ELSE` runs; cast of null is null—not the word “missing.”
+Answer: The `ELSE` runs. Casting null to text produces null, not the word "missing."
 
 ### DB-030 — COALESCE returns the first non-null argument
 
@@ -689,13 +747,15 @@ People: Ada/null nickname, Grace/`''`, Lin/`'L'`. What does `COALESCE(nickname, 
 
 **Answer:**
 
-Ada→Ada, Grace→`''` (empty is not null), Lin→L. Arguments must share a common type; a later incompatible argument errors even if never chosen—use casts.
+`COALESCE` returns the first argument that is not null, and null only when every argument is null. Ada's nickname is null, so the result is Ada. Grace's nickname is `''`. An empty string is a value, so the name is never used. Lin's nickname is `L`.
+
+Every argument must share a common type. PostgreSQL checks that while planning, so a later argument of the wrong type is an error even if an earlier argument would always win. Cast the arguments when the types differ.
 
 **Follow-up:**
 
 `COALESCE(nickname, NULL, name)` for Ada and Grace?
 
-Answer: Unchanged—middle nulls are skipped; Grace still returns `''` first.
+Answer: The same results. The middle null is skipped. Grace still returns `''`, because that empty string comes before `name`.
 
 ### DB-031 — AND and OR are three-valued, and WHERE keeps only true
 
@@ -709,13 +769,15 @@ Flags with mixes of true/false/null for `active`/`archived`. Values of AND/OR/NO
 
 **Answer:**
 
-`false AND x` → false; `true AND unknown` → unknown; `true OR x` → true; `NOT unknown` → unknown. `WHERE active` → ids with true (1,2). `NOT active` → only known false (3,5), not null. `IS NOT TRUE` → false or unknown (3,4,5).
+`AND`, `OR`, and `NOT` use true, false, and unknown. `false AND x` is false. `true AND unknown` is unknown. `true OR x` is true even when `x` is unknown. `NOT unknown` is unknown. `WHERE` keeps only true.
+
+`WHERE active` returns ids 1 and 2. `WHERE NOT active` returns only known false, ids 3 and 5. A null flag stays unknown when negated, so it is excluded. `active IS NOT TRUE` keeps both false and unknown: ids 3, 4, and 5.
 
 **Follow-up:**
 
 `WHERE active IS UNKNOWN OR archived IS UNKNOWN`?
 
-Answer: Ids 2, 3, 4.
+Answer: Ids 2, 3, and 4. Those are the rows where at least one of the two flags is null.
 
 ### DB-032 — A view is a stored query
 
@@ -729,13 +791,15 @@ View `open_item` = items where `name <> 'tape'`. After inserts, which rows appea
 
 **Answer:**
 
-Views store a query, not rows (except materialized views). Reading sees current base data minus tape. Simple updatable views can insert; `WITH CHECK OPTION` rejects rows that would vanish. Named-column views ignore new base columns; `SELECT *` views pick them up after recreate/replace rules—prefer explicit columns.
+A view stores a query, not a copy of the rows. A materialized view is the exception: it stores a snapshot until you refresh it. Reading `open_item` reruns the query and hides the name `tape`.
+
+A simple one-table view can be inserted through. By default the new row is stored even when the view would not show it. `WITH CHECK OPTION` rejects that row. PostgreSQL saves the view's column list at creation. A column added later to `item` stays hidden until you replace the view, so name the columns you mean.
 
 **Follow-up:**
 
 Update a visible row to `'tape'` without vs with check option?
 
-Answer: Without: succeeds; row leaves the view but stays in `item`. With check: rejected (`44000`).
+Answer: Without the check, the update succeeds. The row leaves the view and remains in `item`. With the check, PostgreSQL rejects it with `44000`.
 
 ### DB-033 — A generated column is computed on write
 
@@ -749,13 +813,15 @@ Answer: Without: succeeds; row leaves the view but stays in `item`. With check: 
 
 **Answer:**
 
-PG16 has stored generated columns only (`STORED` required). Insert stores 150; update stores 200. Rejects direct writes to the generated column (unless the expression is overridden only where allowed—typically not). Expression may reference base columns only, not other generated columns.
+A stored generated column is computed from other columns of the same row and written to the heap. PostgreSQL 16 has this stored form only; the `STORED` keyword is required. Virtual generated columns, computed on read, are not in 16.
+
+Inserting quantity 3 and unit price 50 stores 150. Updating the quantity to 4 stores 200. You cannot write the generated column directly. Omit it, or use `DEFAULT`. The expression may use base columns of the row only. It cannot call a volatile function, and it cannot read another generated column.
 
 **Follow-up:**
 
 `GENERATED AS (amount_cents / 10)`?
 
-Answer: Rejected. Use `((qty * unit_cents) / 10)` on base columns.
+Answer: Rejected, because `amount_cents` is itself generated. Repeat the base expression: `((qty * unit_cents) / 10)`.
 
 ### DB-034 — A domain constrains a type; a table CHECK can see the row
 
@@ -769,13 +835,15 @@ Domain `posint` with `VALUE > 0`; table `CHECK (spare <= units)`. Inserts `(5,2)
 
 **Answer:**
 
-`(5,2)` ok; `(0,0)` fails domain; `(5,9)` fails table check; `(NULL,NULL)` ok (domain/table checks see unknown). Domains see only `VALUE`, not other columns—cross-column rules need table `CHECK`.
+A domain is a type plus constraints on one value. A table `CHECK` can see the whole row. `(5, 2)` passes both. `(0, 0)` fails the domain because 0 is not greater than 0. `(5, 9)` passes the domain and fails the table check because spare is greater than units. `(NULL, NULL)` passes: both the domain check and the table check see unknown, and unknown is accepted.
+
+`spare <= units` cannot be a domain constraint. The domain is substituted for a single `VALUE` and never sees the other column. Cross-column rules belong on the table.
 
 **Follow-up:**
 
 Domain with `NOT NULL`, insert scalar subquery that returns no row into `units`?
 
-Answer: Stores null—empty scalar is already typed; domain `NOT NULL` is not reapplied that way. Prefer column `NOT NULL`.
+Answer: The column stores null. An empty scalar subquery is already a typed null, and PostgreSQL does not reapply the domain's `NOT NULL` in that case. Put `NOT NULL` on the column.
 
 ### DB-035 — DEFERRABLE moves the check to statement end or commit
 
@@ -789,13 +857,15 @@ Answer: Stores null—empty scalar is already typed; domain `NOT NULL` is not re
 
 **Answer:**
 
-Deferrable unique checks at statement end (immediate) or commit (deferred); non-deferrable unique checks per row. One-statement swap succeeds when deferrable immediate; fails when not deferrable. Two statements need `SET CONSTRAINTS ... DEFERRED`; commit after only the first update fails. `NOT NULL`/`CHECK` are never deferrable. FKs cannot target a deferrable unique.
+A deferrable constraint can wait until the end of the statement, or until commit if you run `SET CONSTRAINTS ... DEFERRED`. A unique constraint that is not deferrable is checked per row, so a swap can fail on a temporary duplicate.
+
+One `UPDATE` that swaps two emails succeeds when the constraint is deferrable. It fails when it is not. Two statements need the check deferred, and committing after only the first update fails. `NOT NULL` and `CHECK` cannot be deferred. A foreign key cannot target a deferrable unique constraint.
 
 **Follow-up:**
 
 Deferred FK cycle inserts `(1,2)` then `(2,1)`?
 
-Answer: Commit succeeds when deferred; non-deferrable rejects the first insert; commit after only the first deferred insert fails.
+Answer: Commit succeeds when the foreign keys are deferred. A non-deferrable foreign key rejects the first insert. Committing after only the first deferred insert fails.
 
 ### DB-036 — Explicit casts truncate; assignment to varchar rejects
 
@@ -809,13 +879,15 @@ Answer: Commit succeeds when deferred; non-deferrable rejects the first insert; 
 
 **Answer:**
 
-Assignment into `varchar(n)` rejects overflow (`22001`) except trimming trailing spaces. Explicit cast to `varchar(n)` truncates silently. `CAST`/`::` are equivalent. Cast float/numeric to int truncates toward zero (`2.9`→2, `-2.9`→-2).
+Assignment and an explicit cast enforce `varchar(n)` differently. Inserting a longer string into `varchar(3)` fails with `22001`, except that PostgreSQL first trims trailing spaces to fit. An explicit `CAST` or `::` to `varchar(n)` truncates silently and keeps the leading characters. `CAST(x AS t)` and `x::t` are the same conversion.
+
+Casting `numeric` or `double precision` to `integer` truncates toward zero. `CAST(2.9 AS int)` is 2, and `CAST(-2.9 AS int)` is -2. It does not round to the nearest integer.
 
 **Follow-up:**
 
 Insert `'ab '` and `'abc '` into `varchar(3)`?
 
-Answer: `'ab '` stored (space kept). `'abc '` stored as `'abc'` (trailing space truncated on assignment).
+Answer: `'ab '` is stored with its space, because it already fits. `'abc '` is stored as `'abc'`. Assignment drops the trailing space that would have overflowed.
 
 ### DB-037 — WHERE cannot see a select-list name
 
@@ -829,13 +901,15 @@ Answer: `'ab '` stored (space kept). `'abc '` stored as `'abc'` (trailing space 
 
 **Answer:**
 
-Logical order: FROM → WHERE → GROUP BY → HAVING → SELECT → DISTINCT → ORDER BY → LIMIT. `WHERE` cannot see select aliases (`42703`); filter on `cents`. `GROUP BY` prefers input columns; `ORDER BY` prefers output names. Ambiguity: know which binding you mean.
+PostgreSQL resolves clauses in this order: `FROM`, `WHERE`, `GROUP BY`, `HAVING`, `SELECT`, `DISTINCT`, `ORDER BY`, then `LIMIT`. `WHERE` runs before the select list, so it cannot see the alias `amount`. The query fails with `42703`. Filter on `cents`.
+
+If a name is both an input column and an output alias, `GROUP BY` uses the input column and `ORDER BY` uses the output name. `cents AS id` therefore means two different things in those two clauses. Pick an alias that does not collide.
 
 **Follow-up:**
 
 `SELECT cents AS id ... ORDER BY id` vs `GROUP BY id`?
 
-Answer: `ORDER BY id` sorts by output (`cents`). `GROUP BY id` groups by `payment.id`.
+Answer: `ORDER BY id` sorts by the output alias, which is `cents`. `GROUP BY id` groups by `payment.id`.
 
 ### DB-038 — ORDER BY puts nulls last on the way up and first on the way down
 
@@ -849,13 +923,15 @@ Events: dates Jan 2, NULL, Jan 1, Jan 1. Orders for ASC/DESC and null modifiers?
 
 **Answer:**
 
-Default: nulls larger—so ASC → NULLS LAST, DESC → NULLS FIRST. Overrides apply per key. Fully specify ties with `id`. Expressions like `ORDER BY measured_on NULLS FIRST NULLS LAST` are rejected as contradictory.
+PostgreSQL sorts null as larger than any date. Ascending order therefore puts nulls last, and descending order puts nulls first. You can override that per sort key with `NULLS FIRST` or `NULLS LAST`. Equal dates are not a stable order unless you add a unique tie-break such as `id`.
+
+`ORDER BY measured_on NULLS FIRST NULLS LAST` is rejected. A key has one null placement, and those two options contradict each other. If the report needs a specific null position, write it on that key instead of relying on the default.
 
 **Follow-up:**
 
 `ORDER BY measured_on DESC NULLS LAST, id ASC`—where is null id 2?
 
-Answer: Last. Ids: 1, 3, 4, 2.
+Answer: Last. The ids come out 1, 3, 4, then 2.
 
 ### DB-039 — OFFSET and FETCH FIRST need an order to name rows
 
@@ -869,13 +945,15 @@ Same four events. What do `OFFSET`/`LIMIT`/`FETCH` return with `ORDER BY id`? Wh
 
 **Answer:**
 
-`OFFSET` then limit. `OFFSET 1 LIMIT 1` → id 2; `FETCH FIRST 2` → 1,2. `WITH TIES` keeps peers of the last included row on the sort key. Without `ORDER BY`, which rows are “first” is undefined.
+`OFFSET` skips rows after the sort. `LIMIT` or `FETCH FIRST` then keeps what follows. With `ORDER BY id`, `OFFSET 1 LIMIT 1` returns id 2, and `FETCH FIRST 2 ROWS ONLY` returns ids 1 and 2. `WITH TIES` also keeps later rows that tie the last included row on the sort key.
+
+Without `ORDER BY`, "first" is undefined, and the same limit can change after vacuum. A stable page needs a unique sort.
 
 **Follow-up:**
 
 `ORDER BY measured_on ASC NULLS LAST, id OFFSET 3 FETCH FIRST 5`?
 
-Answer: Only id 2—short page; fetch does not invent rows.
+Answer: Only id 2. The skip leaves one row, and `FETCH` does not invent rows to fill five.
 
 ### DB-040 — BETWEEN includes both endpoints
 
@@ -889,13 +967,15 @@ Stay nights Jan 31–Mar 1; pings at Feb 1 00:00 and Feb 28 12:00. Which ids mat
 
 **Answer:**
 
-Inclusive on both ends: nights Feb 1 and Feb 28 match; Jan 31/Mar 1 do not. Reversed endpoints (`Feb 28` AND `<= Feb 1`) match nothing—no auto-swap. Timestamp `BETWEEN` date-only bounds depends on cast/midnight; prefer half-open ranges for instants.
+`x BETWEEN a AND b` means `x >= a AND x <= b`. Both ends are included, and PostgreSQL does not swap them when they are backwards. Feb 1 and Feb 28 match a February range. Jan 31 and Mar 1 do not. Reversed endpoints match nothing.
+
+Date bounds compared with a timestamp are cast through midnight, so an end date can exclude later that day, such as Feb 28 12:00. For instants, write a half-open test: `>= start AND < next_day`.
 
 **Follow-up:**
 
 `BETWEEN SYMMETRIC` with reversed endpoints?
 
-Answer: Symmetric orders endpoints; mid-February date matches. Timestamp still needs careful bounds.
+Answer: `SYMMETRIC` orders the two endpoints, so a mid-February date matches. A timestamp still needs an explicit upper bound if the end day should be included through 23:59.
 
 ### DB-041 — LIKE is case-sensitive and underscore matches one character
 
@@ -909,13 +989,15 @@ Emails include `Ada@Ex.com`, `ada@ex.com`, `a_b@ex.com`, `axb@ex.com`, null. Whi
 
 **Answer:**
 
-`LIKE` case-sensitive: 2,5,6 (not Ada@Ex). `ILIKE`: 1,2,5,6. `_` matches one char: both `a_b` and `axb`. Null email → unknown, dropped. Escape wildcards with `ESCAPE`.
+`LIKE` is case-sensitive. `%` matches any sequence of characters, including empty, and `_` matches exactly one character. `LIKE '%@ex.com'` returns ids 2, 5, and 6. It does not return `Ada@Ex.com`, because `Ex` differs in case. `ILIKE` uses a case-insensitive match and returns ids 1, 2, 5, and 6.
+
+`LIKE 'a_b@ex.com'` matches both `a_b@ex.com` and `axb@ex.com`, because `_` is a wildcard. A null email makes the predicate unknown, so `WHERE` drops it. To match a literal percent or underscore, declare an `ESCAPE` character and escape the wildcard.
 
 **Follow-up:**
 
 `LIKE '%'` vs `LIKE '\%' ESCAPE '\'`?
 
-Answer: `%` matches all non-null emails. Escaped percent matches a literal `%` email only—empty here.
+Answer: `LIKE '%'` matches every non-null email. The escaped form matches a literal `%` only. No email here is that character, so the result is empty.
 
 ### DB-042 — NULLIF turns one sentinel into null
 
@@ -929,13 +1011,15 @@ Ratios 10/4 and 10/0. What is `numerator / NULLIF(denominator, 0)`? What if the 
 
 **Answer:**
 
-`NULLIF(a,b)` returns null when `a = b`, else `a`. Yields 2 and NULL (avoids div-by-zero). Null first arg returns null (`=` unknown). Integer division still truncates when denominator is non-null.
+`NULLIF(a, b)` returns null when `a = b`, and otherwise returns `a`. It is the small pattern for turning one sentinel into null. `numerator / NULLIF(denominator, 0)` divides 10 by 4 and returns 2. It turns the denominator 0 into null, the division is null, and PostgreSQL does not raise division by zero.
+
+If the first argument is null, the comparison with the second argument is unknown, so `NULLIF` returns null. When the denominator is a non-null integer, integer division still truncates. Null-safety does not change that.
 
 **Follow-up:**
 
 `NULLIF` with `''` nickname?
 
-Answer: Both argument orders null out equal empty strings; null nickname returns null as first arg when compared to `''`.
+Answer: Either argument order turns an empty string into null when the two sides are equal. If the nickname is already null and it is the first argument, the result is null.
 
 ### DB-043 — The || operator yields null if either side is null
 
@@ -949,13 +1033,15 @@ Names Ada Lovelace; Grace + null; both null. Results of `||`, `concat`, `concat_
 
 **Answer:**
 
-`||` nulls the whole string if any part is null. `concat` skips nulls (may leave trailing spaces you passed). `concat_ws` skips nulls and omits separators for skipped args; null separator → null result. Empty string is kept, not skipped.
+`||` returns null if either side is null. Ada and Lovelace concatenate normally. Grace concatenated with a null surname is null, and two nulls are null. One missing part wipes out the whole name.
+
+`concat` skips null arguments and concatenates what remains, but it keeps any space you passed yourself, so a trailing separator can remain. `concat_ws` skips null arguments and also skips the separator that would have stood next to them. If the separator itself is null, `concat_ws` returns null. An empty string is a real value: both functions keep it.
 
 **Follow-up:**
 
 `concat_ws(NULL, ...)` and `concat_ws(' ', '', 'Lovelace')`?
 
-Answer: Null separator → null. Empty first name is kept → leading separator/`' Lovelace'` style depending on args.
+Answer: A null separator makes the whole result null. An empty first name is kept, so the separator remains and the result is a leading space before Lovelace.
 
 ### DB-044 — Integer division truncates; numeric division is exact
 
@@ -969,13 +1055,15 @@ Answer: Null separator → null. Empty first name is kept → leading separator/
 
 **Answer:**
 
-Integer `/` truncates toward zero: 2 and 2. `/ numeric` → 2.5 and 2.5. Declared scale rounds; numeric ties round away from zero. Cast/literal must enter before `/` if you want non-integer results.
+The `/` operator uses the types of its arguments. `integer / integer` truncates toward zero, so 5/2 is 2 and 10/4 is 2. If either side is `numeric`, the division keeps the fraction: both results are 2.5. The cast or the numeric literal has to be applied before the division. Casting the already-truncated result is too late.
+
+When a value is stored in a `numeric` with a declared scale, PostgreSQL rounds to that scale. A tie rounds away from zero. That is a property of `numeric`, not of integer division.
 
 **Follow-up:**
 
 `(5/2)*1.0` vs `5*1.0/2`?
 
-Answer: 2.0 vs 2.5—order matters.
+Answer: The first is 2.0, because integer division happens before the multiplication. The second is 2.5, because `5 * 1.0` is numeric before the division.
 
 ### DB-045 — GREATEST and LEAST ignore null arguments
 
@@ -989,13 +1077,15 @@ Bids (10,30), (NULL,30), (NULL,NULL), (10,10). PostgreSQL `GREATEST`/`LEAST`? SQ
 
 **Answer:**
 
-PG skips null args; null only if all null → 30/10, 30/30, NULL/NULL, 10/10. Standard returns null if any arg is null—PG documents the deviation.
+PostgreSQL's `GREATEST` and `LEAST` skip null arguments. The result is null only when every argument is null. The four rows therefore produce greatest/least pairs of 30/10, 30/30, null/null, and 10/10. A null bid does not wipe out the other number.
+
+The SQL standard returns null if any argument is null. PostgreSQL documents this difference on purpose. If you need the standard behavior, test for null yourself before calling `LEAST` or `GREATEST`. Do not assume a library written for another database means the same thing here.
 
 **Follow-up:**
 
 `LEAST(a,b,0)` for rows 1 and 2?
 
-Answer: Both 0. The literal 0 competes; it is not “default only when null.”
+Answer: Both are 0. The literal 0 always competes. It is not a default that appears only when the other arguments are null.
 
 ### DB-046 — DEFAULT fills an omitted column; NULL is a value
 
@@ -1009,13 +1099,15 @@ Answer: Both 0. The literal 0 competes; it is not “default only when null.”
 
 **Answer:**
 
-Omit → defaults apply. Explicit NULL on `status` → `23502` (default not used). Keyword `DEFAULT` applies the default. `DEFAULT` in values is not the same as omitting with a trigger-only default story—here both work for declared defaults.
+A column default is used when the `INSERT` omits the column, or when the `INSERT` writes the keyword `DEFAULT`. It is not used when you explicitly send null. Null is a value, so `status` set to null fails `NOT NULL` with `23502` and the default `'open'` is never substituted.
+
+Omitting both columns stores `'open'` and `2026-01-01`. Writing `DEFAULT` for each column does the same thing. A default expression on the column and the `DEFAULT` keyword in `VALUES` are the same mechanism for a declared default.
 
 **Follow-up:**
 
 All columns `DEFAULT`, and `DEFAULT NULL` on date?
 
-Answer: Explicit `DEFAULT` still fills `'open'` and the date. `DEFAULT NULL` means omit stores null.
+Answer: Explicit `DEFAULT` still stores `'open'` and the date default. A default defined as `DEFAULT NULL` stores null when the column is omitted.
 
 ### DB-047 — now() stays at the start of the transaction
 
@@ -1029,13 +1121,15 @@ In one transaction, two inserts with `DEFAULT now()` and `clock_timestamp()` aro
 
 **Answer:**
 
-`now()`/`CURRENT_TIMESTAMP`/`transaction_timestamp()` freeze at transaction start—both `noted_at` equal. `clock_timestamp()` advances—second `wall_at` later. `TIMESTAMP 'now'` in `CREATE TABLE` is a constant parsed at create time, not per row.
+`now()`, `CURRENT_TIMESTAMP`, and `transaction_timestamp()` all return the start time of the current transaction. Two inserts in that transaction, even with `pg_sleep` between them, store the same `noted_at`. `clock_timestamp()` reads the wall clock each time it is called, so the second `wall_at` is later. Use `clock_timestamp()` when you need elapsed time inside one transaction.
+
+`DEFAULT TIMESTAMP 'now'` does not mean "call `now()` on each insert." The string is parsed when the `CREATE TABLE` statement runs, and the column default becomes that fixed timestamp forever.
 
 **Follow-up:**
 
 New transaction’s `now()` vs create-time `'now'` constant?
 
-Answer: New `now()` is later than the prior transaction. Create-time constant stays fixed forever.
+Answer: The new transaction's `now()` is later than the previous transaction. The constant stored at `CREATE TABLE` never moves.
 
 ### DB-048 — RETURNING projects the row that was written
 
@@ -1049,13 +1143,15 @@ Insert/update `line` with generated `amount_cents`. What does `RETURNING` show, 
 
 **Answer:**
 
-`RETURNING` projects written rows after defaults/generated columns—insert `(1,3,50)` returns amount 150. Update returns new values. No match → empty result, table unchanged. Order of returned rows is undefined unless you wrap/sort.
+`RETURNING` shows the rows the statement wrote, after defaults, generated columns, and `BEFORE` triggers. Inserting quantity 3 at 50 cents returns `amount_cents` 150, which is also what the table stores. An `UPDATE` returns the new row.
+
+If no row matches, the result is empty and the table is unchanged. PostgreSQL does not promise the order of returned rows. Sort them in an outer query when the caller cares.
 
 **Follow-up:**
 
 `UPDATE ... WHERE id = 99 RETURNING id` when only id 1 exists?
 
-Answer: Empty result; id 1 unchanged; `UPDATE 0`.
+Answer: The result is empty, id 1 is unchanged, and the command tag is `UPDATE 0`.
 
 ### DB-049 — UPDATE FROM updates each target row at most once
 
@@ -1069,17 +1165,19 @@ Accounts sales_id 10/99/10; employees 10=Ada, 11=Grace. What does `UPDATE ... FR
 
 **Answer:**
 
-`FROM`: accounts 1 and 3 → `'Ada'`; 2 unmatched stays `'kept'`. Multi-match `FROM` updates once from an unspecified row. Scalar subquery with no `WHERE`: unmatched assigns null → whole statement fails `23502`, nothing changes. Add `WHERE sales_id IN (SELECT id FROM employee)` to match `FROM` behavior.
+`UPDATE ... FROM` joins the target to the source and changes each target row at most once. Accounts 1 and 3 match employee 10 and become `'Ada'`. Account 2 matches nobody, so it stays `'kept'`. Several source rows for one target still update it once, from an unspecified source row.
+
+A scalar subquery with no employee returns null. Writing that into a `NOT NULL` contact fails the whole statement with `23502`. Add `WHERE sales_id IN (SELECT id FROM employee)` when unmatched rows should be left alone.
 
 **Trade-offs:**
 
-Scalar form fails loudly on multi-row subqueries; `FROM` silently picks one—prefer a unique source or `ORDER BY … LIMIT 1`/`MAX`.
+A scalar subquery fails the statement when it unexpectedly returns several rows. `FROM` quietly picks one. Prefer a unique source. If you must choose, use `ORDER BY ... LIMIT 1` or an aggregate such as `MAX`.
 
 **Follow-up:**
 
 Two quotes for sku A—what does `UPDATE shelf FROM quote` guarantee? How store max 15?
 
-Answer: A updated once to 12 or 15 (unspecified); B untouched. Use a scalar subquery `ORDER BY price DESC LIMIT 1` with a `WHERE` that sku has quotes.
+Answer: Sku A is updated once, to either 12 or 15, and PostgreSQL does not promise which. Sku B is untouched. Take the max with a scalar subquery that orders by price descending, limits to one row, and whose `WHERE` requires the sku to have quotes.
 
 ### DB-050 — LATERAL runs a subquery once per left row
 
@@ -1093,7 +1191,9 @@ Customers Ada/Grace/Lin; orders 10/11 for Ada, 12 for Grace. What does left join
 
 **Answer:**
 
-Ada/11/15, Grace/12/8, Lin/NULL/NULL. Drop `LIMIT 1` → Ada twice. Without `LATERAL`, referencing `c.id` is illegal. `LATERAL` correlates per left row; use left join to keep customers with no orders.
+`LATERAL` lets a subquery in `FROM` read columns from items to its left, and PostgreSQL runs it once per left row. The left join returns Ada with order 11 totaling 15, Grace with order 12 totaling 8, and Lin with nulls. `ON true` is enough because the link is already in the subquery.
+
+Without `LIMIT 1`, Ada appears twice. Without `LATERAL`, `c.id` inside the subquery is illegal. Keep the left join so a customer with no orders remains.
 
 **Code:**
 
@@ -1111,4 +1211,4 @@ LEFT JOIN LATERAL (
 
 Second lateral reading a sibling lateral to the right?
 
-Answer: Illegal—lateral may only read items to its left. Place `recent` first, then a second lateral that may read `c` and `recent`.
+Answer: That is illegal. A lateral subquery may read only items to its left. Define `recent` first, then a second lateral that reads `c` and `recent`.

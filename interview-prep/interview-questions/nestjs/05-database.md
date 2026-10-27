@@ -16,13 +16,13 @@ Repository/module wiring, DataSource and PrismaService lifecycle, transactions (
 
 **Answer:**
 
-`TypeOrmModule.forRoot()` takes static options. `forRootAsync({ inject: [ConfigService], useFactory })` builds options after config is loaded, so env vars and secrets are validated and available. Use async in any real app.
+`TypeOrmModule.forRoot()` takes a fixed set of options that you write directly in code. `forRootAsync({ inject: [ConfigService], useFactory })` builds the options later, after your configuration has been loaded. That means environment variables and secrets are already read and validated when the database connection is created. In a real application you almost always want the async version, because connection details usually come from the environment.
 
 **Follow-up:**
 
 Why not read `process.env` directly in `forRoot`?
 
-Answer: `ConfigModule` may not have loaded `.env` yet, and you lose validation and testability. Inject `ConfigService`.
+Answer: `ConfigModule` may not have loaded the `.env` file yet, so you can get missing values. You also lose validation and make testing harder. Inject `ConfigService` instead.
 
 ### NEST-202 — [TypeORM] What do forFeature and @InjectRepository do
 
@@ -36,13 +36,13 @@ Answer: `ConfigModule` may not have loaded `.env` yet, and you lose validation a
 
 **Answer:**
 
-`forFeature([User])` registers a repository provider for each entity in that module. `@InjectRepository(User)` injects it by token `getRepositoryToken(User)`.
+`TypeOrmModule.forFeature([User])` registers a repository provider for each entity you list, inside the module where you call it. `@InjectRepository(User)` then injects that repository into a class. Under the hood it uses a token created by `getRepositoryToken(User)`. So `forFeature` makes the repository available, and `@InjectRepository` asks for it. If you skip the first step, Nest has nothing to inject.
 
 **Follow-up:**
 
 Why do I get "Nest can't resolve dependencies of UserService (?)"?
 
-Answer: the module did not import `TypeOrmModule.forFeature([User])`, or a different module needs the repo and you did not export it.
+Answer: Usually the module didn't import `TypeOrmModule.forFeature([User])`. Or another module needs the repository and the owning module never exported it.
 
 ### NEST-203 — [Prisma] How should PrismaService be defined
 
@@ -56,13 +56,13 @@ Answer: the module did not import `TypeOrmModule.forFeature([User])`, or a diffe
 
 **Answer:**
 
-`class PrismaService extends PrismaClient implements OnModuleInit { async onModuleInit() { await this.$connect(); } }`, provided in a module and exported. Share one instance (singleton).
+Create a class that extends `PrismaClient` and implements `OnModuleInit`. In `onModuleInit`, call `await this.$connect()`. Put it in a module, add it to `providers`, and export it so other modules can inject it. Nest creates providers as singletons by default, so the whole app shares one client and one connection pool. That is what you want, because each `PrismaClient` manages its own pool.
 
 **Follow-up:**
 
 Is `$connect()` required?
 
-Answer: no, Prisma connects lazily on the first query. Explicit connect gives fail-fast at boot and predictable startup.
+Answer: No, Prisma connects lazily on the first query. Calling it at startup is useful because the app fails fast if the database is unreachable, and startup is more predictable.
 
 ### NEST-204 — [Prisma] How do you disconnect cleanly on shutdown
 
@@ -76,13 +76,13 @@ Answer: no, Prisma connects lazily on the first query. Explicit connect gives fa
 
 **Answer:**
 
-Call `app.enableShutdownHooks()` in `main.ts` and implement `OnModuleDestroy` with `await this.$disconnect()`. Since Prisma 5 the `beforeExit` hook is gone, so Nest hooks are the right path.
+First, call `app.enableShutdownHooks()` in `main.ts`, so Nest reacts to signals like SIGTERM. Then implement `OnModuleDestroy` in `PrismaService` and call `await this.$disconnect()` inside it. This closes database connections properly when the app stops. In older Prisma versions you might have used the `beforeExit` hook, but with Prisma 5 that hook is gone for the default engine, so Nest's lifecycle hooks are the right way.
 
 **Follow-up:**
 
 What breaks without shutdown hooks?
 
-Answer: open connections linger, rolling deploys can leak pool slots, and in-flight queries can be cut off.
+Answer: Connections can linger after the app stops. During rolling deployments this can waste connection slots, and queries that are still running may be cut off abruptly.
 
 ### NEST-205 — [TypeORM] How does the DataSource lifecycle work in Nest
 
@@ -96,13 +96,13 @@ Answer: open connections linger, rolling deploys can leak pool slots, and in-fli
 
 **Answer:**
 
-`TypeOrmModule` creates and initializes the `DataSource` as an async provider, so the app does not finish bootstrapping until the DB connects. On app close, it calls `destroy()`. Inject `DataSource` directly for transactions and query runners.
+`TypeOrmModule` creates the `DataSource` and initializes it as an async provider. Because of that, the app doesn't finish starting until the database connection is ready. When the app closes, the module calls `destroy()` to release connections. If you need transactions or query runners, you can inject `DataSource` directly into your service. So you rarely need to open or close the connection yourself.
 
 **Follow-up:**
 
-What if the DB is down at boot?
+What if the database is down at startup?
 
-Answer: by default it retries (`retryAttempts`, `retryDelay`) and then crashes. That is good under an orchestrator that restarts it.
+Answer: By default TypeORM retries, controlled by `retryAttempts` and `retryDelay`, and then the app crashes. That is fine under an orchestrator such as Kubernetes, which restarts it.
 
 ### NEST-206 — [Both] Should the DB module be @Global()
 
@@ -116,13 +116,13 @@ Answer: by default it retries (`retryAttempts`, `retryDelay`) and then crashes. 
 
 **Answer:**
 
-Usually no. A `DatabaseModule` or `PrismaModule` exporting the client is acceptable as global because it is true infrastructure. Feature repositories should stay in their feature modules to keep boundaries explicit.
+Usually not. The one exception is a module that only provides the database client, like a `PrismaModule` or `DatabaseModule`. Making that global is acceptable, because it is true infrastructure that nearly everything uses. Feature repositories, however, should stay inside their own feature modules and be imported or exported explicitly. That keeps module boundaries visible, and it is easy to see who depends on what.
 
 **Follow-up:**
 
 What is the cost of too many globals?
 
-Answer: hidden dependencies, harder module extraction, and tests that quietly depend on global state.
+Answer: Dependencies become hidden, so modules are harder to extract or reuse. Tests can also end up depending on global state without anyone noticing.
 
 ### NEST-207 — [TypeORM] Repository pattern vs Active Record
 
@@ -136,13 +136,13 @@ Answer: hidden dependencies, harder module extraction, and tests that quietly de
 
 **Answer:**
 
-Data Mapper (repository) keeps entities as plain classes and puts persistence in `Repository<T>`. Active Record (`BaseEntity`) puts `save()` and `find()` on the entity, which hides a static global DataSource. Nest favors the repository because it is injectable and mockable.
+With the repository pattern, also called Data Mapper, entities are plain classes and all database work happens in a separate `Repository<T>`. With Active Record, entities extend `BaseEntity` and have methods like `save()` and `find()` on themselves. That hides a static, global `DataSource`. In Nest, the repository approach is preferred, because repositories are injectable and easy to replace with mocks in tests.
 
 **Follow-up:**
 
 When is Active Record acceptable?
 
-Answer: small scripts or prototypes. Avoid it in Nest services because it is hard to test and ignores DI-scoped DataSources and transactions.
+Answer: For small scripts or quick prototypes. In Nest services, avoid it: it is hard to test, and it ignores the injected `DataSource` and any transaction you opened.
 
 ### NEST-208 — [TypeORM] How do you write a custom repository in 0.3
 
@@ -156,13 +156,13 @@ Answer: small scripts or prototypes. Avoid it in Nest services because it is har
 
 **Answer:**
 
-`@EntityRepository` is removed. Create an `@Injectable()` class that injects `DataSource` or `Repository<User>` and adds domain methods (`findActiveByEmail`). Alternatively extend `Repository<User>` and call `super(User, dataSource.createEntityManager())`.
+The old `@EntityRepository` decorator was removed in TypeORM 0.3. Instead, create a normal `@Injectable()` class that injects `DataSource` or `Repository<User>`, and add methods that describe your domain, such as `findActiveByEmail`. Another option is to extend `Repository<User>` and call `super(User, dataSource.createEntityManager())` in the constructor. The first approach, wrapping, is usually simpler and cleaner to use in Nest.
 
 **Follow-up:**
 
 Why wrap instead of extend?
 
-Answer: composition hides generic `Repository` methods you do not want exposed and gives a narrow, domain-shaped, mockable API.
+Answer: Wrapping hides the generic `Repository` methods you don't want to expose. You get a small, domain-focused API that is easy to mock.
 
 ### NEST-209 — [Both] DTO vs entity — why separate them
 
@@ -176,13 +176,13 @@ Answer: composition hides generic `Repository` methods you do not want exposed a
 
 **Answer:**
 
-DTOs are the API contract (validation, versioning). Entities model persistence (columns, relations). Coupling them leaks columns like `passwordHash`, enables mass assignment, and ties API changes to schema changes.
+A DTO describes what the API accepts or returns, including validation and versioning. An entity describes how data is stored: columns, relations, and constraints. They change for different reasons, so they should be separate. If you use the entity as the DTO, you can accidentally expose fields like `passwordHash`, allow clients to set fields they shouldn't (mass assignment), and make every database change a breaking API change.
 
 **Follow-up:**
 
 Does Prisma need the same split?
 
-Answer: yes. Prisma types are generated DB shapes, not API contracts. Map to response DTOs.
+Answer: Yes. Prisma's generated types describe database rows, not your API contract. Map them to response DTOs before returning them.
 
 ### NEST-210 — [TypeORM] How do you hide fields in responses
 
@@ -196,13 +196,13 @@ Answer: yes. Prisma types are generated DB shapes, not API contracts. Map to res
 
 **Answer:**
 
-Map to a response DTO explicitly, or use `ClassSerializerInterceptor` with `@Exclude()` / `@Expose()` on classes. Explicit mapping or `select` is safer than relying on decorators on entities.
+The safest way is to map the entity to a response DTO yourself, so only the fields you choose are returned. Another option is `ClassSerializerInterceptor` together with `@Exclude()` and `@Expose()` on your classes. You can also limit the columns with `select` in the query. Explicit mapping is safer than relying on decorators placed on entities, because a new sensitive column won't leak by accident.
 
 **Follow-up:**
 
-Why does `@Exclude` silently fail?
+Why does `@Exclude` sometimes silently fail?
 
-Answer: the interceptor only works on class instances, not plain objects from `.lean()`-style queries or spread results.
+Answer: The interceptor only works on class instances. If you return plain objects, such as raw query results or spread copies, there are no decorators to apply.
 
 ### NEST-211 — [TypeORM] How do you use a QueryRunner transaction
 
@@ -216,19 +216,22 @@ Answer: the interceptor only works on class instances, not plain objects from `.
 
 **Answer:**
 
+Create a query runner from the `DataSource`, connect, and start a transaction. Do your saves, then commit. If anything fails, roll back and rethrow. In a `finally` block, always release the runner so the connection returns to the pool. The important detail is to do all work through `qr.manager`. Repositories injected into your service use the default connection, so they would run outside this transaction.
+
+**Code:**
+
 ```ts
 const qr = ds.createQueryRunner(); await qr.connect(); await qr.startTransaction();
 try { await qr.manager.save(a); await qr.manager.save(b); await qr.commitTransaction(); }
 catch (e) { await qr.rollbackTransaction(); throw e; }
 finally { await qr.release(); }
 ```
-Use `qr.manager`, not injected repos.
 
 **Follow-up:**
 
 What if you forget `release()`?
 
-Answer: the connection never returns to the pool, so the pool exhausts and the app hangs.
+Answer: The connection never goes back to the pool. Eventually the pool runs out of connections and the app hangs.
 
 ### NEST-212 — [TypeORM] dataSource.transaction vs QueryRunner
 
@@ -242,13 +245,13 @@ Answer: the connection never returns to the pool, so the pool exhausts and the a
 
 **Answer:**
 
-`ds.transaction(async (em) => {...})` handles begin, commit, rollback, and release for you. Use it for simple units. Use QueryRunner when you need manual savepoints or control across multiple steps and methods.
+`ds.transaction(async (em) => {...})` is the simple option. It starts the transaction, commits on success, rolls back on error, and releases the connection for you. Use it for most units of work. Choose a `QueryRunner` when you need more manual control, such as savepoints, or when the transaction must span several methods and steps. With either approach, all queries must go through the transaction's manager.
 
 **Follow-up:**
 
 Why does `this.repo.save()` inside the callback escape the transaction?
 
-Answer: the injected repo uses the default manager and a different connection. Use `em.getRepository()` or `em.save()`.
+Answer: The injected repository uses the default manager and a different connection. Use `em.getRepository()` or `em.save()` so the query runs inside the transaction.
 
 ### NEST-213 — [Prisma] $transaction: array vs interactive
 
@@ -262,13 +265,13 @@ Answer: the injected repo uses the default manager and a different connection. U
 
 **Answer:**
 
-Array form `$transaction([q1, q2])` runs prepared operations atomically. Interactive `$transaction(async (tx) => {...})` allows logic between queries. Interactive has a default timeout of 5s (`maxWait`, `timeout` options) and must use `tx`, not the outer client.
+The array form, `$transaction([q1, q2])`, takes a list of prepared queries and runs them together atomically. It is simple, but you can't put your own logic between the queries. The interactive form, `$transaction(async (tx) => {...})`, lets you read results and make decisions in the middle. It has a default timeout of 5 seconds, adjustable with `maxWait` and `timeout`. Inside it, always use `tx`, never the outer client.
 
 **Follow-up:**
 
 Why avoid HTTP calls inside interactive transactions?
 
-Answer: they hold a connection and locks while waiting, risking timeouts and pool starvation.
+Answer: The transaction holds a database connection and possibly locks while it waits for the network. That risks timeouts and can use up the connection pool.
 
 ### NEST-214 — [Both] What is a Unit of Work in Nest
 
@@ -282,13 +285,13 @@ Answer: they hold a connection and locks while waiting, risking timeouts and poo
 
 **Answer:**
 
-One business operation, one transaction boundary: a service method (or use-case) opens the transaction and all repository calls participate. Implement it with a `TransactionManager` that wraps `ds.transaction` or `prisma.$transaction`.
+A Unit of Work means one business operation uses one transaction. A service method, or a use case, opens the transaction, and every repository call inside it takes part in that same transaction. Either everything succeeds, or everything is rolled back. In Nest, you can implement this with a small `TransactionManager` class that wraps `ds.transaction` for TypeORM or `prisma.$transaction` for Prisma.
 
 **Follow-up:**
 
 Where should the boundary be, controller or service?
 
-Answer: the application or service layer (use case). Controllers stay thin, and repositories never open their own transactions when called inside one.
+Answer: In the service or use-case layer. Controllers stay thin, and repositories should not start their own transaction when they're called inside one.
 
 ### NEST-215 — [Both] How do you propagate a transaction without passing `tx` everywhere
 
@@ -302,13 +305,13 @@ Answer: the application or service layer (use case). Controllers stay thin, and 
 
 **Answer:**
 
-Use `AsyncLocalStorage` through `nestjs-cls` (with `@nestjs-cls/transactional` adapters for TypeORM or Prisma) or `typeorm-transactional`. Repositories read the current transaction from the CLS context.
+Use `AsyncLocalStorage`, which keeps context that follows a request through async calls. In Nest, the `nestjs-cls` package does this, and `@nestjs-cls/transactional` provides adapters for TypeORM and Prisma. Another option is the `typeorm-transactional` package. You start the transaction once, and repositories read the current transaction from that context. This avoids adding a `tx` parameter to every method between your service and your repositories.
 
 **Follow-up:**
 
-Downside?
+What is the downside?
 
-Answer: implicit magic. Code outside a context silently runs without a transaction. Test it and keep boundaries visible with a `@Transactional()` decorator.
+Answer: It is implicit magic. Code that runs outside the context silently runs without a transaction. Add tests, and keep the boundary visible with a `@Transactional()` decorator.
 
 ### NEST-216 — [Both] Request-scoped repository vs singleton
 
@@ -322,13 +325,13 @@ Answer: implicit magic. Code outside a context silently runs without a transacti
 
 **Answer:**
 
-Repositories and PrismaClient should be singletons: they are stateless and own the pool. Request scope is only for request data (tenant, user). Prefer passing tenant or transaction context as an argument or through CLS instead of scoping the repository.
+Repositories and `PrismaClient` should be singletons. They hold no request data, and they own or share the connection pool, so creating many of them would waste connections. Request scope is meant for data that really belongs to one request, such as the current tenant or user. Instead of making repositories request-scoped, pass the tenant or transaction as an argument, or keep it in a context such as CLS.
 
 **Follow-up:**
 
 What does REQUEST scope cost?
 
-Answer: a new instance per request and bubbling up to every dependent provider, which hurts performance and breaks some features (for example, cron and gateways).
+Answer: Nest creates a new instance per request, and the scope spreads to every provider that depends on it. That hurts performance and breaks some features, such as cron jobs and gateways.
 
 ### NEST-217 — [Both] Why avoid creating a DB client per request
 
@@ -342,13 +345,13 @@ Answer: a new instance per request and bubbling up to every dependent provider, 
 
 **Answer:**
 
-Each client has its own pool. Creating one per request exhausts DB connections and adds connect latency. Create once, reuse, and size the pool deliberately.
+Each database client creates its own connection pool. If you create a new client for every request, you quickly open more connections than the database allows. You also pay the connection setup time again and again, which makes requests slower. The right approach is to create the client once at startup, reuse it for the whole application, and choose the pool size deliberately.
 
 **Follow-up:**
 
-How do you spot it?
+How do you spot this problem?
 
-Answer: `too many connections` errors, rising connection count in `pg_stat_activity`, and slow cold paths.
+Answer: You will see `too many connections` errors and a rising connection count in `pg_stat_activity`. Some requests will also be slow because they open a new connection.
 
 ### NEST-218 — [TypeORM] How do you configure the connection pool
 
@@ -362,13 +365,13 @@ Answer: `too many connections` errors, rising connection count in `pg_stat_activ
 
 **Answer:**
 
-Use driver options: `extra: { max: 10, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 }` for `pg`. Rule: `instances × max ≤ DB max_connections` minus headroom for migrations and admin tools.
+With the `pg` driver, you pass pool settings through `extra`, for example `extra: { max: 10, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 }`. When you pick `max`, remember that every app instance has its own pool. The total, `instances × max`, must stay below the database's `max_connections`, and you should leave some room for migrations and admin tools.
 
 **Follow-up:**
 
 How do you size `max`?
 
-Answer: start small (5–10) per instance, then measure. More connections than DB cores usually slows things down.
+Answer: Start small, around 5 to 10 per instance, and measure. Having far more connections than the database has CPU cores usually makes things slower, not faster.
 
 ### NEST-219 — [Prisma] How do you configure the pool
 
@@ -382,13 +385,13 @@ Answer: start small (5–10) per instance, then measure. More connections than D
 
 **Answer:**
 
-Set `connection_limit` and `pool_timeout` in the connection URL. Default `connection_limit` is `num_cpus * 2 + 1`. With PgBouncer in transaction mode add `?pgbouncer=true`.
+Prisma reads pool settings from the connection URL. Use `connection_limit` for the maximum number of connections and `pool_timeout` for how long a query waits for a free one. The default `connection_limit` is based on your CPUs: roughly `num_physical_cpus * 2 + 1`. If you use PgBouncer in transaction mode, add `?pgbouncer=true` to the URL so Prisma avoids features that don't work with it.
 
 **Follow-up:**
 
 Why use PgBouncer or Prisma Accelerate with serverless?
 
-Answer: many short-lived instances each hold a pool, so you need an external pooler to cap total DB connections.
+Answer: Serverless runs many short-lived instances, and each one holds its own pool. An external pooler caps the total number of connections the database sees.
 
 ### NEST-220 — [Both] Migrations vs `synchronize: true`
 
@@ -402,13 +405,13 @@ Answer: many short-lived instances each hold a pool, so you need an external poo
 
 **Answer:**
 
-`synchronize` auto-alters schema from entities. It is fine for local prototypes but can drop columns or data in production. Use migrations everywhere else: versioned, reviewable, and repeatable.
+With `synchronize: true`, TypeORM automatically changes the database schema to match your entities every time the app starts. That is convenient for local prototypes. In production it is dangerous, because it can drop columns or data without warning. Migrations are better: each one is a versioned file, you can review it before it runs, and the same changes run the same way in every environment.
 
 **Follow-up:**
 
 What is the red flag in a config review?
 
-Answer: `synchronize: true` outside `NODE_ENV=development`.
+Answer: `synchronize: true` in anything other than local development, for example when `NODE_ENV` isn't `development`.
 
 ### NEST-221 — [TypeORM] Migration workflow
 
@@ -422,13 +425,13 @@ Answer: `synchronize: true` outside `NODE_ENV=development`.
 
 **Answer:**
 
-Generate with `typeorm migration:generate` (diff of entities vs DB), review the SQL, then run `migration:run` in CI/CD before the new app version starts. Keep a separate `data-source.ts` for the CLI.
+Generate a migration with `typeorm migration:generate`, which compares your entities with the current database. Always read the generated SQL before committing it. Then run `migration:run` in CI/CD, before the new app version starts. Keep a separate `data-source.ts` file for the CLI, since the CLI can't use your Nest module configuration. This way the database schema is ready before any new code needs it.
 
 **Follow-up:**
 
-Auto-run with `migrationsRun: true`?
+Is auto-running with `migrationsRun: true` a good idea?
 
-Answer: acceptable for small apps, but with several replicas starting at once it can race. Run it as a single pre-deploy job.
+Answer: It's acceptable for small apps. But when several replicas start at once, they can race to run the same migration. Run migrations as a single pre-deploy job instead.
 
 ### NEST-222 — [Prisma] migrate dev vs migrate deploy
 
@@ -442,13 +445,13 @@ Answer: acceptable for small apps, but with several replicas starting at once it
 
 **Answer:**
 
-`prisma migrate dev` creates and applies migrations locally and may reset a shadow DB. `prisma migrate deploy` only applies pending committed migrations, and is safe for CI and production. Never use `db push` for production history.
+`prisma migrate dev` is for your local machine. It creates new migrations from schema changes, applies them, and may reset a shadow database. `prisma migrate deploy` only applies migrations that are already committed and pending. It never creates or resets anything, so it's safe for CI and production. Don't use `db push` for production, because it changes the schema without recording a migration history.
 
 **Follow-up:**
 
 Where do you run `deploy`?
 
-Answer: a release job or init container before rollout, not in each app replica's start command.
+Answer: In a release job or an init container that runs before the rollout, not in the start command of each app replica.
 
 ### NEST-223 — [Both] How do you do zero-downtime schema changes
 
@@ -462,13 +465,13 @@ Answer: a release job or init container before rollout, not in each app replica'
 
 **Answer:**
 
-Expand/contract: add nullable column, deploy code that writes both, backfill, switch reads, then drop the old column in a later release. The old and new app versions must both work against the intermediate schema.
+Use the expand and contract approach, in small steps. First add the new column as nullable. Then deploy code that writes to both the old and new columns, and backfill existing rows. Next, switch reads to the new column. Only in a later release do you drop the old column. At every step, both the old and the new app versions must work with the current schema, because during a rolling deploy they run side by side.
 
 **Follow-up:**
 
 Why is renaming a column risky?
 
-Answer: during rolling deploy old pods still query the old name. Use add, copy, switch, and drop.
+Answer: During a rolling deploy, old instances still query the old name and will fail. Instead add a new column, copy data, switch over, and drop the old one later.
 
 ### NEST-224 — [TypeORM] How is soft delete implemented
 
@@ -482,13 +485,13 @@ Answer: during rolling deploy old pods still query the old name. Use add, copy, 
 
 **Answer:**
 
-Add `@DeleteDateColumn() deletedAt`. Use `repo.softDelete(id)` and `restore(id)`. `find*` methods exclude soft-deleted rows by default. Pass `withDeleted: true` to include them.
+Add a `@DeleteDateColumn() deletedAt` field to the entity. Then call `repo.softDelete(id)` to mark a row as deleted, which sets the timestamp instead of removing the row, and `repo.restore(id)` to bring it back. The `find*` methods automatically skip soft-deleted rows. If you need to see them, for example in an admin view, pass `withDeleted: true`.
 
 **Follow-up:**
 
-Does QueryBuilder auto-filter?
+Does QueryBuilder filter them automatically?
 
-Answer: yes for `getMany` on entities with a delete-date column, but raw queries and some joins need `withDeleted()` or manual conditions. Test it.
+Answer: Yes for entity queries like `getMany` on entities with a delete-date column. Raw queries and some joins don't, so they need `withDeleted()` or a manual condition. Test these cases.
 
 ### NEST-225 — [Prisma] How do you implement soft delete
 
@@ -502,13 +505,13 @@ Answer: yes for `getMany` on entities with a delete-date column, but raw queries
 
 **Answer:**
 
-Prisma has no native support. Use a client extension (`$extends` query hooks) that rewrites `delete` into an update of `deletedAt` and adds `deletedAt: null` to reads. Middleware (`$use`) is deprecated.
+Prisma has no built-in soft delete. The usual solution is a client extension using `$extends` with query hooks. It rewrites `delete` calls into updates that set `deletedAt`, and it adds `deletedAt: null` to read queries so deleted rows are hidden. Older examples use middleware with `$use`, but that is deprecated. Remember that the extension only covers what you hook into, so check your edge cases.
 
 **Follow-up:**
 
 What do extensions miss?
 
-Answer: nested relation reads/writes and raw queries need explicit handling, so test them.
+Answer: Nested relation reads and writes, and raw queries. They need explicit handling, so write tests for them.
 
 ### NEST-226 — [Both] How does soft delete interact with unique constraints
 
@@ -522,13 +525,13 @@ Answer: nested relation reads/writes and raw queries need explicit handling, so 
 
 **Answer:**
 
-A deleted row still holds its unique value, so re-creating the same email fails. Use a partial unique index (`WHERE deleted_at IS NULL`) in Postgres, or include `deletedAt` in the unique key.
+A soft-deleted row is still in the table, so it still holds its unique value. If a user deletes their account and later signs up again with the same email, the insert fails with a unique violation. In Postgres, fix this with a partial unique index, `WHERE deleted_at IS NULL`, so only active rows must be unique. Another option is to include `deletedAt` in the unique key.
 
 **Follow-up:**
 
 Should you soft delete at all?
 
-Answer: only if audit, undo, or retention is required. For GDPR you still need a hard delete or anonymization path.
+Answer: Only when you need auditing, undo, or retention. For privacy laws like GDPR, you still need a way to hard delete or anonymize the data.
 
 ### NEST-227 — [TypeORM] What causes N+1 in Nest services
 
@@ -542,13 +545,13 @@ Answer: only if audit, undo, or retention is required. For GDPR you still need a
 
 **Answer:**
 
-Loading a list, then accessing a relation per item (lazy relations or a repo call in a loop) produces 1 + N queries.
+The N+1 problem happens when you load a list with one query, and then load a related record separately for each item. For example, you fetch 100 users and then loop over them to fetch each user's orders. That's 1 query plus 100 more, so 101 in total. It often hides behind lazy relations or repository calls inside loops, and it makes endpoints slow as the list grows.
 
 **Follow-up:**
 
 How do you detect it?
 
-Answer: enable `logging: ['query']` or a query count in tests and APM, then compare the count to the item count.
+Answer: Turn on query logging with `logging: ['query']`, or count queries in tests and in your APM tool. Compare the number of queries with the number of items returned.
 
 ### NEST-228 — [TypeORM] Eager vs lazy vs explicit relations
 
@@ -562,13 +565,13 @@ Answer: enable `logging: ['query']` or a query count in tests and APM, then comp
 
 **Answer:**
 
-`eager: true` loads relations on every `find*` (hidden cost, not in QueryBuilder). Lazy relations return Promises and are easy to N+1 on. Prefer explicit `relations: { orders: true }` or `leftJoinAndSelect` where needed, plus `select` for narrow fields.
+`eager: true` loads the relation on every `find*` call, which hides extra cost and doesn't apply in QueryBuilder. Lazy relations return Promises, and it's easy to trigger N+1 queries with them. The better habit is to load explicitly: use `relations: { orders: true }` or `leftJoinAndSelect` only where needed, and use `select` to fetch only the fields you need. Then every query shows exactly what it loads.
 
 **Follow-up:**
 
 Why is a join-based load not always better?
 
-Answer: large one-to-many joins multiply rows. `relationLoadStrategy: 'query'` (separate queries) is sometimes faster.
+Answer: Joining a large one-to-many relation repeats the parent's data in every row, so the result gets huge. Sometimes separate queries with `relationLoadStrategy: 'query'` are faster.
 
 ### NEST-229 — [Prisma] How do you avoid N+1 with Prisma
 
@@ -582,13 +585,13 @@ Answer: large one-to-many joins multiply rows. `relationLoadStrategy: 'query'` (
 
 **Answer:**
 
-Use `include` / `select` (batched into a few queries) and avoid per-item `findUnique` in loops. Prisma batches `findUnique` calls in the same tick via its DataLoader-style dataloader internally.
+Load related data in the same call using `include` or `select`. Prisma combines these into a small number of queries. Avoid calling `findUnique` once per item inside a loop. Prisma does have an internal dataloader that batches `findUnique` calls made in the same tick, which helps, but you shouldn't depend on it. Planning the query shape up front is clearer and more predictable.
 
 **Follow-up:**
 
-`include` vs `select`?
+What is the difference between `include` and `select`?
 
-Answer: `include` adds relations to all scalar fields, `select` picks exact fields. Use `select` to reduce payload and avoid leaking columns.
+Answer: `include` returns all scalar fields plus the relations you list. `select` returns exactly the fields you name. Use `select` to shrink the payload and avoid leaking columns.
 
 ### NEST-230 — [Both] DataLoader in Nest
 
@@ -602,13 +605,13 @@ Answer: `include` adds relations to all scalar fields, `select` picks exact fiel
 
 **Answer:**
 
-Use for GraphQL field resolvers or aggregate endpoints: batch `load(id)` calls into one `WHERE id IN (...)`. Create loaders per request (request-scoped provider or CLS) so cache does not leak across users.
+DataLoader collects many small `load(id)` calls made around the same time and turns them into one query, like `WHERE id IN (...)`. It is especially useful in GraphQL field resolvers and in endpoints that combine data from many places. Create a new loader for each request, using a request-scoped provider or CLS. That way its cache only lives as long as one request, and data doesn't leak between users.
 
 **Follow-up:**
 
-Why per request?
+Why create it per request?
 
-Answer: the DataLoader cache is keyed by ID and ignores authorization, so a shared one would leak data between users.
+Answer: DataLoader's cache is keyed by ID and knows nothing about permissions. A shared loader could return one user's data to another user.
 
 ### NEST-231 — [Both] Offset vs cursor pagination in Nest
 
@@ -622,13 +625,13 @@ Answer: the DataLoader cache is keyed by ID and ignores authorization, so a shar
 
 **Answer:**
 
-Offset (`skip/take`) is simple but slow on deep pages and unstable under inserts. Cursor (keyset: `id > :cursor ORDER BY id LIMIT n`, or Prisma `cursor` + `skip: 1`) is stable and fast. Expose a `{ items, nextCursor }` DTO.
+Offset pagination, `skip` and `take`, is easy to build, but gets slow on deep pages and can show duplicates or skip items when rows are inserted. Cursor, or keyset, pagination asks for "rows after this one", for example `id > :cursor ORDER BY id LIMIT n`. In Prisma that's `cursor` plus `skip: 1`. It stays fast and stable. Return a DTO shaped like `{ items, nextCursor }`.
 
 **Follow-up:**
 
-How do you do a stable sort with cursor?
+How do you get a stable sort with a cursor?
 
-Answer: sort by a unique tiebreaker (for example `createdAt, id`) and encode both in an opaque cursor.
+Answer: Sort by a unique tiebreaker, such as `createdAt, id`, and put both values in an opaque cursor.
 
 ### NEST-232 — [Both] Multi-tenancy strategies
 
@@ -642,13 +645,13 @@ Answer: sort by a unique tiebreaker (for example `createdAt, id`) and encode bot
 
 **Answer:**
 
-(1) Shared schema with `tenant_id` column, (2) schema per tenant, (3) database per tenant. Trade-offs: isolation and noisy-neighbor risk vs ops cost and migration complexity. Most SaaS start with shared schema.
+There are three common options. First, a shared schema where every table has a `tenant_id` column. Second, a separate schema for each tenant. Third, a separate database for each tenant. The trade-off is isolation against effort. Separate databases isolate tenants best and prevent noisy neighbors, but cost more to run and migrate. Most SaaS products start with the shared schema because it is the simplest.
 
 **Follow-up:**
 
 How do you choose?
 
-Answer: by isolation and compliance needs, tenant count, and customization. Thousands of small tenants point to shared schema, a few large or regulated tenants to a dedicated DB.
+Answer: Look at isolation and compliance needs, the number of tenants, and customization needs. Thousands of small tenants suit a shared schema. A few large or regulated tenants may justify dedicated databases.
 
 ### NEST-233 — [TypeORM] How do you route to a tenant DB per request
 
@@ -662,13 +665,13 @@ Answer: by isolation and compliance needs, tenant count, and customization. Thou
 
 **Answer:**
 
-Keep a map (cache) of `DataSource` per tenant, resolved from a header or JWT claim in a request-scoped `TenantConnectionProvider` or CLS. Initialize lazily and cap the number of open pools (LRU eviction).
+Keep a cache that maps each tenant to its own `DataSource`. For each request, find the tenant from a header or a JWT claim, using a request-scoped `TenantConnectionProvider` or CLS, and fetch the matching connection from the cache. Create each connection lazily, the first time a tenant needs it. Put a limit on how many pools stay open, and close the least recently used ones.
 
 **Follow-up:**
 
-Main danger?
+What is the main danger?
 
-Answer: pool explosion. N tenants × pool size can exceed DB limits, so use small per-tenant pools or an external pooler.
+Answer: Pool explosion. If you have many tenants, each with its own pool, the total can exceed the database limits. Use small per-tenant pools or an external pooler.
 
 ### NEST-234 — [Prisma] How do you enforce tenant filters in shared schema
 
@@ -682,13 +685,13 @@ Answer: pool explosion. N tenants × pool size can exceed DB limits, so use smal
 
 **Answer:**
 
-Use `$extends` query extensions to inject `where: { tenantId }` on every operation, with the tenant ID from CLS. For defense in depth, use Postgres RLS with `SET LOCAL app.tenant_id` inside an interactive transaction.
+Use a `$extends` query extension that adds `where: { tenantId }` to every operation, taking the tenant id from CLS. That way developers can't forget the filter. For defense in depth, add Postgres Row-Level Security too. Inside an interactive transaction, run `SET LOCAL app.tenant_id`, and the database itself will only return rows for that tenant, even if the application code has a bug.
 
 **Follow-up:**
 
 Why not trust only the app-layer filter?
 
-Answer: one missed `where` is a cross-tenant leak. RLS enforces it in the DB.
+Answer: A single missed `where` is a cross-tenant data leak. Row-Level Security enforces the rule in the database as a safety net.
 
 ### NEST-235 — [Both] How do you write e2e tests with a test DB
 
@@ -702,13 +705,13 @@ Answer: one missed `where` is a cross-tenant leak. RLS enforces it in the DB.
 
 **Answer:**
 
-Use a separate DB (docker or Testcontainers), run migrations in `beforeAll`, bootstrap the app with `Test.createTestingModule` and Supertest, and override config to point at the test DB.
+Use a separate test database, started with Docker or Testcontainers. Run your migrations in `beforeAll`, so the schema matches production. Then build the app with `Test.createTestingModule`, override the configuration to point at the test database, and call endpoints with Supertest. This tests the real stack, including queries, constraints, and transactions, instead of mocks that may hide problems.
 
 **Follow-up:**
 
-Why not SQLite in tests while prod is Postgres?
+Why not use SQLite in tests while production uses Postgres?
 
-Answer: dialect differences (JSON, enums, locking, constraints) hide real bugs. Use the same engine.
+Answer: The databases behave differently for JSON, enums, locking, and constraints, so tests can pass while production fails. Use the same engine in both.
 
 ### NEST-236 — [Both] How do you isolate tests from each other
 
@@ -722,13 +725,13 @@ Answer: dialect differences (JSON, enums, locking, constraints) hide real bugs. 
 
 **Answer:**
 
-Options: truncate tables in `afterEach`, wrap each test in a rolled-back transaction, or create a fresh schema per worker for parallelism. Truncate with `RESTART IDENTITY CASCADE` for determinism.
+There are three common ways. You can truncate tables after each test. You can wrap each test in a transaction and roll it back at the end. Or, when tests run in parallel, you can give each worker its own schema. When truncating, use `RESTART IDENTITY CASCADE` so IDs reset and the results are predictable. Whatever you choose, each test should start from a known clean state.
 
 **Follow-up:**
 
 Why is transaction rollback tricky in Nest?
 
-Answer: the app opens its own transactions and connections, so you need nested/savepoint support or a shared connection through CLS.
+Answer: The app opens its own connections and transactions. To make rollback work, you need savepoint support or a shared connection, for example through CLS.
 
 ### NEST-237 — [TypeORM] How do you unit test a service with repositories
 
@@ -742,13 +745,13 @@ Answer: the app opens its own transactions and connections, so you need nested/s
 
 **Answer:**
 
-Provide `{ provide: getRepositoryToken(User), useValue: mockRepo }` in the testing module. For Prisma, provide a mock `PrismaService` (for example with `jest-mock-extended` `mockDeep<PrismaClient>()`).
+In the testing module, replace the real repository with a fake: `{ provide: getRepositoryToken(User), useValue: mockRepo }`. The service then receives your mock and you can control its results and check how it was called. With Prisma, provide a mock `PrismaService` instead, for example using `mockDeep<PrismaClient>()` from `jest-mock-extended`. This keeps unit tests fast, because no database is needed.
 
 **Follow-up:**
 
 What do mocks not catch?
 
-Answer: query semantics, constraints, and transaction behavior. Cover those with integration tests on a real DB.
+Answer: Query behavior, database constraints, and transaction handling. Cover those with integration tests against a real database.
 
 ### NEST-238 — [Both] Why Testcontainers
 
@@ -762,13 +765,13 @@ Answer: query semantics, constraints, and transaction behavior. Cover those with
 
 **Answer:**
 
-It spins up a throwaway real Postgres per test run, with no shared state and identical CI and local behavior. Start in `globalSetup`, pass the URL via env, run migrations, and stop on teardown.
+Testcontainers starts a real, temporary Postgres container for your tests. There is no shared database to get dirty, and tests behave the same on your laptop and in CI. Typically you start the container in `globalSetup`, pass its connection URL through an environment variable, run migrations, and stop the container during teardown. You get production-like behavior without managing a database by hand.
 
 **Follow-up:**
 
 How do you keep it fast?
 
-Answer: one container per suite run (not per test), template DB or truncation between tests, and `tmpfs` for data.
+Answer: Start one container per test run, not per test. Reset data between tests using truncation or a template database, and store the data on `tmpfs` (in memory).
 
 ### NEST-239 — [Both] How do you add DB health checks
 
@@ -782,13 +785,13 @@ Answer: one container per suite run (not per test), template DB or truncation be
 
 **Answer:**
 
-Use `@nestjs/terminus`: `TypeOrmHealthIndicator.pingCheck('db')` for TypeORM. For Prisma, write a custom indicator that runs `$queryRaw\`SELECT 1\``. Expose `/health` through `HealthCheckService.check([...])`.
+Use `@nestjs/terminus`. For TypeORM, it has a ready-made `TypeOrmHealthIndicator.pingCheck('db')`. For Prisma, write a custom health indicator that runs a simple query such as `SELECT 1` through `$queryRaw`. Then expose a `/health` endpoint that calls `HealthCheckService.check([...])` with your indicators. Orchestrators and load balancers call this endpoint to decide whether the instance is working.
 
 **Follow-up:**
 
 Why set a timeout on the ping?
 
-Answer: a hung DB should fail the check fast instead of hanging the probe and causing misleading restarts.
+Answer: If the database hangs, the check should fail quickly. Otherwise the probe itself hangs, and the orchestrator may make misleading restart decisions.
 
 ### NEST-240 — [Both] Liveness vs readiness for the DB
 
@@ -802,13 +805,13 @@ Answer: a hung DB should fail the check fast instead of hanging the probe and ca
 
 **Answer:**
 
-Liveness answers "is the process alive?" and should not depend on the DB. Readiness answers "can I serve traffic?" and may include the DB. If liveness fails on DB outage, the orchestrator restarts all pods and makes the outage worse.
+Liveness asks, "is the process alive?" It should not depend on the database. Readiness asks, "can this instance serve traffic right now?" and it can include the database. This difference matters. If liveness fails whenever the database is down, the orchestrator restarts every pod, and the outage gets worse instead of simply pausing traffic until the database comes back.
 
 **Follow-up:**
 
 Should readiness fail on a brief DB blip?
 
-Answer: yes, to drain traffic, but add small thresholds so one slow ping does not flap the pod.
+Answer: Yes, so traffic is drained away. But use small thresholds, such as a few failures in a row, so one slow ping doesn't make the pod flap in and out.
 
 ### NEST-241 — [TypeORM] How do you configure read replicas
 
@@ -822,13 +825,13 @@ Answer: yes, to drain traffic, but add small thresholds so one slow ping does no
 
 **Answer:**
 
-Use `replication: { master: {...}, slaves: [{...}, {...}] }` in options. Reads (`find`, `SELECT` QueryBuilder) go to slaves round-robin, and writes and transactions go to master.
+Add a `replication` option with one `master` and a list of `slaves`: `replication: { master: {...}, slaves: [{...}, {...}] }`. After that, TypeORM sends read queries, such as `find` and SELECT QueryBuilder calls, to the replicas in round-robin order. Writes and transactions always go to the master. So your code mostly stays the same, and the routing happens behind the scenes.
 
 **Follow-up:**
 
-How do you force a read to master?
+How do you force a read to the master?
 
-Answer: `queryRunner = ds.createQueryRunner('master')`. Do it for read-your-own-writes flows.
+Answer: Create a query runner with `ds.createQueryRunner('master')`. Do this when a user must immediately see their own write.
 
 ### NEST-242 — [Prisma] How do you use read replicas
 
@@ -842,13 +845,13 @@ Answer: `queryRunner = ds.createQueryRunner('master')`. Do it for read-your-own-
 
 **Answer:**
 
-Use the `@prisma/extension-read-replicas` client extension: `prisma.$extends(readReplicas({ url: [...] }))`. Reads go to replicas, and `$primary()` forces the primary.
+Use the official `@prisma/extension-read-replicas` client extension: `prisma.$extends(readReplicas({ url: [...] }))`. After that, read queries are sent to the replicas, and writes go to the primary. When you need to read from the primary, call `$primary()` explicitly. This gives you scaling for read-heavy traffic without changing most of your query code.
 
 **Follow-up:**
 
 What is the main risk?
 
-Answer: replication lag, so a user may not see their own write. Route immediate follow-up reads to the primary.
+Answer: Replication lag. A replica may be slightly behind, so a user might not see data they just saved. Send reads that immediately follow a write to the primary.
 
 ### NEST-243 — [Both] What is the outbox pattern in a Nest service
 
@@ -862,13 +865,13 @@ Answer: replication lag, so a user may not see their own write. Route immediate 
 
 **Answer:**
 
-In the same DB transaction that saves the business row, insert an `outbox_events` row (type, payload, status). A separate worker publishes it to the broker, then marks it sent. This avoids the dual-write problem (DB committed, broker publish failed).
+The outbox pattern solves the problem of saving data and sending an event reliably. In the same database transaction that saves your business row, you also insert a row into an `outbox_events` table with the event type, payload, and status. A separate worker later reads pending rows, publishes them to the message broker, and marks them as sent. This avoids the dual-write problem, where the database commit succeeds but the broker publish fails.
 
 **Follow-up:**
 
-Why not publish after commit?
+Why not just publish after the commit?
 
-Answer: if the process crashes between commit and publish, the event is lost. Outbox makes it durable.
+Answer: If the process crashes between the commit and the publish, the event is lost forever. With an outbox, the event is stored in the database, so it can't be lost.
 
 ### NEST-244 — [Both] How do you run the outbox relay
 
@@ -882,13 +885,13 @@ Answer: if the process crashes between commit and publish, the event is lost. Ou
 
 **Answer:**
 
-Use a Nest `@Cron`/interval poller or a dedicated worker app. Select pending rows with `FOR UPDATE SKIP LOCKED` in batches, publish, mark sent, and retry with backoff. Delivery is at-least-once.
+The relay is a background process, either a Nest `@Cron` or interval job, or a separate worker app. Each run it selects a batch of pending rows using `FOR UPDATE SKIP LOCKED`, so several workers don't take the same rows. It publishes them, marks them as sent, and retries failures with backoff. Delivery is at-least-once, which means an event may sometimes be published more than once.
 
 **Follow-up:**
 
 What do consumers need?
 
-Answer: idempotency (dedupe by event ID), because duplicates are possible on retry or crash.
+Answer: Idempotency. They should detect duplicates, for example by event ID, because retries or crashes can cause the same event to arrive twice.
 
 ### NEST-245 — [Both] How do you make a write endpoint idempotent
 
@@ -902,13 +905,13 @@ Answer: idempotency (dedupe by event ID), because duplicates are possible on ret
 
 **Answer:**
 
-Require an `Idempotency-Key` header. Store key plus request hash and response in a table with a unique constraint on the key. On a repeat, return the stored response, and on the same key with a different body, return 422/409.
+Require clients to send an `Idempotency-Key` header. Store the key, a hash of the request, and the response in a table with a unique constraint on the key. If the same key arrives again, return the stored response instead of doing the work again. If the same key comes with a different body, that's a client mistake, so reject it with 422 or 409. This makes retries safe.
 
 **Follow-up:**
 
 How do you handle two concurrent requests with the same key?
 
-Answer: insert the key first and let the unique constraint serialize them. The loser waits or gets 409 until the first finishes.
+Answer: Insert the key first and let the unique constraint decide who goes first. The second request waits, or gets a 409, until the first one finishes.
 
 ### NEST-246 — [Both] Upsert and unique constraints for idempotency
 
@@ -922,13 +925,13 @@ Answer: insert the key first and let the unique constraint serialize them. The l
 
 **Answer:**
 
-Natural-key uniqueness (for example `(orderId, paymentRef)`) lets duplicates fail safely. Use `INSERT ... ON CONFLICT DO NOTHING/UPDATE` through TypeORM `upsert()` / QueryBuilder `orIgnore()`, or Prisma `upsert` / `createMany({ skipDuplicates })`.
+A unique constraint on a natural key, for example `(orderId, paymentRef)`, makes duplicates fail safely instead of creating a second row. You can then use `INSERT ... ON CONFLICT DO NOTHING` or `DO UPDATE`. In TypeORM, that's `upsert()` or the QueryBuilder's `orIgnore()`. In Prisma, use `upsert`, or `createMany({ skipDuplicates })`. The database enforces uniqueness, so even concurrent requests can't create duplicates.
 
 **Follow-up:**
 
 Is Prisma `upsert` atomic?
 
-Answer: it uses native `ON CONFLICT` only when conditions are met (unique where, same fields). Otherwise it is read-then-write and can race.
+Answer: Only when it can use the database's native `ON CONFLICT`, which needs specific conditions, such as filtering on a unique field. Otherwise it reads first and then writes, which can race.
 
 ### NEST-247 — [TypeORM] How do you do optimistic locking
 
@@ -942,13 +945,13 @@ Answer: it uses native `ON CONFLICT` only when conditions are met (unique where,
 
 **Answer:**
 
-Add `@VersionColumn() version`. `save()` increments it. For checks, use `repo.findOne(..., { lock: { mode: 'optimistic', version } })` or compare the version in an `UPDATE ... WHERE id AND version`. A mismatch throws `OptimisticLockVersionMismatchError`.
+Optimistic locking assumes conflicts are rare, and detects them using a version number. Add `@VersionColumn() version` to the entity, and TypeORM increments it on every `save()`. To check a version, use `repo.findOne(..., { lock: { mode: 'optimistic', version } })`, or write an `UPDATE ... WHERE id AND version` yourself. If the version no longer matches, TypeORM throws `OptimisticLockVersionMismatchError`, meaning someone else changed the row.
 
 **Follow-up:**
 
 What HTTP status do you return?
 
-Answer: 409 Conflict (or 412 with ETag/`If-Match`), and let the client refetch and retry.
+Answer: 409 Conflict, or 412 Precondition Failed when you use ETag and `If-Match`. The client should reload the latest data and try again.
 
 ### NEST-248 — [Prisma] How do you do optimistic locking
 
@@ -962,13 +965,13 @@ Answer: 409 Conflict (or 412 with ETag/`If-Match`), and let the client refetch a
 
 **Answer:**
 
-Prisma has no built-in support. Add an `Int version` field and use `updateMany({ where: { id, version }, data: { ..., version: { increment: 1 } } })`. If `count === 0`, throw a conflict.
+Prisma has no built-in support, so you add it yourself. Give the model an `Int version` field. When updating, use `updateMany({ where: { id, version }, data: { ..., version: { increment: 1 } } })`. This only updates the row if the version still matches. Afterwards, check `count`. If it is 0, another request changed the row first, so throw a conflict error.
 
 **Follow-up:**
 
 Why `updateMany` and not `update`?
 
-Answer: `update` requires a unique `where` and throws `P2025` on miss. In older versions `version` was not allowed in `where`, so `updateMany` returns a clean `count`.
+Answer: `update` throws a `P2025` error when nothing matches, and before Prisma 5 it only allowed unique fields in `where`. `updateMany` simply returns a `count`, which is easy to check.
 
 ### NEST-249 — [Both] Pessimistic locking in Nest
 
@@ -982,13 +985,13 @@ Answer: `update` requires a unique `where` and throws `P2025` on miss. In older 
 
 **Answer:**
 
-TypeORM: `setLock('pessimistic_write')` or `lock: { mode: 'pessimistic_write' }` inside a transaction. Prisma: `$queryRaw\`SELECT ... FOR UPDATE\`` in an interactive transaction. Use it for hot rows like balances and inventory.
+Pessimistic locking locks a row while you work on it, so others must wait. In TypeORM, use `setLock('pessimistic_write')` or `lock: { mode: 'pessimistic_write' }` inside a transaction. In Prisma, run a raw `SELECT ... FOR UPDATE` with `$queryRaw` inside an interactive transaction. It suits hot rows where conflicts are likely, such as account balances or inventory counts. The lock only lasts until the transaction ends.
 
 **Follow-up:**
 
 How do you avoid deadlocks?
 
-Answer: lock rows in a consistent order, keep transactions short, and retry on deadlock errors.
+Answer: Lock rows in a consistent order, keep transactions short, and retry when the database reports a deadlock.
 
 ### NEST-250 — [Both] How do you map DB errors to HTTP errors
 
@@ -1002,10 +1005,10 @@ Answer: lock rows in a consistent order, keep transactions short, and retry on d
 
 **Answer:**
 
-Catch in a global `ExceptionFilter`: Postgres `23505` (unique) → 409, `23503` (FK) → 409/422, TypeORM `EntityNotFoundError` → 404; Prisma `P2002` → 409, `P2025` → 404, `P2003` → 409. Do not leak raw SQL or constraint names to clients.
+Catch them in one global `ExceptionFilter` and translate them into HTTP responses. For Postgres, `23505` (unique violation) becomes 409, and `23503` (foreign key) becomes 409 or 422. TypeORM's `EntityNotFoundError` becomes 404. For Prisma, `P2002` becomes 409, `P2025` becomes 404, and `P2003` becomes 409. Never send raw SQL or constraint names to the client, since that exposes your schema.
 
 **Follow-up:**
 
 Where should the mapping live?
 
-Answer: a single filter (or repository-layer translation to domain errors) so services stay DB-agnostic and the responses stay consistent.
+Answer: In a single filter, or in a repository layer that turns database errors into domain errors. Then services stay independent of the database, and responses stay consistent.

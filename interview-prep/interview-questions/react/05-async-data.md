@@ -8,7 +8,7 @@ React 18+. Compact format. Covers effects, races, server-state caches, Suspense,
 **Difficulty:** Junior
 **Category:** Async data / Effects
 **Question:** How do you fetch data in `useEffect`, and what usually goes wrong with the naive version?
-**Answer:** Start the request in the effect, store the result in state, and list every input in the dependency array. The naive version has no cleanup (races, setState after unmount), no error or loading state, no caching or deduping, and it starts only after first paint, which creates waterfalls. It works for small apps but you re-implement server-state concerns by hand.
+**Answer:** You start the request inside the effect, save the result in state, and list every value the request uses in the dependency array. The naive version has several gaps. There's no cleanup, so you can get race conditions or state updates after unmount. There's no loading or error state, and no caching or de-duplication. The request also starts only after the first render, which can create waterfalls. It's fine for small apps, but you end up rebuilding what a data library gives you.
 **Code:**
 ```jsx
 useEffect(() => {
@@ -17,7 +17,7 @@ useEffect(() => {
 ```
 **Follow-up:** What does this code not handle?
 
-Answer: Errors, non-2xx responses, loading UI, cancellation, and out-of-order responses when `id` changes.
+Answer: Errors, non-2xx responses, a loading UI, cancellation, and responses arriving out of order when `id` changes.
 
 ---
 
@@ -25,7 +25,7 @@ Answer: Errors, non-2xx responses, loading UI, cancellation, and out-of-order re
 **Difficulty:** Junior
 **Category:** Async data / Effects
 **Question:** Why can't you write `useEffect(async () => {...})`?
-**Answer:** An async function returns a Promise, but React expects the effect to return either nothing or a cleanup function. A Promise would be treated as an invalid cleanup, and React warns about it. Define an async function inside the effect and call it, or use `.then`. The cleanup must stay synchronous so React can run it before the next effect or on unmount.
+**Answer:** An async function always returns a Promise. But React expects an effect to return either nothing or a cleanup function. A Promise isn't a valid cleanup function, so React warns about it. The fix is to define an async function inside the effect and call it, or to use `.then`. The cleanup itself has to stay synchronous, because React needs to run it before the next effect or when the component unmounts.
 **Code:**
 ```jsx
 useEffect(() => {
@@ -43,10 +43,10 @@ Answer: Return it from the outer effect callback, not from the inner async funct
 **Difficulty:** Intermediate
 **Category:** Async data / Race conditions
 **Question:** What is a race condition in a fetch effect, and how does it occur?
-**Answer:** When `id` changes quickly, request A (old) and request B (new) are both in flight. Responses can arrive out of order, so A may resolve last and overwrite B's data, and the UI shows data for the wrong input. The effect re-ran, but nothing told the old request that it no longer matters. The fix is to cancel or ignore stale requests in cleanup, or to use a library that keys results by input.
+**Answer:** Say `id` changes quickly. Request A for the old id and request B for the new id are both in flight. Responses can arrive in a different order, so A might finish last and overwrite B's data. The UI then shows data for the wrong input. The effect re-ran, but nothing told the old request that its result no longer matters. The fix is to cancel or ignore stale requests in cleanup, or use a library that stores results by input.
 **Follow-up:** Is this only a network problem?
 
-Answer: No. Any async work with variable latency, such as debounced search or slow endpoints, can resolve out of order.
+Answer: No. Any async work with varying delay can finish out of order, such as debounced search or slow endpoints.
 
 ---
 
@@ -54,7 +54,7 @@ Answer: No. Any async work with variable latency, such as debounced search or sl
 **Difficulty:** Intermediate
 **Category:** Async data / Abort
 **Question:** How do you use `AbortController` in an effect, and what must you handle?
-**Answer:** Create a controller in the effect, pass `signal` to `fetch`, and call `controller.abort()` in cleanup. This cancels the network request and rejects the promise with an `AbortError`. You must ignore that error so it is not shown as a failure. Aborting saves bandwidth and prevents stale updates, but the server may still process the request, so it is not a substitute for idempotent endpoints.
+**Answer:** In the effect, I create a controller, pass its `signal` to `fetch`, and call `controller.abort()` in the cleanup. That cancels the request, and the promise rejects with an `AbortError`. I must ignore that specific error so it isn't shown as a real failure. Aborting saves bandwidth and prevents stale updates. But the server may still process the request, so it doesn't replace designing writes to be safe to repeat.
 **Code:**
 ```jsx
 useEffect(() => {
@@ -66,7 +66,7 @@ useEffect(() => {
 ```
 **Follow-up:** Does abort stop a POST on the server?
 
-Answer: Not reliably. The server may already have received it, so use idempotency keys for writes.
+Answer: Not reliably. The server may have already received it, so use idempotency keys for writes.
 
 ---
 
@@ -74,7 +74,7 @@ Answer: Not reliably. The server may already have received it, so use idempotenc
 **Difficulty:** Intermediate
 **Category:** Async data / Race conditions
 **Question:** When would you use an `ignore` flag instead of `AbortController`?
-**Answer:** When the async API cannot be aborted, such as a third-party SDK or a plain promise, use a closure variable set to true in cleanup and check it before calling `setState`. It prevents stale writes but doesn't cancel the work. Each effect run gets its own flag, so the latest run is the only one allowed to commit. Prefer `AbortController` when supported since it also saves network.
+**Answer:** I use an ignore flag when the async API can't be cancelled, such as a third-party SDK or a plain promise. I create a variable inside the effect, set it to true in the cleanup, and check it before calling `setState`. This stops stale results from being saved, but it doesn't cancel the work itself. Each effect run has its own flag, so only the latest run can update state. If cancellation is supported, `AbortController` is better because it also saves network usage.
 **Code:**
 ```jsx
 useEffect(() => {
@@ -85,7 +85,7 @@ useEffect(() => {
 ```
 **Follow-up:** Why is a per-effect flag correct but a ref flag risky?
 
-Answer: A shared ref is overwritten by the next run, so an older response can pass the check. A closure flag is isolated per run.
+Answer: A shared ref gets overwritten by the next run, so an older response could pass the check. A variable inside the effect belongs to that run only.
 
 ---
 
@@ -93,7 +93,7 @@ Answer: A shared ref is overwritten by the next run, so an older response can pa
 **Difficulty:** Intermediate
 **Category:** Async data / Closures
 **Question:** What is a stale closure in async code, and how does it cause bugs?
-**Answer:** Each render creates new functions that capture that render's props and state. A timer, event listener, or promise callback created in an earlier render still sees the old values after they change. For example, `setInterval(() => setCount(count + 1))` keeps using the initial `count`. Fix it with functional updates, correct dependencies, or a ref holding the latest value when you intentionally need non-reactive access.
+**Answer:** Each render creates new functions that remember that render's props and state. A timer, event listener, or promise callback created in an earlier render keeps seeing the old values, even after they change. For example, `setInterval(() => setCount(count + 1))` keeps using the first `count`. I fix this with a functional update, correct dependencies, or a ref that holds the latest value when I intentionally need to read current data without re-running the effect.
 **Code:**
 ```jsx
 useEffect(() => {
@@ -103,7 +103,7 @@ useEffect(() => {
 ```
 **Follow-up:** When is a "latest ref" appropriate?
 
-Answer: For callbacks that must read current values without re-subscribing, like an event handler registered once.
+Answer: When a callback must read current values without re-subscribing, such as an event handler registered only once.
 
 ---
 
@@ -111,10 +111,10 @@ Answer: For callbacks that must read current values without re-subscribing, like
 **Difficulty:** Intermediate
 **Category:** Async data / Effects
 **Question:** Why shouldn't you silence the exhaustive-deps lint rule on a fetch effect?
-**Answer:** The rule finds values the effect reads but doesn't declare, which means the effect won't re-run when they change and will use stale values. Typical symptoms: filters change but the list doesn't, or a request uses an old token. If a dependency causes too many runs, fix the cause: move functions inside the effect, memoize object inputs, or use primitives. Suppressing the rule hides real bugs.
+**Answer:** The rule finds values the effect uses but doesn't list. If they're missing, the effect won't re-run when those values change, and it will use stale ones. You'd see symptoms like filters changing without the list updating, or a request using an old token. If a dependency causes too many runs, I fix the cause: move functions inside the effect, memoize object inputs, or depend on primitive values. Silencing the rule just hides real bugs.
 **Follow-up:** What if an inline object dep re-triggers the effect every render?
 
-Answer: Depend on its primitive fields, or memoize it with `useMemo` so identity is stable.
+Answer: Depend on its primitive fields instead, or memoize it with `useMemo` so its identity stays stable.
 
 ---
 
@@ -122,10 +122,10 @@ Answer: Depend on its primitive fields, or memoize it with `useMemo` so identity
 **Difficulty:** Intermediate
 **Category:** Async data / Strict Mode
 **Question:** In development, my fetch effect runs twice. Is it a bug?
-**Answer:** No. In React 18 Strict Mode, development mounts, unmounts, and re-mounts each component to expose missing cleanup. Production runs once. The correct response is to make the effect resilient: abort or ignore the first request in cleanup so the second wins. Do not add a "has fetched" ref to hide it, since that breaks real remounts, such as Offscreen or fast refresh. A query library dedupes naturally.
+**Answer:** No, that's expected. In React 18 Strict Mode during development, React mounts, unmounts, and re-mounts each component to reveal missing cleanup. Production runs the effect once. The right response is to make the effect safe to repeat: abort or ignore the first request in cleanup, so the second one wins. I wouldn't add a "has fetched" ref to hide it, because that breaks real remounts, such as fast refresh. A query library avoids duplicate requests anyway.
 **Follow-up:** Why simulate unmount/remount?
 
-Answer: React may preserve state while hiding and re-showing UI, so effects must be safely repeatable.
+Answer: React may keep a component's state while hiding and later showing its UI again. So effects must be safe to run more than once.
 
 ---
 
@@ -133,7 +133,7 @@ Answer: React may preserve state while hiding and re-showing UI, so effects must
 **Difficulty:** Intermediate
 **Category:** Async data / State modeling
 **Question:** How should you model request state to avoid impossible combinations?
-**Answer:** Avoid separate `loading`, `error`, and `data` booleans that can disagree, such as loading and error both true. Use a single status field with a discriminated union: idle, loading, success with data, or error with error. Render by switching on status. This makes states exhaustive and TypeScript can enforce it. Libraries expose the same idea with `status`, `isPending`, and `isError`.
+**Answer:** I avoid separate `loading`, `error`, and `data` booleans, because they can disagree, like loading and error both being true. Instead I use one `status` field with a discriminated union: loading, success with data, or error with an error. The UI switches on the status, which makes every case explicit, and TypeScript can check that I handled them all. Libraries use the same idea with `status`, `isPending`, and `isError`.
 **Code:**
 ```ts
 type State<T> =
@@ -143,7 +143,7 @@ type State<T> =
 ```
 **Follow-up:** Where does "refetching" fit?
 
-Answer: It's a separate flag (`isFetching`) layered on success, since you still have data to show.
+Answer: It's a separate flag, like `isFetching`, on top of success. You already have data to show while it refreshes.
 
 ---
 
@@ -151,10 +151,10 @@ Answer: It's a separate flag (`isFetching`) layered on success, since you still 
 **Difficulty:** Intermediate
 **Category:** Async data / UX states
 **Question:** What is the difference between initial loading and background fetching, and why does the UI care?
-**Answer:** Initial loading means there is no data yet, so a skeleton or spinner replaces the content. Background fetching means data exists but is being revalidated, so keep showing it, optionally with a subtle indicator. Treating both as "loading" flashes spinners on every refocus or refetch and hurts perceived performance. Libraries expose them separately, for example `isPending` versus `isFetching` in TanStack Query.
+**Answer:** Initial loading means there's no data yet, so a skeleton or spinner replaces the content. Background fetching means data already exists and is being refreshed, so I keep showing it, maybe with a small indicator. If I treat both as "loading," users see spinners on every refocus or refetch, and the app feels slower. Libraries separate these states, for example `isPending` and `isFetching` in TanStack Query.
 **Follow-up:** What about a failed background refetch?
 
-Answer: Keep the stale data visible and show a non-blocking error or retry affordance.
+Answer: Keep the old data visible and show a non-blocking error message or a retry option.
 
 ---
 
@@ -162,10 +162,10 @@ Answer: Keep the stale data visible and show a non-blocking error or retry affor
 **Difficulty:** Junior
 **Category:** Async data / UX states
 **Question:** Why must "no results" be distinct from "still loading" and "failed"?
-**Answer:** `data.length === 0` is only meaningful after a successful response. If you check emptiness before loading completes, users briefly see "No results" and then the list pops in. If a failure is shown as empty, users believe nothing exists. Render in order: error, loading, then empty versus content. Each state needs different copy and actions: retry for errors, a call to action for empty.
+**Answer:** An empty list is only meaningful after a successful response. If you check for emptiness before loading finishes, users briefly see "No results" and then the list pops in. If a failure is shown as empty, users think nothing exists. So I render in order: error first, then loading, then empty versus content. Each state needs different text and actions, like a retry button for errors and a call to action for empty results.
 **Follow-up:** What default value for `data` causes this bug?
 
-Answer: Defaulting to `[]` makes unloaded data look like an empty list.
+Answer: Defaulting it to `[]`. Data that hasn't loaded yet then looks like an empty list.
 
 ---
 
@@ -173,10 +173,10 @@ Answer: Defaulting to `[]` makes unloaded data look like an empty list.
 **Difficulty:** Intermediate
 **Category:** Async data / Error handling
 **Question:** Do error boundaries catch errors thrown in promises or event handlers?
-**Answer:** No. Boundaries catch errors during render, lifecycle, and constructors of their subtree. Errors in event handlers, effects' async callbacks, and timers are not caught. Handle them in `try/catch` or `.catch`, store them in state, and render the error. To route an async error to a boundary, rethrow it during render, for example `setState(() => { throw err; })`. Suspense-based data libraries throw errors during render by design.
+**Answer:** No. Error boundaries catch errors during rendering, lifecycle methods, and constructors in their subtree. They don't catch errors in event handlers, async callbacks inside effects, or timers. For those, I use `try/catch` or `.catch`, store the error in state, and render it. If I want an async error to reach a boundary, I rethrow it during render, for example with `setState(() => { throw err; })`. Suspense-based data libraries throw errors during render by design.
 **Follow-up:** Where do you place boundaries?
 
-Answer: Around independent regions so one failing widget doesn't blank the whole page.
+Answer: Around independent regions, so one failing widget doesn't blank the whole page.
 
 ---
 
@@ -184,14 +184,14 @@ Answer: Around independent regions so one failing widget doesn't blank the whole
 **Difficulty:** Intermediate
 **Category:** Async data / Cache keys
 **Question:** What makes a good cache key for server data?
-**Answer:** The key must uniquely identify the data and include every variable the request depends on: resource, ids, filters, sort, page. When the key changes, the cache treats it as a different entry and fetches or reuses it. Use stable, serializable, hierarchical arrays like `['todos', { status, page }]` so you can invalidate by prefix. Leaving out a variable returns wrong data from cache; including unrelated values fragments the cache.
+**Answer:** A good key uniquely identifies the data and includes every variable the request depends on: the resource, ids, filters, sort order, and page. When the key changes, the cache treats it as a different entry and fetches or reuses it. I use stable, serializable, hierarchical arrays like `['todos', { status, page }]`, so I can invalidate by prefix. If a variable is missing, you can get wrong data from the cache. Including unrelated values splits the cache needlessly.
 **Code:**
 ```js
 useQuery({ queryKey: ['todos', { status, page }], queryFn: () => getTodos({ status, page }) });
 ```
 **Follow-up:** Why arrays instead of strings?
 
-Answer: Hierarchical arrays support prefix invalidation and structured params without string concatenation.
+Answer: Hierarchical arrays support prefix invalidation and structured parameters without string concatenation.
 
 ---
 
@@ -199,7 +199,7 @@ Answer: Hierarchical arrays support prefix invalidation and structured params wi
 **Difficulty:** Intermediate
 **Category:** Async data / Cache keys
 **Question:** How is a query key similar to an effect dependency array?
-**Answer:** Both declare what the async work depends on. In an effect, changing a dep re-runs it; with a query, changing the key switches to another cache entry and fetches if missing or stale. The key also gives caching, deduping, and race safety, because each response is stored under its own key, so a late response cannot overwrite a different key's data. Anything used in `queryFn` should appear in the key.
+**Answer:** Both declare what the async work depends on. In an effect, changing a dependency re-runs it. With a query, changing the key switches to a different cache entry, and fetches if that entry is missing or stale. The key also gives you caching, de-duplication, and protection from races, because each response is stored under its own key. A late response can't overwrite another key's data. Anything used inside `queryFn` should appear in the key.
 **Follow-up:** What bug appears if `queryFn` uses a variable that is not in the key?
 
 Answer: Different inputs share one cache entry, so users see stale or wrong data.
@@ -210,10 +210,10 @@ Answer: Different inputs share one cache entry, so users see stale or wrong data
 **Difficulty:** Intermediate
 **Category:** Async data / State architecture
 **Question:** What distinguishes server state from client state?
-**Answer:** Server state lives remotely, is shared and owned elsewhere, can be changed by others, and is therefore always potentially stale. It needs caching, revalidation, deduping, retries, and invalidation. Client state, such as modal open or form draft, is synchronous, local, and owned by the UI. Mixing them in one store (Redux or context) forces you to hand-write loading flags and sync logic. Use a server-state library for the first and `useState` or a small store for the second.
+**Answer:** Server state lives remotely and is owned elsewhere. Other people can change it, so my copy might always be out of date. That means it needs caching, revalidation, de-duplication, retries, and invalidation. Client state, like whether a modal is open or a form draft, is synchronous, local, and owned by the UI. If I mix both in one store, I end up hand-writing loading flags and sync logic. I use a server-state library for the first and `useState` or a small store for the second.
 **Follow-up:** Where does URL state fit?
 
-Answer: It's client state that is shareable and bookmarkable, and often forms part of the query key.
+Answer: It's client state that can be shared and bookmarked, and it often becomes part of the query key.
 
 ---
 
@@ -221,11 +221,11 @@ Answer: It's client state that is shareable and bookmarkable, and often forms pa
 **Difficulty:** Senior
 **Category:** Async data / State architecture
 **Question:** Why is putting fetched data in React Context usually a mistake?
-**Answer:** Context only distributes values; it provides no caching, deduping, invalidation, or retry. You still write the fetch logic, and every consumer re-renders when the value changes, even if it uses one field. Data is tied to the provider's lifetime, so navigation often drops it and refetches. Components can't select slices, and multiple providers duplicate requests. Context fits low-frequency, truly global client values like theme or auth user.
+**Answer:** Context only passes values around. It doesn't cache, de-duplicate, invalidate, or retry. You still write the fetch logic yourself. Every consumer also re-renders when the value changes, even if it uses one field. The data lives only as long as the provider, so navigating away often drops it and forces a refetch. Several providers can also duplicate requests. Context is better for rarely changing global client values, such as the theme or the signed-in user.
 **Trade-offs:** Context is simple for tiny apps; a query cache scales with shared data and reduces boilerplate.
 **Follow-up:** Can you fix re-renders with memoization?
 
-Answer: Partly by splitting contexts, but you still lack cache lifecycle and revalidation.
+Answer: Partly, by splitting the context into smaller ones. But you'd still lack cache lifetime management and revalidation.
 
 ---
 
@@ -233,10 +233,10 @@ Answer: Partly by splitting contexts, but you still lack cache lifecycle and rev
 **Difficulty:** Intermediate
 **Category:** Async data / TanStack Query
 **Question:** What does `staleTime` control?
-**Answer:** It's how long fetched data is considered fresh. While fresh, the cache serves it without refetching, even on mount or window focus. After it elapses the data becomes stale: it's still shown instantly, but triggers a background refetch on the next trigger. The default is 0, so data is stale immediately. Increase it for rarely changing data (config, lists), and set it to `Infinity` for static data.
+**Answer:** It controls how long fetched data counts as fresh. While data is fresh, the cache returns it without refetching, even on mount or window focus. Once that time passes, the data becomes stale. It's still shown instantly, but it can trigger a background refetch the next time something prompts one. The default is 0, so data is stale right away. I raise it for data that rarely changes, and use `Infinity` for static data.
 **Follow-up:** Does stale mean removed from cache?
 
-Answer: No. Stale data is still returned and displayed; it's just eligible for revalidation.
+Answer: No. Stale data is still returned and displayed. It's just eligible to be refreshed.
 
 ---
 
@@ -244,10 +244,10 @@ Answer: No. Stale data is still returned and displayed; it's just eligible for r
 **Difficulty:** Intermediate
 **Category:** Async data / TanStack Query
 **Question:** What does `gcTime` do, and how does it differ from `staleTime`?
-**Answer:** `gcTime` is how long an unused query's data stays in memory after its last observer unmounts, defaulting to 5 minutes. After that it's garbage collected. `staleTime` decides when to refetch; `gcTime` decides when to discard. Keeping `gcTime` greater than `staleTime` lets users navigate back and instantly see cached data while it revalidates. It was renamed from `cacheTime` in v5 to reduce confusion.
+**Answer:** `gcTime` is how long unused query data stays in memory after the last component using it unmounts. The default is five minutes, and after that the data is garbage collected. `staleTime` decides when data should be refetched, while `gcTime` decides when it's thrown away. If `gcTime` is longer than `staleTime`, users can navigate back and see cached data instantly while it refreshes. In version 5 it was renamed from `cacheTime` to reduce confusion.
 **Follow-up:** What happens on return after gc?
 
-Answer: There is no cached data, so the UI shows a loading state until the fetch completes.
+Answer: There's no cached data, so the UI shows a loading state until the fetch finishes.
 
 ---
 
@@ -255,14 +255,14 @@ Answer: There is no cached data, so the UI shows a loading state until the fetch
 **Difficulty:** Intermediate
 **Category:** Async data / TanStack Query
 **Question:** What does invalidating a query do, and when do you use it?
-**Answer:** Invalidation marks matching cache entries as stale and immediately refetches those that are currently being observed. Inactive ones refetch on next use. Call it after a mutation changes server data, for example invalidating `['todos']` after creating a todo, which also matches `['todos', {page}]` by prefix. It is the simplest way to keep the UI consistent with the server because it uses the server as the source of truth.
+**Answer:** Invalidating marks matching cache entries as stale. Those currently in use on screen are refetched immediately, and inactive ones are refetched the next time they're used. I call it after a mutation changes server data. For example, invalidating `['todos']` after creating a todo also matches `['todos', {page}]` by prefix. It's the simplest way to keep the UI consistent, because the server stays the source of truth.
 **Code:**
 ```js
 queryClient.invalidateQueries({ queryKey: ['todos'] });
 ```
 **Follow-up:** Why not just update the cache by hand?
 
-Answer: You can, but it duplicates server logic and risks drift; invalidation is simpler and safer.
+Answer: You can, but it duplicates server logic and risks the cache drifting from the server. Invalidation is simpler and safer.
 
 ---
 
@@ -270,10 +270,10 @@ Answer: You can, but it duplicates server logic and risks drift; invalidation is
 **Difficulty:** Intermediate
 **Category:** Async data / Revalidation
 **Question:** When do query libraries refetch stale data automatically?
-**Answer:** Typically on component mount, window refocus, network reconnect, and optionally on an interval (polling). These triggers match the moments when users are likely to see outdated data. Because only stale data refetches, `staleTime` throttles them. Disable or tune them per query for expensive endpoints, and use `refetchInterval` only when near-real-time updates are required, ideally with a pause when the tab is hidden.
+**Answer:** Typically when a component mounts, when the window regains focus, when the network reconnects, and optionally on a timer for polling. These are moments when users are likely to see outdated data. Only stale data is refetched, so `staleTime` limits how often it happens. For expensive endpoints I tune or disable these triggers. I'd use `refetchInterval` only when near-real-time updates are needed, ideally pausing when the tab is hidden.
 **Follow-up:** Why can refocus refetching be annoying?
 
-Answer: It can cause flicker or overwrite in-progress UI, so it's often paired with a larger `staleTime`.
+Answer: It can cause flicker or overwrite something the user is in the middle of doing. A larger `staleTime` often helps.
 
 ---
 
@@ -281,10 +281,10 @@ Answer: It can cause flicker or overwrite in-progress UI, so it's often paired w
 **Difficulty:** Intermediate
 **Category:** Async data / Revalidation
 **Question:** What is the stale-while-revalidate strategy?
-**Answer:** Return cached data immediately, then fetch fresh data in the background and update when it arrives. The user sees content instantly, and correctness is restored shortly after. It trades guaranteed freshness for responsiveness. HTTP has the same idea in `Cache-Control: stale-while-revalidate`, and SWR and TanStack Query implement it in the client. It fits data where brief staleness is acceptable, not balances or inventory at checkout.
+**Answer:** You show cached data immediately, fetch fresh data in the background, and update the screen when it arrives. Users see content instantly, and the correct data follows shortly after. It trades guaranteed freshness for responsiveness. HTTP has the same idea in `Cache-Control: stale-while-revalidate`, and SWR and TanStack Query do it in the client. It suits data where brief staleness is acceptable, but not things like account balances or stock at checkout.
 **Follow-up:** When is SWR a poor fit?
 
-Answer: When showing outdated values is harmful, such as payments or stock at purchase time.
+Answer: When showing an outdated value could cause harm, such as payments or inventory at purchase time.
 
 ---
 
@@ -292,14 +292,14 @@ Answer: When showing outdated values is harmful, such as payments or stock at pu
 **Difficulty:** Intermediate
 **Category:** Async data / Revalidation
 **Question:** What does an SWR-style hook give you over a hand-rolled effect?
-**Answer:** A key-based shared cache, request deduping across components, revalidation on focus and reconnect, retries with backoff, and race safety. You write `useSWR(key, fetcher)` and get `data`, `error`, and `isLoading`. Components using the same key share one request and update together. It removes most boilerplate, but you still design keys, error handling, and mutation flows.
+**Answer:** You get a shared cache keyed by input, de-duplicated requests across components, revalidation on focus and reconnect, retries with backoff, and protection from out-of-order responses. You write `useSWR(key, fetcher)` and get `data`, `error`, and `isLoading`. Components using the same key share one request and update together. It removes most of the boilerplate, but you still have to design keys, error handling, and mutation flows.
 **Code:**
 ```jsx
 const { data, error, isLoading } = useSWR(['user', id], () => getUser(id));
 ```
 **Follow-up:** How do SWR and TanStack Query differ conceptually?
 
-Answer: Mostly in API breadth; TanStack Query has richer mutation, pagination, and devtools features, while SWR is smaller.
+Answer: Mostly in scope. TanStack Query has richer mutation, pagination, and devtools features, while SWR is smaller and simpler.
 
 ---
 
@@ -307,7 +307,7 @@ Answer: Mostly in API breadth; TanStack Query has richer mutation, pagination, a
 **Difficulty:** Intermediate
 **Category:** Async data / Mutations
 **Question:** How do mutations differ from queries?
-**Answer:** Queries read and are declarative, cached, and auto-refetched. Mutations write (create, update, delete) and are imperative: you trigger them from an event, they are not cached, and they usually aren't retried by default because they may not be idempotent. A mutation exposes pending, error, and success state and callbacks. After success you typically invalidate or update related queries.
+**Answer:** Queries read data. They're declarative, cached, and refetched automatically. Mutations write data, such as create, update, or delete. You trigger them yourself from an event, they aren't cached, and they usually aren't retried by default, because a write may not be safe to repeat. A mutation gives you pending, error, and success states plus callbacks. After success, you typically invalidate or update the related queries.
 **Code:**
 ```js
 const m = useMutation({ mutationFn: createTodo,
@@ -315,7 +315,7 @@ const m = useMutation({ mutationFn: createTodo,
 ```
 **Follow-up:** Why no auto-retry for mutations?
 
-Answer: A retried non-idempotent write could duplicate side effects.
+Answer: Retrying a write that isn't safe to repeat could duplicate its side effects, like creating two orders.
 
 ---
 
@@ -323,11 +323,11 @@ Answer: A retried non-idempotent write could duplicate side effects.
 **Difficulty:** Senior
 **Category:** Async data / Optimistic UI
 **Question:** What is an optimistic update and what steps does it require?
-**Answer:** You update the UI as if the mutation had succeeded, before the server responds, then reconcile with the real result. Steps: cancel in-flight queries for that key, snapshot the previous cache, write the optimistic value, run the mutation, roll back from the snapshot on error, and invalidate on settle to sync with the server. It makes UI feel instant but adds complexity and risk of flicker or inconsistency.
+**Answer:** You update the UI as if the mutation already succeeded, before the server responds, then reconcile with the real result. The steps are: cancel any in-flight queries for that key, save a snapshot of the current cache, write the optimistic value, run the mutation, restore the snapshot if it fails, and invalidate when it settles to sync with the server. It makes the UI feel instant, but adds complexity and a risk of flicker or inconsistency.
 **Trade-offs:** Great for likes, toggles, reorder; avoid for payments or actions with likely validation failure.
 **Follow-up:** Why cancel in-flight queries first?
 
-Answer: A pending refetch could resolve afterward and overwrite the optimistic value with old data.
+Answer: A pending refetch could finish afterward and overwrite the optimistic value with old data.
 
 ---
 
@@ -335,10 +335,10 @@ Answer: A pending refetch could resolve afterward and overwrite the optimistic v
 **Difficulty:** Senior
 **Category:** Async data / Optimistic UI
 **Question:** How do you handle failure of an optimistic mutation?
-**Answer:** Save the previous data in context during `onMutate`, and restore it in `onError`. Always invalidate in `onSettled` so the cache converges to server truth whether it failed or succeeded. Tell the user: show an error toast and, if needed, preserve their input. With concurrent mutations, rolling back a snapshot can erase other optimistic changes, so prefer invalidation or scope updates to the specific item.
+**Answer:** In `onMutate`, I save the previous data and return it as context. In `onError`, I restore it. In `onSettled`, I always invalidate, so the cache ends up matching the server whether the mutation succeeded or failed. I also tell the user, for example with an error toast, and keep their input if needed. With several mutations at once, restoring a snapshot can erase other optimistic changes, so I'd prefer invalidation or limit updates to the specific item.
 **Follow-up:** What about multiple rapid optimistic edits?
 
-Answer: Serialize them or key mutations per entity, so rollbacks don't clobber newer edits.
+Answer: Run them one at a time, or key mutations per item, so a rollback doesn't wipe out newer edits.
 
 ---
 
@@ -346,10 +346,10 @@ Answer: Serialize them or key mutations per entity, so rollbacks don't clobber n
 **Difficulty:** Senior
 **Category:** Async data / Mutations
 **Question:** After a mutation, should you invalidate queries or write the response into the cache?
-**Answer:** Invalidate when the server may change other derived data (lists, counts, sorting) because refetching guarantees correctness at the cost of an extra request. Write directly with `setQueryData` when the response returns the full updated entity and only that entry is affected, saving a round trip and avoiding flicker. Often combine both: set the detail entry from the response, invalidate lists.
+**Answer:** It depends on what the change affects. If the server may change other related data, like lists, counts, or sort order, I invalidate. Refetching guarantees correctness, at the cost of one extra request. If the response returns the full updated item and only that cache entry is affected, I write it directly with `setQueryData`. That saves a request and avoids flicker. Often I do both: set the detail entry from the response, and invalidate the lists.
 **Follow-up:** Risk of manual writes?
 
-Answer: Client logic can diverge from server rules like ordering, filters, or computed fields.
+Answer: Your client logic can drift from server rules, such as ordering, filters, or computed fields.
 
 ---
 
@@ -357,10 +357,10 @@ Answer: Client logic can diverge from server rules like ordering, filters, or co
 **Difficulty:** Intermediate
 **Category:** Async data / Caching
 **Question:** What is request deduping and how do query libraries achieve it?
-**Answer:** When several components request the same key at roughly the same time, only one network request is made and all subscribers share the result. The cache stores the in-flight promise under the key. This lets components fetch their own data locally without prop drilling or fear of duplicate calls. Raw `useEffect` fetching has no deduping, so N components trigger N requests.
+**Answer:** When several components ask for the same key at about the same time, only one network request is sent, and they all share the result. The cache stores the in-flight promise under that key, so later callers reuse it. This lets each component fetch its own data without prop drilling and without worrying about duplicate calls. Plain `useEffect` fetching has no de-duplication, so N components send N requests.
 **Follow-up:** How does deduping interact with Strict Mode?
 
-Answer: The remount's request reuses the in-flight one, so you don't see double fetches in the network tab.
+Answer: The remount reuses the request already in flight, so you don't see double fetches in the network tab.
 
 ---
 
@@ -368,10 +368,10 @@ Answer: The remount's request reuses the in-flight one, so you don't see double 
 **Difficulty:** Senior
 **Category:** Async data / Performance
 **Question:** What is a fetch waterfall and why is it common in React?
-**Answer:** A waterfall occurs when requests run sequentially because each starts only after the previous one finishes. In React it arises when a child component fetches in an effect: the child doesn't mount until the parent finishes loading and renders, so its request starts late. Nested components multiply latency. Fixes: hoist fetches, start requests in parallel, prefetch in route loaders, or fetch on the server.
+**Answer:** A waterfall is when requests run one after another, because each one starts only after the previous one finishes. In React it often happens when a child fetches inside an effect. The child doesn't mount until the parent finishes loading and renders, so its request starts late. With nested components, the delays add up. Fixes include moving fetches up, starting independent requests in parallel, prefetching in route loaders, or fetching on the server.
 **Follow-up:** Is every sequential fetch a waterfall problem?
 
-Answer: No. Truly dependent data, like needing a user id to fetch their posts, must be sequential; the problem is accidental sequencing.
+Answer: No. If one request truly depends on another, like needing a user id before fetching their posts, it must be sequential. The problem is accidental sequencing.
 
 ---
 
@@ -379,14 +379,14 @@ Answer: No. Truly dependent data, like needing a user id to fetch their posts, m
 **Difficulty:** Intermediate
 **Category:** Async data / Performance
 **Question:** How do you fetch independent data in parallel?
-**Answer:** Start all requests at the same time instead of waiting for each. In plain code use `Promise.all`. With a query library, call several `useQuery` hooks in the same component or use `useQueries`, so they all fire on mount. For route-level data, kick off requests in a loader before rendering. Parallel loading reduces total time to the slowest request instead of the sum.
+**Answer:** Start all the requests at the same time instead of waiting for each one. In plain code, `Promise.all` does this. With a query library, call several `useQuery` hooks in the same component or use `useQueries`, so they all fire on mount. For route data, start the requests in a loader before rendering. The total wait becomes the time of the slowest request, instead of the sum of all of them.
 **Code:**
 ```js
 const [user, posts] = await Promise.all([getUser(id), getPosts(id)]);
 ```
 **Follow-up:** What does `Promise.all` do if one rejects?
 
-Answer: It rejects immediately; use `Promise.allSettled` if you want partial results.
+Answer: It rejects immediately. Use `Promise.allSettled` if you want partial results.
 
 ---
 
@@ -394,14 +394,14 @@ Answer: It rejects immediately; use `Promise.allSettled` if you want partial res
 **Difficulty:** Intermediate
 **Category:** Async data / Query control
 **Question:** How do you handle a query that depends on another query's result?
-**Answer:** Disable it until its inputs exist using an `enabled` flag, for example `enabled: !!userId`. It stays idle, then fires once the prerequisite data arrives. Put the dependency in the key. This is a legitimate waterfall, so consider whether the backend could return the combined data in one call or expose the needed id earlier to avoid the extra round trip.
+**Answer:** I disable the second query until its inputs exist, using the `enabled` option, for example `enabled: !!userId`. It stays idle, then runs once the first query provides the needed value. The dependency also goes in the query key. This is a legitimate waterfall, so I'd ask whether the backend could return the combined data in one call, or expose the needed id earlier, to avoid the extra round trip.
 **Code:**
 ```js
 useQuery({ queryKey: ['projects', userId], queryFn: () => getProjects(userId), enabled: !!userId });
 ```
 **Follow-up:** What status does a disabled query report?
 
-Answer: It remains pending but not fetching; check `fetchStatus` to distinguish idle from loading.
+Answer: It stays in a pending state but isn't fetching. Check `fetchStatus` to tell idle apart from loading.
 
 ---
 
@@ -409,10 +409,10 @@ Answer: It remains pending but not fetching; check `fetchStatus` to distinguish 
 **Difficulty:** Intermediate
 **Category:** Async data / Performance
 **Question:** What is prefetching, and where is it useful?
-**Answer:** Prefetching loads data into the cache before the user needs it, so navigation feels instant. Typical triggers: hovering a link, route transitions, or after loading a list item's neighbors. In TanStack Query, `queryClient.prefetchQuery` fills the cache under the same key the page will use. Choose triggers carefully: aggressive prefetch wastes bandwidth and server load, and prefetched data needs a `staleTime` or it refetches on mount.
+**Answer:** Prefetching loads data into the cache before the user needs it, so navigation feels instant. Typical triggers are hovering over a link, a route transition, or loading neighboring items in a list. In TanStack Query, `queryClient.prefetchQuery` fills the cache under the same key the page will use. I choose triggers carefully, because aggressive prefetching wastes bandwidth and server capacity. I also set a `staleTime`, otherwise the page refetches on mount anyway.
 **Follow-up:** Why does `staleTime` matter here?
 
-Answer: With the default of 0, prefetched data is immediately stale and the page refetches anyway.
+Answer: With the default of 0, prefetched data is stale immediately, so the page fetches again anyway.
 
 ---
 
@@ -420,7 +420,7 @@ Answer: With the default of 0, prefetched data is immediately stale and the page
 **Difficulty:** Senior
 **Category:** Async data / Suspense
 **Question:** How does Suspense support data fetching?
-**Answer:** A component can suspend by throwing a pending promise during render (or using `use`). React shows the nearest `<Suspense fallback>` and retries when the promise resolves. This replaces manual `isLoading` checks and lets you declare loading boundaries independently of the data code. React doesn't provide a fetching or caching API itself; you need a Suspense-compatible library or framework that caches the promise.
+**Answer:** A component can "suspend" during render by throwing a pending promise, or by using `use`. React then shows the closest `<Suspense fallback>` and tries again when the promise resolves. This replaces manual `isLoading` checks and lets you place loading boundaries separately from the data code. React itself doesn't provide fetching or caching. You need a Suspense-compatible library or framework that caches the promise.
 **Code:**
 ```jsx
 <Suspense fallback={<Skeleton />}>
@@ -429,7 +429,7 @@ Answer: With the default of 0, prefetched data is immediately stale and the page
 ```
 **Follow-up:** Why can't I just `throw fetch()` in render?
 
-Answer: A new promise per render never resolves into a cached value, causing an infinite suspend loop.
+Answer: A new promise is created on every render, so it never settles into a cached value. You get an endless suspend loop.
 
 ---
 
@@ -437,7 +437,7 @@ Answer: A new promise per render never resolves into a cached value, causing an 
 **Difficulty:** Senior
 **Category:** Async data / Suspense
 **Question:** What does `use(promise)` do in React 19, and what are its rules?
-**Answer:** `use` reads a promise (or context) during render. If the promise is pending, the component suspends; if rejected, the nearest error boundary handles it; if fulfilled, it returns the value. Unlike hooks, it can be called conditionally or in loops. The promise must be stable across renders, so create it outside render, in a cache, or in a Server Component and pass it down.
+**Answer:** `use` reads a promise, or a context, during render. If the promise is pending, the component suspends. If it's rejected, the nearest error boundary handles it. If it's fulfilled, `use` returns the value. Unlike other hooks, it can be called inside conditions or loops. The promise must stay the same between renders, so I create it outside render, in a cache, or in a Server Component and pass it down.
 **Code:**
 ```jsx
 function Comments({ promise }) {
@@ -447,7 +447,7 @@ function Comments({ promise }) {
 ```
 **Follow-up:** Why must the promise be stable?
 
-Answer: A fresh promise each render restarts suspending and never settles into stable output.
+Answer: A fresh promise on every render restarts the suspending, so it never settles into stable output.
 
 ---
 
@@ -455,10 +455,10 @@ Answer: A fresh promise each render restarts suspending and never settles into s
 **Difficulty:** Senior
 **Category:** Async data / Suspense
 **Question:** What's wrong with `use(fetch(url))` inside a Client Component?
-**Answer:** Each render creates a new promise, so React suspends on it, re-renders when it resolves, creates another new promise, and loops. React warns that uncached promises are unsupported in Client Components. Create the promise in a Server Component, a router loader, or a cache keyed by input (for example via `cache` or a library), then pass it down. Libraries wrap this to make it safe.
+**Answer:** Every render creates a new promise. React suspends on it, re-renders when it resolves, then creates another new promise, and the cycle repeats. React warns that uncached promises aren't supported in Client Components. The promise should be created in a Server Component, a router loader, or a cache keyed by input, for example with `cache` or a library, and then passed down. Libraries wrap this to make it safe.
 **Follow-up:** Does Server Component promise creation have this problem?
 
-Answer: No. Server render runs once per request, so the promise is created once and serialized to the client.
+Answer: No. Server rendering runs once per request, so the promise is created once and sent to the client.
 
 ---
 
@@ -466,10 +466,10 @@ Answer: No. Server render runs once per request, so the promise is created once 
 **Difficulty:** Intermediate
 **Category:** Async data / Suspense
 **Question:** How do you structure loading and error handling with Suspense?
-**Answer:** Suspense handles the pending state and error boundaries handle failures, so you wrap data-reading components in both. The boundary catches thrown errors, and you offer a retry that resets it and refetches (for example, `QueryErrorResetBoundary` with `react-error-boundary`). Place pairs around independent regions so each can load or fail on its own, avoiding a single page-wide spinner or crash.
+**Answer:** Suspense handles the pending state and error boundaries handle failures, so I wrap data-reading components in both. The boundary catches thrown errors, and I offer a retry that resets the boundary and refetches, for example with `QueryErrorResetBoundary` and `react-error-boundary`. I place these pairs around independent regions, so each region can load or fail on its own, rather than one page-wide spinner or crash.
 **Follow-up:** How granular should boundaries be?
 
-Answer: Group content that should appear together; separate parts that can stream independently.
+Answer: Group content that should appear together, and separate parts that can load independently.
 
 ---
 
@@ -477,10 +477,10 @@ Answer: Group content that should appear together; separate parts that can strea
 **Difficulty:** Senior
 **Category:** Async data / Concurrent rendering
 **Question:** How do `startTransition` and `useDeferredValue` improve data-driven UIs?
-**Answer:** When a state change causes a suspending component to render, React normally replaces the UI with the fallback. Wrapping the update in `startTransition` marks it non-urgent, so React keeps the old UI visible until the new one is ready and exposes `isPending`. `useDeferredValue` does similar for a value: the input stays responsive while lists or results render with the lagging value. Both avoid jarring spinners on navigation or search.
+**Answer:** Normally, when a state change makes a component suspend, React replaces the UI with the fallback. If I wrap the update in `startTransition`, React treats it as non-urgent and keeps the old UI visible until the new one is ready, and I get an `isPending` flag. `useDeferredValue` does something similar for a value: the input stays responsive while the results render using a slightly older value. Both avoid jarring spinners during navigation or search.
 **Follow-up:** How do you signal "updating" with deferred value?
 
-Answer: Compare the deferred value with the current one; if they differ, the view is stale.
+Answer: Compare the deferred value with the current one. If they differ, the view is out of date.
 
 ---
 
@@ -488,7 +488,7 @@ Answer: Compare the deferred value with the current one; if they differ, the vie
 **Difficulty:** Senior
 **Category:** Async data / Server Components
 **Question:** How do Server Components change data fetching?
-**Answer:** Server Components can be `async`, so they `await` data directly (database, internal API) during server render, with no effect, client state, or API round trip from the browser. Only the rendered output is sent, so fetching code and secrets stay off the client and bundle size drops. They can't use state or effects. Fetching near the component that needs it is fine because frameworks dedupe and cache requests.
+**Answer:** Server Components can be `async`, so they can `await` data directly, from a database or internal API, while rendering on the server. There's no effect, no client state, and no extra request from the browser. Only the rendered output is sent, so fetching code and secrets stay off the client and the bundle gets smaller. They can't use state or effects. Fetching right next to the component that needs the data is fine, because frameworks de-duplicate and cache requests.
 **Code:**
 ```jsx
 export default async function Page({ params }) {
@@ -498,7 +498,7 @@ export default async function Page({ params }) {
 ```
 **Follow-up:** Do Server Components remove the need for client data libraries?
 
-Answer: Not entirely; interactive, frequently changing, or user-driven data still benefits from client caching.
+Answer: Not entirely. Interactive, frequently changing, or user-driven data still benefits from client-side caching.
 
 ---
 
@@ -506,11 +506,11 @@ Answer: Not entirely; interactive, frequently changing, or user-driven data stil
 **Difficulty:** Staff
 **Category:** Async data / Server Components
 **Question:** How do you decide what data to fetch on the server versus in the client?
-**Answer:** Fetch on the server for initial, SEO-relevant, or secret-dependent data to avoid waterfalls and keep tokens private. Fetch on the client for user-triggered, real-time, or frequently refreshed data, plus mutations. A hybrid is common: the server fetches initial data and passes it to a client component, or passes a promise that the client reads with `use`. Watch the serialization boundary: only serializable props cross it.
+**Answer:** I fetch on the server for initial data, SEO-relevant data, or anything needing secrets. That avoids waterfalls and keeps tokens private. I fetch on the client for user-triggered, real-time, or frequently refreshed data, and for mutations. A hybrid is common: the server fetches the initial data and passes it to a client component, or passes a promise that the client reads with `use`. I also watch the serialization boundary, since only serializable props can cross it.
 **Trade-offs:** Server fetch improves first paint but ties to request latency; client fetch gives interactivity but costs another round trip.
 **Follow-up:** How do you pass server data to a client cache?
 
-Answer: Dehydrate it on the server and hydrate it into the client query cache, or use it as initial data.
+Answer: Dehydrate it on the server and hydrate it into the client query cache, or use it as the initial data.
 
 ---
 
@@ -518,10 +518,10 @@ Answer: Dehydrate it on the server and hydrate it into the client query cache, o
 **Difficulty:** Senior
 **Category:** Async data / SSR
 **Question:** How is data handled across server rendering and hydration?
-**Answer:** On the server you fetch data, render HTML with it, and serialize that data into the page. On the client, React hydrates the HTML and must render the same output on first pass, so the client state must start from the serialized data, not refetch and render a loading state. Effects don't run on the server, so effect-fetching never produces SSR data. Use a framework loader, Server Components, or a hydrated query cache.
+**Answer:** On the server, you fetch the data, render HTML with it, and embed that data in the page. In the browser, React hydrates that HTML and has to produce the same output on the first render. So client state must start from the embedded data. It shouldn't refetch and show a loading state. Effects don't run on the server, so fetching inside an effect never produces server-rendered data. I'd use a framework loader, Server Components, or a hydrated query cache.
 **Follow-up:** Why doesn't `useEffect` fetching work for SEO?
 
-Answer: Effects run only in the browser, so the initial HTML has no data for crawlers or first paint.
+Answer: Effects only run in the browser, so the initial HTML has no data for crawlers or the first paint.
 
 ---
 
@@ -529,10 +529,10 @@ Answer: Effects run only in the browser, so the initial HTML has no data for cra
 **Difficulty:** Senior
 **Category:** Async data / Hydration
 **Question:** What causes data-related hydration mismatches, and how do you fix them?
-**Answer:** The client's first render differs from the server HTML. Common causes: `Date.now()`, random ids, locale or timezone formatting, reading `localStorage` or `window` during render, and the client starting with empty data while the server rendered populated data. Fix by serializing the server's values, rendering deterministic output first and updating in an effect, using `useId`, or marking an element `suppressHydrationWarning` for harmless text only.
+**Answer:** A mismatch happens when the browser's first render differs from the HTML the server sent. Common causes are `Date.now()`, random ids, locale or timezone formatting, reading `localStorage` or `window` during render, and the client starting with empty data while the server rendered real data. To fix it, I send the server's values to the client, render predictable output first and update in an effect, use `useId`, or use `suppressHydrationWarning` only for harmless text.
 **Follow-up:** What happens on mismatch in React 18?
 
-Answer: React logs an error and falls back to client-rendering the affected Suspense boundary or tree, hurting performance.
+Answer: React logs an error and falls back to client rendering for the affected Suspense boundary or tree, which hurts performance.
 
 ---
 
@@ -540,10 +540,10 @@ Answer: React logs an error and falls back to client-rendering the affected Susp
 **Difficulty:** Staff
 **Category:** Async data / SSR
 **Question:** How do you share server-prefetched data with a client query cache?
-**Answer:** On the server, create a query client per request, prefetch the needed queries, and dehydrate the cache into serializable state. Send it to the client and wrap the app in a hydration boundary. The client cache starts populated using the same keys, so components render immediately without a loading state, then follow normal `staleTime` rules. Create the client per request, never a module singleton, to avoid leaking data between users.
+**Answer:** On the server, I create a query client for each request, prefetch the needed queries, and dehydrate the cache into plain serializable data. I send that to the browser and wrap the app in a hydration boundary. The client cache starts filled using the same keys, so components render immediately with no loading state, and then follow the normal `staleTime` rules. The client must be created per request, never as a shared module-level instance, to avoid leaking data between users.
 **Follow-up:** Why per-request clients?
 
-Answer: A shared server-side cache would expose one user's data to another.
+Answer: A shared server-side cache would expose one user's data to another user.
 
 ---
 
@@ -551,14 +551,14 @@ Answer: A shared server-side cache would expose one user's data to another.
 **Difficulty:** Intermediate
 **Category:** Async data / Pagination
 **Question:** How do you implement paginated lists without UI flashing between pages?
-**Answer:** Put the page in the query key so each page is cached separately. When the key changes, there is no data for the new page, which would flash a loading state. Keep the previous page's data visible while the next loads using `placeholderData: keepPreviousData` (v5) and show `isPlaceholderData` to dim the list. Prefetch the next page for snappier navigation, and disable "next" while placeholder data is shown.
+**Answer:** I put the page number in the query key, so each page is cached separately. But when the key changes, the new page has no data yet, which would flash a loading state. To avoid that, I use `placeholderData: keepPreviousData` in version 5, which keeps the previous page visible while the next one loads. I use `isPlaceholderData` to dim the list. I can also prefetch the next page, and disable the "next" button while placeholder data is shown.
 **Code:**
 ```js
 useQuery({ queryKey: ['items', page], queryFn: () => getItems(page), placeholderData: keepPreviousData });
 ```
 **Follow-up:** Why disable "next" on placeholder data?
 
-Answer: The shown page isn't the requested one yet, so counts or `hasMore` could be wrong.
+Answer: The page on screen isn't the one that was requested yet, so values like `hasMore` could be wrong.
 
 ---
 
@@ -566,10 +566,10 @@ Answer: The shown page isn't the requested one yet, so counts or `hasMore` could
 **Difficulty:** Senior
 **Category:** Async data / Pagination
 **Question:** How does an infinite query differ from a normal paginated query?
-**Answer:** An infinite query stores all loaded pages under one key as an ordered list. You supply `getNextPageParam` (a cursor or page number derived from the last page) and call `fetchNextPage` to append. Refetching refetches pages sequentially, so keep `maxPages` and page size sensible. Render by flattening pages. It suits feeds and endless lists, while discrete pages with URLs suit navigation and shareability.
+**Answer:** An infinite query stores all loaded pages as one ordered list under a single key. You provide `getNextPageParam`, which works out the next cursor or page number from the last page, and call `fetchNextPage` to add more. When it refetches, it refetches the pages one by one, so I keep page size and `maxPages` reasonable. I render by flattening the pages. It suits feeds and endless lists, while separate pages with URLs suit navigation and sharing.
 **Follow-up:** Why can refetching many pages be expensive?
 
-Answer: Each loaded page is refetched in order to keep the list consistent, so cost grows with depth.
+Answer: Each loaded page is refetched in order to keep the list consistent, so the cost grows as the user scrolls deeper.
 
 ---
 
@@ -577,7 +577,7 @@ Answer: Each loaded page is refetched in order to keep the list consistent, so c
 **Difficulty:** Senior
 **Category:** Async data / Pagination
 **Question:** Why do infinite feeds usually use cursor pagination rather than offset?
-**Answer:** Offset (`page=3`) breaks when items are inserted or deleted between requests: you get duplicates or skip rows. It also gets slower on large tables. Cursor pagination asks for items after a stable marker, like an id or timestamp, which stays consistent under changes and scales with indexes. The downside is no random jump to page N. React clients should treat the cursor as opaque and pass it via `pageParam`.
+**Answer:** With offset pagination, like `page=3`, items inserted or deleted between requests cause duplicates or skipped rows. It also gets slower on large tables. Cursor pagination asks for items after a stable marker, like an id or timestamp, which stays consistent when data changes and works well with database indexes. The downside is that you can't jump straight to page N. In React, I treat the cursor as an opaque value and pass it through `pageParam`.
 **Follow-up:** When is offset fine?
 
 Answer: For small, mostly static data where users jump to specific page numbers.
@@ -588,10 +588,10 @@ Answer: For small, mostly static data where users jump to specific page numbers.
 **Difficulty:** Intermediate
 **Category:** Async data / Pagination
 **Question:** How do you trigger loading the next page on scroll?
-**Answer:** Place a sentinel element at the end of the list and observe it with `IntersectionObserver`, calling `fetchNextPage` when it enters the viewport and there is a next page. Guard against duplicate calls with `isFetchingNextPage`. Avoid scroll listeners, which fire constantly. For very long lists, add virtualization so DOM size stays bounded, and provide a visible error and retry control if loading fails.
+**Answer:** I put a small sentinel element at the end of the list and watch it with `IntersectionObserver`. When it enters the viewport and there's a next page, I call `fetchNextPage`. I guard against duplicate calls with `isFetchingNextPage`. I avoid scroll listeners, because they fire constantly. For very long lists, I add virtualization to keep the DOM small, and I show a visible error with a retry button if loading fails.
 **Follow-up:** Why also virtualize?
 
-Answer: Thousands of rendered rows slow layout and memory regardless of how efficiently data loads.
+Answer: Thousands of rendered rows slow down layout and use a lot of memory, no matter how efficiently the data loads.
 
 ---
 
@@ -599,7 +599,7 @@ Answer: Thousands of rendered rows slow layout and memory regardless of how effi
 **Difficulty:** Intermediate
 **Category:** Async data / Forms
 **Question:** What UX states should a form submitting through a mutation handle?
-**Answer:** Disable the submit button and show pending feedback while the request runs to prevent double submits. Surface field-level validation errors from the server next to inputs, and general failures in an accessible alert. Preserve user input on error. On success, reset or navigate and invalidate affected queries. Prevent default, keep the form usable by keyboard, and consider idempotency keys for safe retries.
+**Answer:** While the request runs, I disable the submit button and show pending feedback to prevent double submits. Field-level validation errors from the server appear next to the inputs, and general failures appear in an accessible alert. On error, I keep the user's input. On success, I reset the form or navigate, and invalidate affected queries. I prevent the default submit, keep the form usable by keyboard, and consider idempotency keys so retries are safe.
 **Code:**
 ```jsx
 <form onSubmit={e => { e.preventDefault(); mutate(values); }}>
@@ -608,7 +608,7 @@ Answer: Thousands of rendered rows slow layout and memory regardless of how effi
 ```
 **Follow-up:** Is disabling the button enough to prevent duplicates?
 
-Answer: Not alone; the server should also be idempotent since users can retry or double-submit across tabs.
+Answer: Not by itself. The server should also handle repeats safely, since users can retry or submit from multiple tabs.
 
 ---
 
@@ -616,7 +616,7 @@ Answer: Not alone; the server should also be idempotent since users can retry or
 **Difficulty:** Senior
 **Category:** Async data / Forms
 **Question:** What do `useActionState` and `useFormStatus` provide in React 19?
-**Answer:** Forms accept a function as `action`. `useActionState(action, initial)` returns the latest result state, a wrapped action, and a pending flag, which suits returning validation errors from the server. `useFormStatus` lets a child, like a submit button, read the parent form's pending state without prop drilling. Actions run inside transitions, and uncontrolled inputs reset after success. They simplify progressive enhancement with Server Actions.
+**Answer:** In React 19, a form can take a function as its `action`. `useActionState(action, initial)` returns the latest result, a wrapped action to pass to the form, and a pending flag. It's useful for returning validation errors from the server. `useFormStatus` lets a child component, like a submit button, read the parent form's pending state without prop drilling. Actions run inside transitions, and uncontrolled inputs reset after success. They work well with Server Actions.
 **Code:**
 ```jsx
 const [state, formAction, pending] = useActionState(save, { error: null });
@@ -632,10 +632,10 @@ Answer: No. It must be called from a component rendered inside the form.
 **Difficulty:** Senior
 **Category:** Async data / Optimistic UI
 **Question:** What does `useOptimistic` do?
-**Answer:** It returns a temporary state derived from real state plus pending optimistic changes. Inside an action or transition you call its setter to show the expected result immediately; when the action finishes, React discards the optimistic layer and renders the real state. If the action fails, the UI reverts automatically, with no manual rollback. It's built for form and Server Action flows; cache libraries use their own mechanisms.
+**Answer:** It gives you a temporary version of state, made from the real state plus any pending optimistic changes. Inside an action or transition, you call its setter to show the expected result right away. When the action finishes, React drops the temporary layer and shows the real state. If the action fails, the UI goes back automatically, with no manual rollback. It's designed for form and Server Action flows. Cache libraries have their own mechanisms.
 **Follow-up:** What if the server returns a different result than expected?
 
-Answer: Once the action settles, the UI shows the real state, replacing the optimistic guess.
+Answer: Once the action settles, the UI shows the real state, which replaces the optimistic guess.
 
 ---
 
@@ -643,11 +643,11 @@ Answer: Once the action settles, the UI shows the real state, replacing the opti
 **Difficulty:** Senior
 **Category:** Async data / Error handling
 **Question:** How should a data layer decide when to retry a failed request?
-**Answer:** Retry transient failures: network errors, timeouts, 502/503/504, and 429 honoring `Retry-After`. Use exponential backoff with jitter and a low cap. Do not retry 4xx client errors like 400, 401, 403, or 404, since results won't change; handle 401 via re-auth. Reads can retry freely; writes only if idempotent. Surface a manual retry after automatic attempts are exhausted.
+**Answer:** I retry temporary failures: network errors, timeouts, 502, 503, and 504 responses, and 429 while honoring the `Retry-After` header. I use exponential backoff with random jitter and a low maximum. I don't retry client errors like 400, 401, 403, or 404, because the result won't change. For 401, I trigger re-authentication instead. Reads can be retried freely, but writes only if they're safe to repeat. After automatic attempts run out, I offer a manual retry.
 **Trade-offs:** More retries hide blips but delay error feedback and can amplify load during outages.
 **Follow-up:** Why add jitter?
 
-Answer: It spreads retries over time so many clients don't hit the server simultaneously.
+Answer: It spreads retries over time, so many clients don't hit the server at the same moment.
 
 ---
 
@@ -655,7 +655,7 @@ Answer: It spreads retries over time so many clients don't hit the server simult
 **Difficulty:** Intermediate
 **Category:** Async data / Search UX
 **Question:** How do you build a search box that doesn't spam the API or show stale results?
-**Answer:** Keep the input state immediate and derive a debounced value (or use `useDeferredValue`) that goes into the query key. Only the settled value triggers requests. Keyed caching handles races, so a slow earlier response can't replace the current one. Use `enabled` to skip empty queries, keep previous data to avoid flashing, and cancel in-flight requests via the signal passed to `queryFn`. Handle empty and error states distinctly.
+**Answer:** I keep the input state updating immediately and derive a debounced value, or use `useDeferredValue`, to put in the query key. Only the settled value triggers requests. Because results are cached by key, a slow earlier response can't replace the current one. I use `enabled` to skip empty queries, keep previous data to avoid flashing, and cancel in-flight requests with the signal passed to `queryFn`. I also handle empty and error states separately.
 **Follow-up:** Debounce vs `useDeferredValue`?
 
-Answer: Debounce reduces network calls with a time delay; `useDeferredValue` reduces render work but doesn't limit requests.
+Answer: Debouncing reduces network calls by adding a delay. `useDeferredValue` reduces rendering work but doesn't limit how many requests are sent.

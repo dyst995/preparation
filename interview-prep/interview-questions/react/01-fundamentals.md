@@ -16,7 +16,11 @@ What does React treat a function component as? When does React call it, and what
 
 **Answer:**
 
-React treats a function component as a pure function from props plus hook state to a UI description. It runs during the render phase. The return is a React element tree (or `null`/boolean/string/number/array)—not DOM. Host nodes update later in commit where the description differs. Strict Mode may call twice in development; concurrent rendering can abandon and retry. Leave side effects to handlers and effects.
+React treats a function component as a plain function that takes props and hook state and returns a description of the UI. React calls it during the render phase, when it needs to know what that part of the screen should look like.
+
+The return value is a tree of React elements (or `null`, a string, a number, or an array), not the DOM itself. React compares it with the previous description and updates the real DOM later, in the commit phase.
+
+Keep it pure, since React may call it more than once.
 
 **Code:**
 
@@ -30,7 +34,7 @@ function Greeting({ name }: { name: string }) {
 
 Why does Strict Mode call the component twice in development, and does production do that?
 
-Answer: It is a development impurity check; it does not commit two trees. Production does not add that call. Concurrent rendering can still repeat or discard a render for scheduling in production.
+Answer: It is a development-only check that helps you spot impure code, and only one result is committed. Production does not add that extra call. Concurrent rendering can still repeat or throw away a render in production when it needs to reschedule work.
 
 ### REACT-002 — Props are owned by the parent
 
@@ -44,7 +48,9 @@ Who owns a prop value? What happens if the child writes `props.title = "Edited"`
 
 **Answer:**
 
-The parent owns the value; the child reads it each render. Mutating `props.title` throws in development (frozen props) and does not update the parent; nested object mutation can still leak. `useState(props.title)` stores only the first value—later props are ignored until `setTitle` or a remount (`key`). Controlled inputs read the prop; drafts that ignore later props should document that API.
+The parent owns a prop. The child only reads it on each render. If the child tries to assign `props.title`, React throws an error in development because props are frozen, and the parent never sees the change. Mutating a nested object inside props can still leak back, so avoid that too.
+
+`useState(props.title)` only uses the prop as the starting value. When the parent later passes a new title, the state keeps the old one until you call `setTitle` or remount the component with a different `key`. Use that pattern only when the prop is meant to be an initial value.
 
 **Code:**
 
@@ -63,7 +69,7 @@ Controlled `value`/`onChange` when the parent must see every change; keyed remou
 
 When is storing a prop in state a real API, rather than a stale copy?
 
-Answer: When the prop is documented as an initial value (like `defaultValue`). If callers need live updates, use controlled `value`/`onChange` or a remounting `key`.
+Answer: When the prop is clearly documented as an initial value, like `defaultValue`. If callers need live updates, make the component controlled with `value` and `onChange`, or change its `key` to reset it.
 
 ### REACT-003 — JSX is an element description
 
@@ -77,13 +83,17 @@ What does `<Profile user={user} />` compile to, why must `Profile` be capitalize
 
 **Answer:**
 
-JSX becomes `jsx`/`jsxs` (or classic `createElement`)—a plain element object (`type`, `props`, `key`), not a component call or DOM write. Capital `Profile` is the function; lowercase `"profile"` is a host tag. Strings/numbers become text; `null`/`undefined`/`false` render nothing; `0` renders `"0"`; plain objects are invalid children. Creating the element does not run `Profile`.
+JSX compiles to a call to `jsx` (or `createElement` in the older setup). That call returns a plain object with a `type`, `props`, and `key`. It does not run the component and it does not touch the DOM.
+
+The capital letter tells the compiler that `Profile` is a variable pointing to your component. A lowercase name would be treated as a built-in HTML tag.
+
+As children, strings and numbers become text. `null`, `undefined`, and `false` render nothing. `0` renders the text "0". A plain object is not a valid child and throws.
 
 **Follow-up:**
 
 What is the difference between an element and a component?
 
-Answer: The component is the function/class. The element is `{ type, props, key }` pointing at it. React runs the component while rendering that element at a tree position, not when the object is allocated.
+Answer: The component is the function or class you wrote. The element is a small object, `{ type, props, key }`, that points at it. React only runs the component when it renders that element at a spot in the tree, not when the object is created.
 
 ### REACT-004 — Elements, fibers, and DOM nodes
 
@@ -97,7 +107,11 @@ Define a component, a React element, a fiber, and a DOM node. Which one holds ho
 
 **Answer:**
 
-Component = your function. Element = one-render description (`type`/`props`/`key`). Fiber = reconciler instance at a position (hooks, links, flags). DOM node = host object created at commit. Hook state lives on the fiber. Reusing one element object mounts two fibers with separate state; they only share the props reference. Element identity is not instance identity.
+A component is the function you write. An element is a lightweight description of what to render, created on every render. A fiber is React's internal record for one mounted instance of something in the tree. A DOM node is the real browser object created during commit.
+
+Hook state lives on the fiber, not on the element.
+
+If two parents return the same element object, React still creates two separate fibers. Each gets its own state. They only share the same props reference. So reusing an element is not the same as sharing an instance.
 
 **Trade-offs:**
 
@@ -107,7 +121,7 @@ Hoist a constant element only when it never closes over changing data. Shared st
 
 Does a parent re-render that returns `<Counter />` again destroy Counter's state?
 
-Answer: No, when type and key at that position are unchanged. State dies when type/key changes or the position unmounts.
+Answer: No. As long as the type and key at that position are the same, React reuses the existing fiber and keeps its state. State is lost only when the type or key changes, or when that position is removed.
 
 ### REACT-005 — setState schedules the next render
 
@@ -128,13 +142,17 @@ function onClick() {
 
 **Answer:**
 
-The log prints `0`—the closed-over snapshot. `setCount` schedules an update; it does not mutate the binding or return a promise. For a discrete click on `createRoot`, React flushes after the handler returns: the function runs again with `1` and commit updates the DOM before paint. From the next line’s perspective, state and DOM are still old.
+The log prints `0`. The handler closed over the `count` from the render that created it, and `setCount` does not change that variable. It only schedules a new render.
+
+For a discrete click on a `createRoot` app, React finishes your handler first, then runs the component again with `count` as `1`, and updates the DOM before the browser paints.
+
+So on the very next line, both your variable and the screen still show the old value. The new value only exists in the next render.
 
 **Follow-up:**
 
 `useState(expensive())` versus `useState(() => expensive())` — what runs on the second render?
 
-Answer: `expensive()` as an argument runs every render (result discarded after mount). The function form is the initializer—called when the slot is created (twice under Strict Mode in development), not on later renders.
+Answer: With `useState(expensive())`, the call happens on every render, but React ignores the result after the first one. With the function form, React calls the initializer only when it creates the state, not on later renders. In development Strict Mode, it may call it twice on mount.
 
 ### REACT-006 — useState replaces object state
 
@@ -148,7 +166,11 @@ A component holds `useState({ a: 1, b: 2 })` and calls `setPair({ a: 3 })`. What
 
 **Answer:**
 
-Next state is `{ a: 3 }`; `b` is gone. Hook setters replace the whole slot value. Class `this.setState({ a: 3 })` shallow-merges, so `b` would stay. Merge yourself with `setPair(prev => ({ ...prev, a: 3 }))`. Spreads copy one level only. A freshly allocated object fails `Object.is` bailout even when every field matches. Replacing this pair does not reset other `useState` slots in the same component.
+After `setPair({ a: 3 })`, the state is just `{ a: 3 }`, and `b` is gone. A `useState` setter replaces the whole value. A class `this.setState` merges the new keys into the old state, so `b` would have stayed.
+
+With hooks, you do the merge yourself using an updater that spreads the previous object. That spread only copies one level deep.
+
+Also, a new object always counts as a change, even when the fields look the same, so React will re-render. Other `useState` slots in the component are not affected.
 
 **Code:**
 
@@ -160,7 +182,7 @@ setPair((prev) => ({ ...prev, a: 3 })); // { a: 3, b: 2 }
 
 What does React guarantee about the identity of the `setPair` function across renders?
 
-Answer: The setter identity is stable for that hook slot; omit it from deps safely. Stability does not freeze the state value.
+Answer: The setter keeps the same identity for the life of that state, so you can safely leave it out of dependency arrays. That stability only applies to the function. The state value itself still changes.
 
 ### REACT-007 — Updates in one batch run in order
 
@@ -174,13 +196,17 @@ Answer: The setter identity is stable for that hook slot; omit it from deps safe
 
 **Answer:**
 
-Queued updates apply in order on the next render. Non-function values replace the pending result; updaters chain. `plain` → `6` (both read `5`). `functional` → `7`. `mixed` → first to `6`, middle replace with closed-over `6`, last updater → `7`. Expressions close over this render unless they use the updater argument.
+React queues updates and applies them in order on the next render. A plain value replaces whatever result is pending. An updater function receives the pending result and returns the next one.
+
+`plain` ends at `6`, because both calls compute from the same `5`. `functional` ends at `7`, because the second updater starts from `6`.
+
+`mixed` goes to `6` with the first updater, then the plain value `count + 1` replaces it with `6` again, and the last updater makes it `7`. Plain values use this render's snapshot. Updaters use the pending state.
 
 **Follow-up:**
 
 If `mixed` used two different slots, does one see the other's pending value?
 
-Answer: No. Each slot has its own queue. They share the batch and commit together, but do not feed each other. Derive during render instead.
+Answer: No. Each state slot has its own queue. They are processed in the same batch and commit together, but one does not feed into the other. If one value depends on another, derive it during render.
 
 ### REACT-008 — React 18 batches outside React events
 
@@ -194,7 +220,11 @@ In one callback, `setCount` and `setFlag` both run. Compare a React `onClick`, `
 
 **Answer:**
 
-On React 18 with `createRoot`, each callback produces one render: both updates apply, then one commit. Automatic batching covers React handlers, timeouts, promise callbacks, and native listeners. React 17 batched only inside React events; the same pair in a timeout, promise, or native listener rendered twice. Legacy `ReactDOM.render` keeps that React 17 behavior. Batching does not mutate closed-over state variables in place after either setter returns.
+Batching means React groups several state updates into one render. In React 18 with `createRoot`, that happens everywhere: React event handlers, timeouts, promise callbacks, and native listeners. Both updates apply, then React renders and commits once.
+
+In React 17, batching only worked inside React's own event handlers. The same pair in a timeout, a promise, or a native listener caused two renders. The old `ReactDOM.render` API keeps that React 17 behavior.
+
+Batching does not change variables you already read. Those still hold the old values.
 
 **Code:**
 
@@ -209,7 +239,7 @@ setTimeout(() => {
 
 A click calls `setQuery(next)` and, inside `startTransition`, `setResults(...)`. Still one render?
 
-Answer: No. Batching groups same-priority updates. A transition may render/commit separately from the urgent update and can be interrupted.
+Answer: No. Batching only groups updates with the same priority. The urgent update and the transition can render and commit separately, and the transition can be interrupted.
 
 ### REACT-009 — An await starts a new batch
 
@@ -231,13 +261,17 @@ How many renders on React 18 `createRoot` if `save` resolves? On React 17? What 
 
 **Answer:**
 
-React 18 `createRoot`: two renders. Lines before `await` batch into one pass with `a===1`, `b===2`. The continuation is a separate task that batches `(3,4)`. React 17: three—synced prefix one render, then unbatched `setA(3)` and `setB(4)`. Remove `await` and all four calls are one batch; later replaces win, so the commit is `a===3`, `b===4` with no intermediate `(1,2)` paint.
+In React 18 with `createRoot`, you get two renders. The two updates before `await` are batched into one render. After the promise resolves, the code continues in a separate task, and those two updates are batched into a second render.
+
+In React 17, you get three. The first pair is batched because it is inside the event handler, but after the `await`, each setter renders on its own.
+
+If you remove the `await`, all four calls form one batch. The last values win, so the screen goes straight to `a=3` and `b=4`, and `(1, 2)` is never painted.
 
 **Follow-up:**
 
 `save` rejects before the second pair. What has the user seen?
 
-Answer: The first batch already committed `(1,2)` unless you never scheduled it. Set error state in `catch`. Prefer an explicit status field over leaving “saving” values orphaned.
+Answer: The first batch has already committed, so the user saw `(1, 2)`. Handle the error in a `catch` and set an error state. A clear status field is better than leaving a half-finished "saving" screen.
 
 ### REACT-010 — flushSync commits before it returns
 
@@ -251,7 +285,13 @@ A click appends a row and must read that row's `getBoundingClientRect()` before 
 
 **Answer:**
 
-`flushSync` runs updates inside its callback through render and commit before returning, so layout reads see the new DOM. Updates outside stay on the normal path. Closed-over locals from this render stay old—the newer render inside `flushSync` has its own bindings. It blocks the main thread; use it only when the next imperative line must see DOM.
+`flushSync` tells React to process the updates inside its callback right now. React renders and commits them before `flushSync` returns, so the DOM is already updated when the next line runs. That lets you measure the new row immediately.
+
+Updates outside the callback still follow the normal batching path.
+
+Variables from the current render, like `count`, do not change. The newer render inside `flushSync` has its own variables.
+
+It blocks the main thread, so use it only when the next imperative line truly needs the updated DOM.
 
 **Code:**
 
@@ -268,7 +308,7 @@ Prefer `useLayoutEffect` when measurement can live with every commit. Prefer der
 
 `flushSync` appends a row, then `setSavedAt` outside. One commit?
 
-Answer: No. Append commits inside `flushSync`; `setSavedAt` is a later update. Put both inside one callback if they must share a commit.
+Answer: No. The append commits inside `flushSync`, and `setSavedAt` is a separate, later update. If both must appear in the same commit, put both inside the same `flushSync` callback.
 
 ### REACT-011 — Reconciliation matches type at a position
 
@@ -282,13 +322,19 @@ A parent renders `<UserCard /><Details />` then `<Details /><UserCard />` with n
 
 **Answer:**
 
-Without keys, siblings match by index. Index 0 was `UserCard` and is now `Details`—type changed, so that subtree unmounts and remounts; same at index 1. State and effects reset. React does not search the sibling list for a matching type and slide fibers. Same type and key at a position updates props in place. The linear heuristic (different type ⇒ different subtree; list identity via `key`) avoids a costly general tree edit.
+Reconciliation is how React decides whether to reuse or replace what is already on screen. Without keys, React compares siblings by position.
+
+At position 0, the type changed from `UserCard` to `Details`, so React unmounts the old one and mounts a new one. The same happens at position 1, and state and effects reset. React does not search the siblings for a matching type to move.
+
+If the type and key at a position are the same, React keeps the instance and updates its props.
+
+This rule is simple and fast. Keys exist for lists where order can change.
 
 **Follow-up:**
 
 Why does declaring `function UserCard` inside the parent reset state every parent render?
 
-Answer: Element type is compared by reference. A new inner function each render is a new type, so React remounts. Keep a stable module-level reference.
+Answer: React compares component types by reference. A function declared inside the parent is a brand new function each render, so React sees a different type and remounts it. Define components at module level so the reference stays stable.
 
 ### REACT-012 — Index keys work while order is identity
 
@@ -302,7 +348,11 @@ A todo list uses `key={index}`; rows hold draft state and uncontrolled inputs. W
 
 **Answer:**
 
-Keys name sibling identity. Index keys are fine when order is identity (static lists, no per-row state). Insert/sort reuses the fiber at that index with new props while keeping draft and uncontrolled DOM—state sticks to position. Use `key={todo.id}` so the fiber moves with the item. Keys must be unique among siblings; random keys remount every render.
+A key tells React which item a row represents. An index key means "the item in this position," which is fine only when the list is static and rows have no state of their own.
+
+If you insert at the front or sort, the item at each index changes. React reuses the row at that index with new props, but keeps the old draft state and input text, so typed text ends up next to the wrong item.
+
+Use a stable id like `todo.id`. Keys must be unique among siblings, and random keys remount every row on every render.
 
 **Code:**
 
@@ -316,7 +366,7 @@ Keys name sibling identity. Index keys are fine when order is identity (static l
 
 Filtered list keyed by `todo.id`—do surviving rows keep drafts?
 
-Answer: Yes. Matching keys keep those fibers. Index keys on a filtered list shift drafts onto wrong items.
+Answer: Yes. Rows with matching keys keep their instances and state. With index keys, a filtered list would shift drafts onto the wrong items.
 
 ### REACT-013 — State stays where type and key stay
 
@@ -330,7 +380,11 @@ For each: `{isUser ? <Panel /> : <Panel />}`, `{isUser ? <UserPanel /> : <GuestP
 
 **Answer:**
 
-React keeps fiber state while type, key, and position stay. First line: one position, type `Panel` in both branches—toggle re-renders the same fiber; state remains. Second: type changes—unmount/mount, fresh state. Third: same type, `kind` prop changes—state remains (read `kind` from props, or reset on purpose). Fourth: key change remounts—the supported reset for the same function. A prop change alone never resets state.
+React keeps state as long as the component type, key, and position stay the same.
+
+In the first case, both branches render `Panel` at the same position, so state survives. In the second, the type changes from `UserPanel` to `GuestPanel`, so React remounts and state resets. In the third, the type is the same and only a prop changes, so state survives. You must read `kind` from props, or reset on purpose.
+
+In the fourth, the key changes, which forces a remount. That is the supported way to reset state.
 
 **Code:**
 
@@ -342,7 +396,7 @@ React keeps fiber state while type, key, and position stay. First line: one posi
 
 Key changes on `Panel` which renders a `textarea` with its own `useState`. Does the textarea keep text?
 
-Answer: No. Remounting `Panel` destroys its subtree—focus and local state included. Lift state that must survive.
+Answer: No. Changing the key remounts `Panel` and everything inside it, including local state and focus. If some state must survive, lift it above the keyed component.
 
 ### REACT-014 — Two conditional slots are two positions
 
@@ -356,7 +410,11 @@ Answer: No. Remounting `Panel` destroys its subtree—focus and local state incl
 
 **Answer:**
 
-Ternary and single `<Editor doc={…}>`: one position—fiber kept; draft from A’s `useState(doc.text)` sticks when props describe B. Two `&&` editors: two sibling slots; switching unmounts one and mounts the other, so returning to A re-reads `docA.text` and loses typed text. Use `key={doc.id}` to remount per document, or lift a draft map by id above the branch.
+With the ternary or the single `<Editor doc={...}>`, there is only one position, so React keeps the same instance. The draft was initialized from A, so it stays even after the props describe B.
+
+With two `&&` editors, there are two separate positions. Switching unmounts one and mounts the other. When you return to A, it re-reads `docA.text`, and whatever you typed is gone.
+
+To remount per document, use `key={doc.id}`. To keep drafts, lift a map of drafts by id above the switch.
 
 **Code:**
 
@@ -372,7 +430,7 @@ CSS-hidden dual editors keep both drafts (and effects). Parent `Record<id, draft
 
 `Editor` moves from under `TabPanelA` to under `TabPanelB`. Does the draft move?
 
-Answer: No. State is on the fiber at a position. Unmount destroys it; remount creates a new fiber. Lift state above both panels.
+Answer: No. State belongs to the instance at a specific place in the tree. Moving it under a different parent destroys the old instance and creates a new one. Lift the state above both panels if it must survive.
 
 ### REACT-015 — Render describes, commit applies
 
@@ -386,13 +444,17 @@ What work is render vs commit? Which phase can run for an update the user never 
 
 **Answer:**
 
-Render calls components and reconciles fibers—no DOM writes. Concurrent render can pause, restart, or discard; the user never sees a discarded pass. Commit applies DOM, attaches refs, runs `useLayoutEffect` before paint, then `useEffect` after a paint opportunity. Commit is not interruptible. Put subscriptions in `useEffect` or handlers; put layout reads/writes that must match before paint in `useLayoutEffect`. Keep the component body pure.
+React works in two phases. In the render phase, it calls your components and works out what changed. It does not touch the DOM. In the commit phase, it applies the changes to the DOM, attaches refs, and runs effects.
+
+Render can be paused, restarted, or thrown away in concurrent mode, so the user may never see some render passes. Commit runs to completion without interruption.
+
+Put subscriptions in `useEffect` or event handlers. Put layout reads and writes that must happen before the browser paints in `useLayoutEffect`. Keep the component body pure.
 
 **Follow-up:**
 
 `useLayoutEffect` calls `setState`. Does the user see the first committed tree?
 
-Answer: No—React flushes that update synchronously before paint. The same `setState` in `useEffect` can paint the intermediate tree first.
+Answer: No. React runs that update synchronously before the browser paints. If you did the same `setState` in `useEffect`, the browser could paint the in-between state first.
 
 ### REACT-016 — A fiber is the unit of work
 
@@ -406,13 +468,17 @@ What is a fiber vs a JSX element? Why replace the stack reconciler? What is `alt
 
 **Answer:**
 
-A fiber is the mutable work node for one instance (type, props, hook list, child/sibling/return, commit flags). Elements are cheap per-render descriptions. Fiber lets React pause/resume/abandon work instead of a recursive stack walk. Double buffering: current vs work-in-progress; `alternate` links twins; commit swaps. State follows the fiber (position/type/key), not element identity.
+A fiber is React's internal object for one piece of the UI. It stores things like the component type, props, hook state, and links to its parent, child, and sibling. A JSX element is just a cheap description created on each render.
+
+The old stack-based reconciler had to finish a whole tree walk in one go. Fibers break that into small units, so React can pause, resume, or abandon work.
+
+React keeps a current fiber tree and a work-in-progress copy, linked by `alternate`. When the new tree is ready, commit swaps them.
 
 **Follow-up:**
 
 If render writes only work-in-progress, how can an impure render still corrupt the screen?
 
-Answer: Impurity wrote elsewhere (module vars, stores, mutated shared objects). Discarding WIP does not undo those writes. Purity makes discard safe.
+Answer: An impure render can write to places outside the work-in-progress tree, like module variables, stores, or shared objects. Throwing away the work-in-progress tree does not undo those writes. Keeping render pure is what makes it safe to discard.
 
 ### REACT-017 — Render can yield; commit runs through
 
@@ -426,13 +492,17 @@ Under concurrent rendering, a transition render is in progress and the user clic
 
 **Answer:**
 
-React may abandon WIP and start an urgent render; already-run component returns are discarded; last committed DOM stays. Commit does not yield—DOM, refs, and layout effects finish. Discarded renders never ran effects, so no cleanup for that pass. Body-started fetches have no React cleanup. Yielding is heuristic, not promised per fiber.
+While a transition render is in progress, React can pause it and handle the urgent click first. It may then throw away the partial work and start over later. The screen keeps showing the last committed result.
+
+Once React starts a commit, it does not yield. DOM updates, refs, and layout effects finish in one go.
+
+A discarded render never reached commit, so its effects never ran, and there is nothing to clean up. But anything you started inside the component body, like a fetch, has no cleanup. That is another reason to keep render pure.
 
 **Follow-up:**
 
 Why does Strict Mode remount effects on mount if discarded renders never run effects?
 
-Answer: Different mechanism: a development mount/cleanup/remount check for missing cleanup—not scheduler abort. Production mounts once.
+Answer: It is a separate mechanism. In development, Strict Mode mounts, cleans up, and mounts again, to catch missing cleanups. It has nothing to do with the scheduler abandoning work. Production mounts once.
 
 ### REACT-018 — Transitions keep the keystroke urgent
 
@@ -446,7 +516,11 @@ A controlled input updates `query` and filters a huge table from the same update
 
 **Answer:**
 
-Keep `setQuery` urgent; mark table work with `startTransition` or pass `useDeferredValue(query)` to the heavy child. React can commit the input first and interrupt stale table renders. Trade: brief stale rows / `isPending`. Does not make the filter faster, debounce network, or fix mounting 20k rows—window or simplify that separately. Never put the input setter inside the transition.
+Keep `setQuery` as a normal urgent update so the input responds immediately. Mark the table update as a transition with `startTransition`, or pass `useDeferredValue(query)` to the heavy child. React can then show the typed text first and render the table in the background, interrupting it if you type again.
+
+The trade-off is that the table briefly lags behind the input, so you may show a pending state.
+
+This does not make the filtering itself faster, does not reduce network requests, and does not fix rendering 20,000 rows. Use windowing for that.
 
 **Code:**
 
@@ -460,7 +534,7 @@ const deferredQuery = useDeferredValue(query);
 
 How does `useDeferredValue` differ from copying in `useEffect`?
 
-Answer: Effect copy schedules an ordinary second urgent render after paint. Deferred value is scheduled as a transition and can be interrupted by the next keystroke.
+Answer: Copying in an effect triggers a second normal-priority render after paint. A deferred value is scheduled as a transition, so it can be interrupted by the next keystroke.
 
 ### REACT-019 — Lanes are the internal priority model
 
@@ -474,13 +548,17 @@ What is a lane in React 18 at a level you can defend: what an update carries, ho
 
 **Answer:**
 
-Internally, updates are tagged with lanes (priority + batch). A render selects pending lanes; others stay queued—so a click can commit while a transition is abandoned. Discrete input outranks transitions; expiration prevents starvation. Bit layouts are not app API. Rely on `startTransition`/`useTransition`, `useDeferredValue`, `useSyncExternalStore`. Same-priority batching still applies; lanes decide which pass and interruptibility.
+A lane is React's internal way of labeling how urgent an update is. Each update gets a lane when it is scheduled. When React renders, it picks which lanes to process now and leaves the others queued.
+
+That is how a click can commit while a transition is abandoned: discrete input has a higher priority than transitions. Expiration rules stop low-priority work from starving.
+
+Lanes are an internal detail, not public API. In app code you use `startTransition`, `useTransition`, `useDeferredValue`, and `useSyncExternalStore`. Updates in the same lane are still batched together.
 
 **Follow-up:**
 
 Why can an external store tear, and what does `useSyncExternalStore` change?
 
-Answer: Different components can read different snapshots across urgent/deferred passes. `useSyncExternalStore` re-reads `getSnapshot` and forces a sync re-render if it changed so the commit is consistent. Cache the snapshot—new objects every call look like perpetual change.
+Answer: With interruptible rendering, different components can read different versions of a store across passes. `useSyncExternalStore` checks the snapshot again and forces a synchronous re-render if it changed, so the commit stays consistent. Cache the snapshot, or a new object each call looks like a constant change.
 
 ### REACT-020 — A parent render runs child functions
 
@@ -494,7 +572,11 @@ Parent state changes. `Child` gets the same primitive props, no state, no `memo`
 
 **Answer:**
 
-`Child`’s function still runs. A parent render creates new child elements and reconciles them; equal primitive props alone do not skip the call. Commit rewrites host DOM only where rendered output changed—so the cost is JS/reconciliation, not a full DOM rebuild. First fix structure: move updating state down so expensive siblings are not children of that component. Reach for `memo` only after a profile shows the child is expensive with usually unchanged props.
+Yes, `Child` runs again. When the parent renders, it creates new child elements, and React calls the child component even if its props look identical. Without `memo`, equal props alone do not skip the call.
+
+The DOM is not rebuilt, though. React only updates DOM nodes whose output actually changed. So the cost is in JavaScript and reconciliation, not in rewriting the page.
+
+If the profiler shows this is hot, restructure first: move the changing state into a smaller component so the expensive siblings are not affected. Use `memo` only after measuring.
 
 **Trade-offs:**
 
@@ -504,7 +586,7 @@ Default re-render until measured. State colocation beats blanket `memo`/`useCall
 
 `memo(Child)` also uses `useContext(ThemeContext)`. Provider value changes, props unchanged. Skip?
 
-Answer: No. `memo` compares props; context is not a prop. Consumers still re-render when the value changes.
+Answer: No. `memo` only compares props, and context is not a prop. A component that reads a context still re-renders when that context's value changes.
 
 ### REACT-021 — Hook identity is call order
 
@@ -526,7 +608,11 @@ function Panel({ enabled }: { enabled: boolean }) {
 
 **Answer:**
 
-Hooks are a linked list on the fiber, matched by call order. The first render called `useState` and stored `open` in slot 0. The second returns before `useState`, so React expects that slot and throws (fewer hooks than last render). Early `return null` is fine for the element tree, illegal for hooks. Call every hook unconditionally, then return `null`. React does not match hooks by the variable name `open`.
+React doesn't track hooks by name. It stores them as an ordered list on the component and matches each call by its position.
+
+On the first render, `useState` was call number one. On the second render, the component returns early before reaching `useState`, so React finds fewer hooks than last time and throws an error.
+
+Returning `null` early is fine for the UI. It is not fine for hooks. Always call every hook first, then decide what to return.
 
 **Code:**
 
@@ -542,7 +628,7 @@ function Panel({ enabled }: { enabled: boolean }) {
 
 Conditional `useAuth()` that itself calls three hooks—what breaks?
 
-Answer: Those three slots appear/disappear in the caller’s list. Same violation as conditional `useState`. Call custom hooks unconditionally.
+Answer: Those three hook slots appear and disappear in the caller's list, which breaks the order. This is the same violation as a conditional `useState`. Always call custom hooks unconditionally.
 
 ### REACT-022 — The timeout closes over the render that scheduled it
 
@@ -556,7 +642,11 @@ Three clicks within 500ms each schedule `setTimeout(() => { console.log(count); 
 
 **Answer:**
 
-Each click runs a handler from the render where `count` is still `0`. The handler only schedules a timer—no `setCount`—so there is no re-render between clicks. All three timers close over `0`, log `0`, and call `setCount(1)`. First commits `1`; later updates bail out via `Object.is(1, 1)`. Final value is `1`. Functional `setCount(c => c + 1)` yields final `3`; the log still prints closed-over `0`.
+Each click runs a handler created in a render where `count` is `0`. The handler only starts a timer. It does not update state, so nothing re-renders between the clicks, and all three timers capture `0`.
+
+When they fire, each logs `0` and calls `setCount(1)`. The first sets it to `1`. The next two set the same value, so React bails out. The final count is `1`, not `3`.
+
+If you use `setCount(c => c + 1)`, the final count is `3`, because the updater uses the latest state. The log still prints `0`.
 
 **Code:**
 
@@ -571,7 +661,7 @@ setTimeout(() => {
 
 Functional updater + `console.log(count)` after the same three overlapping clicks?
 
-Answer: Three logs of `0`, final count `3`. Log reads the closure; updater reads pending/committed state per task.
+Answer: You get three logs of `0` and a final count of `3`. The log reads the stale variable from the closure, while the updater works with the latest state.
 
 ### REACT-023 — Same state skips the render
 
@@ -585,13 +675,17 @@ Answer: Three logs of `0`, final count `3`. Log reads the closure; updater reads
 
 **Answer:**
 
-`useState` bails out when the next value is `Object.is`-equal to the current one. `setCount(0)` skips. `setPair({ n: 0 })` allocates a new object—different reference—so React re-renders; there is no deep compare. Mutating `pair.n` then `setPair(pair)` passes the same reference: bailout, while the mutation is already visible and the UI can stay stale. A parent render can still call this component. Return `prev` from an updater when nothing changed so bailout can apply.
+When you set state, React compares the new value with the current one using `Object.is`. If they are equal, it skips the re-render. So `setCount(0)` when the count is already `0` does nothing visible.
+
+`setPair({ n: 0 })` creates a new object with a different reference. React treats it as changed and re-renders. It does not compare fields deeply.
+
+If you mutate `pair.n` and call `setPair(pair)`, the reference is unchanged. React skips the update, but the object was already changed, so the screen can go stale. Return `prev` from an updater when nothing changed.
 
 **Follow-up:**
 
 `setCount(c => c)` when `c` is `0`? Updater returns `{ ...c }` for object state?
 
-Answer: Returning `c` bails out. A new object does not, even with identical fields.
+Answer: Returning the same value bails out. Returning a copy, even with the same fields, is a new reference, so React re-renders.
 
 ### REACT-024 — The key has to sit on the sibling
 
@@ -605,7 +699,11 @@ Mapping items to `<> <dt key={item.id}>…</dt><dd>…</dd> </>` inside a `<dl>`
 
 **Answer:**
 
-Shorthand `<>` accepts no key; the array’s children are unkeyed fragments, so siblings fall back to index identity. The `key` on `dt` only names children inside that fragment. Reorders reuse the fragment at that index—row state sticks to position. Put `key` on the array’s direct child via `<Fragment key={item.id}>`. A keyed `<div>` wrapper keys correctly but breaks the `<dl>` content model and accessibility tree.
+The key must be on the element that the `map` returns, because that is what React compares among siblings. Here the shorthand `<>` fragment cannot take a key. The `key` on `dt` only identifies children inside the fragment, not the fragments themselves.
+
+So the fragments are matched by index. After a reorder, state sticks to the position instead of the item.
+
+The fix is `<Fragment key={item.id}>`. Wrapping with a `<div>` would give a key, but it breaks the valid structure of a `<dl>` and hurts accessibility.
 
 **Code:**
 
@@ -622,7 +720,7 @@ Shorthand `<>` accepts no key; the array’s children are unkeyed fragments, so 
 
 Why can `<Fragment key={…}>` take a key when `<>` cannot?
 
-Answer: Shorthand compiles with no props/key. Explicit `Fragment` accepts `key`/`children`—a compile-time difference; reconciliation treats a keyed fragment as a normal keyed sibling.
+Answer: The `<>` shorthand has no way to pass props, so it cannot carry a key. The explicit `Fragment` accepts `key` like any element, and React then treats it as a normal keyed sibling.
 
 ### REACT-025 — The draft followed the index, not the id
 
@@ -636,7 +734,11 @@ Fifty `Line` rows use `useState(item.amount)` and `key={index}`. After blur, par
 
 **Answer:**
 
-Batched promise updates are one render; keys decide fiber identity. Index keys keep the fiber at position 2 with its draft while a different item arrives. `useState` never re-reads the prop. Fix: `key={item.id}`. To overwrite draft with server amount without remount, adjust state during render when `item.amount` changes (guard so the restart settles); or remount with a versioned key (drops focus too).
+Keys decide which instance belongs to which item. With `key={index}`, the row at position 2 keeps its instance and its draft state, even though a different item now sits there after the reorder. `useState(item.amount)` only reads the prop once, so it never picks up the new item.
+
+Fix it with `key={item.id}`, so each draft follows its item.
+
+To force the server amount into the draft, adjust state during render when `item.amount` changes, with a guard so it settles. Or remount using a versioned key, which also drops focus.
 
 **Code:**
 
@@ -650,7 +752,7 @@ Batched promise updates are one render; keys decide fiber identity. Index keys k
 
 Id-keyed fiber still shows typed draft after server amount change. Why, and how paint server amount before paint without remounting?
 
-Answer: Type/key matched so state was preserved. Set draft during render when the seen server amount changes so React restarts before paint; a key including amount remounts instead.
+Answer: The type and key matched, so React preserved the state, including the old draft. To show the server amount without remounting, compare the incoming amount with a stored copy and set the draft during render. React restarts the render before painting. Adding the amount to the key works too, but it remounts.
 
 ### REACT-026 — `children` is an element the parent already created
 
@@ -664,13 +766,15 @@ Answer: Type/key matched so state was preserved. Set draft during render when th
 
 **Answer:**
 
-Parent of `Card` creates the `Counter` element during its render—no call yet. `Card` places that element; React renders `Counter` under `Card`’s position—state lives there. `{children}` renders the passed node. `{children()}` means the parent passed a function (must stay pure). `<children />` means `children` is a component type—an element object is not a type; a new function identity each render remounts.
+The component that writes `<Card><Counter /></Card>` creates the `Counter` element during its own render. That is only a description, so `Counter` has not run yet. `Card` places it in its output, and React then renders `Counter` at that spot. Its state lives there.
+
+`{children}` renders the element that was passed in. `{children()}` only works if the parent passed a function, and that function must stay pure. `<children />` treats `children` as a component type, which is wrong for an element object, and a new function each render would remount.
 
 **Follow-up:**
 
 `Card` renders `{children}` in two sibling slots. Shared state? Shared ref?
 
-Answer: Two fibers, two states. They share the element object only. A ref cannot attach to both mounts.
+Answer: No. React creates two separate instances, each with its own state. They share only the element object. A single ref cannot attach to both.
 
 ### REACT-027 — A fragment has no host node
 
@@ -684,13 +788,17 @@ Returning `<>…</>` instead of a `<div>`: what is in the DOM? What fiber? Can R
 
 **Answer:**
 
-A fragment is a fiber (`React.Fragment`) with children and a place in the React tree, but no host instance. Commit places its host descendants into the nearest host parent—no extra box, CSS target, or native listener. Replacing a fragment with a `<div>` (or reverse) changes host structure and remounts that child subtree. React 18: no `ref` or `onClick` on fragments (React 19 allows fragment refs). `<>` cannot take props; use explicit `Fragment` when you need a key.
+A fragment lets you return several elements without adding an extra DOM node. React still has an internal fiber for it, but there is no matching DOM element. The children go straight into the nearest real parent. That means no extra box to style and no element to attach a listener to.
+
+Swapping a fragment for a `<div>`, or the other way around, changes the host structure, so React remounts that subtree.
+
+In React 18, you cannot put `ref` or `onClick` on a fragment. Fragment refs came in React 19. The `<>` shorthand also cannot take a key.
 
 **Follow-up:**
 
 Return `<> <span/> </>` then `<div><span/></div>`. Does span state survive?
 
-Answer: Component fiber may survive, but fragment→`div` is a child type change—that subtree remounts. Span state under the fragment is gone.
+Answer: No. Going from a fragment to a `div` changes the child type at that position, so React remounts the subtree and the span's state is lost.
 
 ### REACT-028 — Two arrays are one sibling list
 
@@ -704,7 +812,11 @@ Two maps under one `div`—`todos` and `done`—can share string ids; each `Row`
 
 **Answer:**
 
-The `div`’s children are two arrays; React flattens them into one sibling list before matching keys. The same id in `todos` and `done` is a duplicate key—reconciliation may reuse the wrong fiber, so drafts cross lists. Wrap each map in a keyed `Fragment` (or host/component) so each group has its own child list. One `<>` around both maps is still one fragment whose arrays flatten together—same collision.
+When a `div` has two arrays as children, React flattens them into one list of siblings before matching keys. If `todos` and `done` both contain the id `"a"`, that is a duplicate key. React may reuse the wrong instance, so drafts end up on the wrong row.
+
+To avoid this, wrap each map in its own keyed `Fragment`, so each group has its own list of children.
+
+A single `<>` around both maps does not help. It is still one fragment, and the arrays inside it are flattened together, so the collision remains.
 
 **Code:**
 
@@ -717,7 +829,7 @@ The `div`’s children are two arrays; React flattens them into one sibling list
 
 Move id `"a"` from open to done with keyed fragments. Does the draft move?
 
-Answer: No. Keys match within one parent. Open unmounts; done mounts. Lift draft by id or use one shared sibling list to move the fiber.
+Answer: No. Keys only match within the same parent. The row in the open group unmounts and a new one mounts in the done group. Lift the draft by id, or use a single shared list so the instance can move.
 
 ### REACT-029 — State does not follow an element across parents
 
@@ -731,7 +843,11 @@ Board flips which `Column` gets `<Editor id="a" />` vs `"b"`. After flip, which 
 
 **Answer:**
 
-Each column’s child slot keeps its fiber (same type/position)—left keeps a’s draft but now gets `id="b"`. Elements moved; fibers did not. `key={id}` under separate parents remounts on key change; it does not teleport. Keep editors as keyed siblings of one parent so React moves fibers with ids, or lift draft state by id.
+React keeps state with the instance at a position in the tree, not with the element you moved. If the left column always renders an `Editor` in the same slot, React keeps that instance and its draft. After the flip, the left editor still holds A's draft but now receives `id="b"`.
+
+Putting `key={id}` under two different parents does not help. A key change remounts, it does not teleport.
+
+To keep drafts with ids, render the editors as keyed siblings under one parent, so React moves instances. Or lift the draft state by id.
 
 **Code:**
 
@@ -745,7 +861,7 @@ Each column’s child slot keeps its fiber (same type/position)—left keeps a�
 
 Keyed editors under a `div` that becomes a `section`—drafts survive?
 
-Answer: No. Host type change unmounts that fiber and its children. Keys are local to the current parent’s child list.
+Answer: No. Changing the host element type unmounts it and everything inside. Keys only work among siblings under the same parent.
 
 ### REACT-030 — Context updates consumers; passed children bound the rest
 
@@ -759,13 +875,17 @@ Answer: No. Host type change unmounts that fiber and its children. Keys are loca
 
 **Answer:**
 
-Provider re-renders; same `children` element reference lets React skip `Layout`; `Title` still runs as a consumer. `value={{ theme }}` new object every time wakes all consumers even if `theme` string is unchanged—stabilize with `useMemo` or pass the string. If App owns theme and renders Layout, App’s re-render runs Layout (parent render), separate from the context subscription rule. `memo` on a consumer does not block context.
+When `setTheme` runs, the provider re-renders. The `children` element is the same reference as before, so React skips `Layout`. `Title` still re-renders because it reads the context.
+
+If the value is `{ theme }`, it is a new object every time, so every consumer re-renders even when the theme string is the same. Use `useMemo` or pass the string.
+
+If App holds the theme and writes the provider and `Layout` itself, App's render creates a new `Layout` element, so `Layout` runs too. `memo` on a consumer does not block context updates.
 
 **Follow-up:**
 
 No provider; default `"light"`. Then `<Provider value={undefined}>`. What does `useContext` return?
 
-Answer: `undefined`. Default applies only with no provider above. A provider passing `undefined` still wins.
+Answer: It returns `undefined` in the second case. The default is used only when there is no provider above. A provider with `undefined` still counts, and its value wins.
 
 ### REACT-031 — Strict Mode's extra render stays in development
 
@@ -779,13 +899,17 @@ Under `<StrictMode>` in development: body, `useState` initializer, updater, and 
 
 **Answer:**
 
-Strict Mode’s extra work is development-only. Inside the subtree, React may call the body, `useState`/`useMemo`/`useReducer` initializers, and state updaters twice and keep one result. On mount, effects run setup → cleanup → setup to surface missing cleanup. One tree commits; event handlers are not double-invoked. Production mounts and runs once. An abandoned transition is a different production mechanism: that pass never committed, so it has no effect cleanup.
+Strict Mode adds extra work only in development, to help you find bugs. React may call your component body, state initializers, and updater functions twice, and keeps one result. On mount, it also runs effects as setup, cleanup, setup again, to expose missing cleanup. Only one tree is committed, and event handlers are not called twice.
+
+Production does none of this: everything runs once.
+
+An abandoned transition is different. That render never committed, so its effects never ran and there is nothing to clean up. It is a production scheduling behavior, not a Strict Mode check.
 
 **Follow-up:**
 
 Initializer `fetch`es into state. How many requests in development?
 
-Answer: Two requests start; one return value is kept in the single slot. Do not fetch in initializers—use effects with abort or event handlers.
+Answer: Two requests start, and only one result is kept. Don't fetch inside an initializer. Use an effect with abort, or an event handler.
 
 ### REACT-032 — `createRoot` is a different root from `ReactDOM.render`
 
@@ -799,7 +923,11 @@ App still mounts with `ReactDOM.render`. Which React 18 behaviors are missing? S
 
 **Answer:**
 
-`ReactDOM.render` is legacy in React 18: that tree runs React 17 mode—no concurrent renderer, no automatic batching outside React events, transitions not interruptible. Supported client mount: `createRoot(container)` once, then `root.render` / `root.unmount`. No third-argument render callback. Server-rendered markup uses `hydrateRoot(container, <App />)`. Calling `createRoot` on a container full of server HTML replaces those children instead of attaching.
+In React 18, `ReactDOM.render` is a legacy mode. Your app runs with React 17 behavior: no concurrent renderer, no automatic batching outside React events, and transitions are not interruptible.
+
+The supported way is to call `createRoot(container)` once, then use `root.render` to update and `root.unmount` to remove it. There is no render callback.
+
+If the HTML was rendered on the server, use `hydrateRoot(container, <App />)` to attach to it. Using `createRoot` on server-rendered markup replaces those children instead of attaching.
 
 **Code:**
 
@@ -813,7 +941,7 @@ root.unmount();
 
 One click updates state in two `createRoot` trees. One render?
 
-Answer: No. Separate trees, renders, commits, context, and error boundaries. Batching does not cross roots.
+Answer: No. Each root has its own render, commit, context, and error boundaries. Batching does not cross roots.
 
 ### REACT-033 — The same props object skips the child
 
@@ -827,13 +955,17 @@ Answer: No. Separate trees, renders, commits, context, and error boundaries. Bat
 
 **Answer:**
 
-Unchanged children element/props reference → React can skip calling Heavy. A parent that evaluates `<Heavy n={1} />` allocates new element/props every time—function runs even if `n` is still `1`. Mutating props on the same reference keeps the skip while UI can stay stale. Different from `Object.is` state bailout. Context updates still wake consumers.
+`Heavy` does not run when `Frame` re-renders. The `<Heavy />` element was created by the outer parent, which did not render, so React sees the same element and skips it.
+
+If a parent writes `<Heavy n={1} />` in its own render, it creates a new element and props object each time, so `Heavy` runs even though `n` is still `1`.
+
+Mutating props on a reused element would also skip the render, but the UI could go stale, so avoid it. This differs from state bailout. Context updates still reach consumers.
 
 **Follow-up:**
 
 Skipped Heavy via same children reference reads ThemeContext; value changes. Does Heavy run?
 
-Answer: Yes. Context is an update for that fiber even when the props reference is unchanged.
+Answer: Yes. A context change marks that component for update even if its props reference is the same.
 
 ### REACT-034 — A new prop reference defeats `memo`
 
@@ -847,13 +979,17 @@ Answer: Yes. Context is an update for that fiber even when the props reference i
 
 **Answer:**
 
-Default `memo` shallow-compares each prop with `Object.is`. Same `title` string matches. `options={{ dense: true }}`, `onSelect={() => …}`, and `<Icon />` as children are new references every parent render—any one fails the compare. A custom compare returns `true` when props are equal (skip)—opposite of `shouldComponentUpdate`. Mutating `options.dense` and passing the same object skips while the UI stays on the old density. Stabilize callbacks/objects, or stop allocating fresh `children` elements.
+By default, `memo` compares each prop with `Object.is`. The `title` string matches. But `options={{ dense: true }}`, the inline `onSelect`, and `<Icon />` as children are new references on every parent render, so any one of them breaks the comparison and the child re-renders.
+
+With a custom compare function, returning `true` means the props are equal, so skip. That is the opposite of `shouldComponentUpdate`.
+
+If you mutate `options` and pass the same object, `memo` skips and the UI stays stale. Stabilize callbacks and objects instead.
 
 **Follow-up:**
 
 Custom compare always returns `true`, including when `title` changes. What does the user see?
 
-Answer: Previous title—React obeyed the compare. The compare is wrong, not `memo`.
+Answer: The old title. React did what the comparison said. The bug is in the comparison function, not in `memo`.
 
 ### REACT-035 — A list can hold different component types
 
@@ -867,7 +1003,11 @@ Feed keyed by id chooses `TextBlock`/`ImageBlock`/`PollBlock` by `kind`. Kind `"
 
 **Answer:**
 
-React matches by key, then requires the same component type. Key `"b"` finds the fiber, but `TextBlock` → `PollBlock` remounts—draft dies, which is correct across widgets. Without keys, insert at index 0: that position remounts on type change; later same-type indexes reuse fibers and show the wrong row’s draft as items shift. Put `key={block.id}` on the typed element the map returns.
+React first matches by key, then checks that the component type is the same. If the item with key `"b"` changes from `TextBlock` to `PollBlock`, React remounts it, and the draft is lost. That is correct, because they are different widgets.
+
+Without keys, inserting an Image at index 0 changes the type at that position, so it remounts. The following Text rows keep matching by index, so they reuse instances and show the wrong item's draft as items shift.
+
+Put `key={block.id}` on the element the map returns.
 
 **Code:**
 
@@ -882,7 +1022,7 @@ React matches by key, then requires the same component type. Key `"b"` finds the
 
 Both kinds return `<article>`; kind changes under same key. Does the article DOM node survive?
 
-Answer: No. Component type change unmounts the whole previous subtree. Host nodes are not matched across the old component’s DOM.
+Answer: No. When the component type changes, React unmounts the whole old subtree. It does not try to reuse DOM nodes from the old component.
 
 ### REACT-036 — The input shows the value from this render
 
@@ -896,7 +1036,11 @@ Answer: No. Component type change unmounts the whole previous subtree. Host node
 
 **Answer:**
 
-`value={text}` is controlled: this render’s state is the source of truth; commit writes it to the DOM. If `onChange` does not update that state, React snaps the DOM back; missing `onChange` warns—use `readOnly` for intentional display. `defaultValue` is uncontrolled: initial DOM value at mount only; later prop changes do not push. Switching controlled↔uncontrolled warns. Prefer `value={maybe ?? ""}`. Remount with `key` to re-apply `defaultValue`.
+With `value={text}`, the input is controlled. React state is the source of truth, and each render writes that value into the DOM. If `onChange` does not update the state, React puts the old value back. Leaving out `onChange` gives a warning. Use `readOnly` when you really want a fixed display.
+
+`defaultValue` makes the input uncontrolled. It sets the initial DOM value on mount only. Later changes to that prop are ignored.
+
+Switching between controlled and uncontrolled gives a warning, so use `value={maybe ?? ""}`. To reapply `defaultValue`, remount with a `key`.
 
 **Code:**
 
@@ -908,7 +1052,7 @@ Answer: No. Component type change unmounts the whole previous subtree. Host node
 
 Handler `setText(e.target.value)` and also reads `e.target.value` into a ref for a count—allowed?
 
-Answer: Yes—event handlers run on the committed tree after the browser applied the keystroke. Put the count in state if it must render.
+Answer: Yes. Event handlers run after the browser has applied the keystroke, so reading the value there is fine. If the count needs to show on screen, keep it in state.
 
 ### REACT-037 — Render does not read the DOM
 
@@ -922,7 +1066,11 @@ Tooltip computes `top` from `ref.current?.getBoundingClientRect()` in the body. 
 
 **Answer:**
 
-Render turns props/state into a description—it must not inspect the document. On the first pass `ref.current` is still `null`, so `top` is `0` and that commits. On updates the ref still points at the previous commit’s box while this render runs. The server has no layout/`document`. Read in `useLayoutEffect` so `setState` flushes before paint; `useEffect` can flash the wrong position. Discarded impure measurements can also leak through module writes.
+Render should only turn props and state into a description. It should not inspect the live page.
+
+On the first render, `ref.current` is still `null`, so `top` falls back to `0` and that wrong value is committed. On later renders, the ref still points to the element as it was after the previous commit, so you measure old layout. On the server there is no layout or `document` at all.
+
+Do the measurement in `useLayoutEffect`, which runs after the DOM is updated and before paint. Using `useEffect` can cause a visible flash.
 
 **Code:**
 
@@ -936,7 +1084,7 @@ useLayoutEffect(() => {
 
 Also branch on `typeof window` for width under SSR+hydration?
 
-Answer: Server/client descriptions disagree—hydration mismatch. Keep first client render matching server; adjust in layout effects after match.
+Answer: That makes the server and client output differ, which causes a hydration mismatch. Keep the first client render identical to the server output, then adjust in a layout effect.
 
 ### REACT-038 — The initializer runs when the slot is created
 
@@ -950,13 +1098,19 @@ Answer: Server/client descriptions disagree—hydration mismatch. Keep first cli
 
 **Answer:**
 
-Eager form runs every render (result ignored after mount). Lazy form runs once when the slot is created—not when `seed` changes. Remount (key/type/unmount) runs it again. Strict Mode may call twice in development—keep pure; no fetch/random/module mutation. Reset via derive, `key={seed}`, or guarded render-time adjust—not by expecting the initializer to track props.
+`useState(buildList(seed))` calls `buildList` on every render, and React ignores the result after the first one. The function form, `useState(() => buildList(seed))`, calls it only once, when React creates the state.
+
+If `seed` changes while the component stays mounted, the initializer does not run again. It runs again only after a remount.
+
+In Strict Mode, React may call it twice in development, so keep it pure: no fetching, randomness, or mutation of outside data.
+
+To follow a changing `seed`, derive the value, use `key={seed}`, or adjust state during render with a guard.
 
 **Follow-up:**
 
 Initializer closes over `seed` and `query` above it; `query` changes. List updates?
 
-Answer: No. Initializer already ran with mount-time `query`. Derive, key, or update from the event that changed `query`.
+Answer: No. The initializer already ran with the `query` from mount time. Derive the list, use a key, or update it from the event that changed `query`.
 
 ### REACT-039 — Setting state during render restarts this pass
 
@@ -966,11 +1120,17 @@ Answer: No. Initializer already ran with mount-time `query`. Derive, key, or upd
 
 **Question:**
 
-During render, when `item.id !== prevId`, call `setPrevId` and `setDraft`. Allowed? Frame of old draft? Unconditional every render? Calling parent’s `setSelected`?
+During render, when `item.id !== prevId`, call `setPrevId` and `setDraft`. Allowed? Frame of old draft? Unconditional every render? Calling parent's `setSelected`?
 
 **Answer:**
 
-Allowed when adjusting this component’s own state to a newly seen prop/store snapshot, if the condition is false after restart. React discards the in-progress render and re-renders before paint—no frame of the old draft. Unconditional sets loop until “too many re-renders.” Calling another component’s setter during render is unsupported—use an event or an effect. Prefer this over copying in `useEffect`, which can paint the stale draft for a frame.
+Yes, it is allowed when a component adjusts its own state in response to a prop or store change, as long as the condition becomes false after the restart. React throws away the current render and runs it again before painting, so the old draft is never shown.
+
+If you set state unconditionally, it loops until React throws "too many re-renders."
+
+Calling another component's setter during render is not supported. Use an event or an effect.
+
+This is usually better than copying props into state in `useEffect`, which can paint the stale draft for one frame.
 
 **Code:**
 
@@ -985,7 +1145,7 @@ if (item.id !== prevId) {
 
 Same id, server normalizes `item.text`. How show it before paint without remount?
 
-Answer: Compare incoming text/version to stored snapshot and set draft during render so restart commits the new text. Key change also works but remounts.
+Answer: Store the last seen server text or a version. When it differs from the incoming value, set the draft during render, so the restarted render commits the new text. A key change also works, but it remounts.
 
 ### REACT-040 — `ref.current` is written in commit
 
@@ -999,13 +1159,17 @@ When is `ref.current` set for `<input ref={inputRef} />`? First render vs next? 
 
 **Answer:**
 
-Object refs are stable; React assigns `.current` in commit before layout effects. First render still sees `null`; later renders see the previous commit’s node. Callback refs run with the node on attach and `null` on detach; a new function identity each render detaches/reattaches every commit (Strict Mode adds extra attach/detach in dev). Do not `setState` from an unstable callback. Reading `.current` in render is the previous commit, not this one’s node.
+React sets `ref.current` during the commit phase, after the DOM is updated and before layout effects. During the first render, it is still `null`. In later renders, it points to the node from the previous commit.
+
+A ref object stays the same across renders. A callback ref is called with the node when attached and with `null` when detached.
+
+If you pass a new inline function each render, React detaches and reattaches it on every commit. Strict Mode adds extra attach and detach in development. Don't call `setState` from an unstable callback ref.
 
 **Follow-up:**
 
 `<input ref={…}>` then `<textarea ref={…}>` same position. After second commit, what is `.current`?
 
-Answer: The textarea. Host type change detaches the input and attaches the textarea; uncontrolled value/focus on the input are gone.
+Answer: The textarea. The element type changed, so React detaches the input and attaches the textarea. The input's uncontrolled value and focus are gone.
 
 ### REACT-041 — A click outranks a scroll update
 
@@ -1019,7 +1183,11 @@ React `onClick` vs `onMouseMove` both `setState`. How does React 18 prioritize? 
 
 **Answer:**
 
-Discrete events (click/keydown/input) outrank continuous ones (mousemove/scroll/wheel). A click is not stuck behind an unbounded move queue. `startTransition` marks those updates lower than both—keep the click’s own setState outside. Priority is not debounce: every `setState` still schedules work; colocating/ref-DOM updates reduce cost. Discrete updates also flush passive effects before the next discrete input.
+React 18 treats discrete events like clicks, key presses, and input as higher priority than continuous events like mouse moves, scrolling, and wheel. A click is therefore not stuck behind a long queue of mouse-move updates.
+
+Wrapping an update in `startTransition` lowers it below both. Keep the click's own `setState` outside the transition.
+
+Priority is not debouncing. Every `setState` still schedules work. If updates are expensive, reduce the work per update, for example by updating the DOM through a ref.
 
 **Code:**
 
@@ -1032,7 +1200,7 @@ startTransition(() => setChartData(compute(points)));
 
 Fifty `onScroll` `setScrollTop`s then a click—what about the click vs scrolls?
 
-Answer: Click is discrete and scheduled ahead of the continuous stream. Fix expensive scroll by rendering less per update, not by raising scroll to discrete priority.
+Answer: The click is discrete, so React schedules it ahead of the continuous scroll updates. To fix expensive scrolling, render less per update. Do not try to make scroll updates discrete.
 
 ### REACT-042 — A render error is caught above; a handler error is not
 
@@ -1046,7 +1214,11 @@ Child throws while rendering. What catches it? Does the same catch `onClick`, fe
 
 **Answer:**
 
-Class boundaries with `getDerivedStateFromError`/`componentDidCatch` catch render/lifecycle throws of descendants and show fallback; failed output is not committed. Function components cannot be boundaries in React 18. Handler throws, promise rejections, and effect throws are not render errors—catch locally and set error state if UI must change. Log/retry from `componentDidCatch` or UI, not from `getDerivedStateFromError`.
+An error boundary catches it. In React 18, that must be a class component using `getDerivedStateFromError` or `componentDidCatch`. It catches errors thrown while rendering its descendants and shows a fallback. The broken output is never committed. Function components cannot be boundaries.
+
+Errors in event handlers, rejected promises, and effects are not render errors, so boundaries do not catch them. Handle those yourself with try/catch, and set error state if the UI should change.
+
+Log or retry from `componentDidCatch` or from the fallback UI, not from `getDerivedStateFromError`.
 
 **Code:**
 
@@ -1060,7 +1232,7 @@ static getDerivedStateFromError(error: Error) {
 
 Fallback showing; Retry only clears `error`. What else for the child to succeed?
 
-Answer: Clearing error re-renders children. Retry works only if the cause changed or the child handles it—same throw is caught again.
+Answer: Clearing the error just renders the children again. It only works if the cause has changed or the child handles it, otherwise the same error is thrown and caught again.
 
 ### REACT-043 — `hydrateRoot` attaches to the server HTML
 
@@ -1074,7 +1246,11 @@ Server HTML already in `#root`. What does `hydrateRoot` do vs `createRoot().rend
 
 **Answer:**
 
-`hydrateRoot` attaches fibers/handlers to existing markup; first client render must match. `createRoot` replaces container contents. Structural text/node mismatches in React 18 client-render from the nearest Suspense boundary (or root)—server HTML for that subtree is discarded. Attribute mismatches warn; `suppressHydrationWarning` is one-element, not a tree ignore. Causes: `window`/`Date`/`random`, divergent data, browser-fixed invalid nesting.
+`hydrateRoot` attaches React to HTML that the server already produced, so the browser does not rebuild it. React expects its first client render to match that markup. `createRoot` ignores it and replaces the container's contents.
+
+If text or elements do not match, React 18 discards the server HTML for the nearest Suspense boundary (or the root) and renders it on the client. A mismatched attribute gives a warning. `suppressHydrationWarning` only covers one element, not a tree.
+
+Typical causes are `window`, `Date`, random values, different data, or invalid nesting that the browser fixed.
 
 **Code:**
 
@@ -1086,7 +1262,7 @@ hydrateRoot(container, <App />);
 
 `suppressHydrationWarning` on a `<p>`; child `<span>` also differs. Covered?
 
-Answer: No—only that element’s own text/attributes. The span needs to match or have its own suppression reason.
+Answer: No. It only covers that element's own text and attributes. The span still has to match, or needs its own reason for suppression.
 
 ### REACT-044 — An urgent update and a transition are two passes
 
@@ -1100,7 +1276,11 @@ Answer: No—only that element’s own text/attributes. The span needs to match 
 
 **Answer:**
 
-Not one batch—different priorities. `setQuery` is discrete; `setResults` is a transition. React can commit the input first and render the list later; mixed frames show the new query with previous results. A later keystroke can abandon in-flight list work. Both reads of `event.target.value` see the same string. Moving `setQuery` inside `startTransition` defers the caret. `isPending` is transition status, not a network flag.
+No, these are not one batch, because the two updates have different priorities. `setQuery` is urgent, and `setResults` is a transition. React can commit the input first and render the list afterward. For a moment, the screen may show the new query with the old results. A newer keystroke can abandon the in-progress list render.
+
+Both lines read the same `event.target.value`, so they see the same string.
+
+If you move `setQuery` into the transition, the input itself becomes laggy. `isPending` only reflects the transition, not any network request.
 
 **Code:**
 
@@ -1114,7 +1294,7 @@ startTransition(() => setResults(filter(next)));
 
 Transition list throw after input already committed. Input revert? Where does error surface?
 
-Answer: Input stays. Transition errors retry sync for reporting; a list boundary can show fallback without undoing the query commit.
+Answer: The input stays as typed. React retries the failed transition synchronously and reports the error. A boundary around the list can show a fallback without undoing the query.
 
 ### REACT-045 — After unmount, that setter does not paint
 
@@ -1128,7 +1308,11 @@ Effect fetches then `setProfile` in `.then`. User navigates away; response arriv
 
 **Answer:**
 
-The setter belongs to that fiber. After unmount it does not paint or remount a new instance; React 18 no longer warns. Silence is not a canceled request—the fetch still runs. Abort in effect cleanup (`AbortController`) and/or ignore stale generations so an old `.then` cannot overwrite a newer id. Promise rejections are not caught by error boundaries. Strict Mode’s development remount needs the same cleanup.
+The setter belongs to the component instance that was unmounted. If the response arrives later and calls it, nothing is painted and no new instance appears. React 18 also no longer logs a warning for this.
+
+But silence is not cancellation. The request still runs and uses bandwidth. Abort it in the effect's cleanup with an `AbortController`, and ignore stale responses so an old request cannot overwrite a newer one.
+
+Promise rejections are also not caught by error boundaries. Strict Mode's development remount needs the same cleanup.
 
 **Code:**
 
@@ -1144,7 +1328,7 @@ useEffect(() => {
 
 `url` changes; first response returns after second render. One shared outer `ignore` flag?
 
-Answer: Per-run flag/controller protects that run. One shared flag flipped by old cleanup can also ignore the newest response—use a generation per effect run.
+Answer: A flag or controller created per effect run protects that run. A single shared flag can be flipped by the old cleanup and then ignore the newest response too. Use one flag per effect run.
 
 ### REACT-046 — A matching host type updates the same DOM node
 
@@ -1158,13 +1342,17 @@ Answer: Per-run flag/controller protects that run. One shared flag flipped by ol
 
 **Answer:**
 
-Same host type, position, and key: React keeps the DOM node and updates changed props. A new `style={{ color }}` object does not remount—React diffs style fields. Scroll, focus, and selection stay. Changing `div` to `section` (or changing `key`) replaces the node and drops browser state and child fibers. Do not pass React children and `dangerouslySetInnerHTML` together—two owners of the same child list.
+No, React does not destroy the node. If the host element type, position, and key are the same, React keeps the same DOM node and updates only the properties that changed. A new `style` object is compared field by field, so it does not cause a remount. Scroll position, focus, and selection are kept.
+
+Changing `div` to `section`, or changing the `key`, replaces the node and its children, and browser state is lost.
+
+Do not combine React children with `dangerouslySetInnerHTML`. Both would try to own the same content.
 
 **Follow-up:**
 
 Child goes string `"Hello"` → `<span>Hello</span>` → string. DOM?
 
-Answer: Text node vs element are different child types—React replaces nodes each way. Matching spans would update text in place.
+Answer: A text node and an element are different kinds of children, so React replaces the node each time. If both were `span` elements, React would update the text in place.
 
 ### REACT-047 — A portal moves the DOM node, not the fiber
 
@@ -1178,7 +1366,11 @@ Answer: Text node vs element are different child types—React replaces nodes ea
 
 **Answer:**
 
-Portal commits host nodes into `domNode` but fiber parent stays the portal renderer—context and error boundaries follow the React tree. State survives while type/key match. React events bubble through fibers (parent `onClick` runs). Native listeners on the root container miss DOM bubbling from `body`; `document` listeners see it. Portal does not change batching/keys/state ownership.
+A portal changes where the DOM nodes are placed, not where the component sits in the React tree. The dialog's React parent is still the component that rendered the portal, so context and error boundaries work as usual. State survives parent re-renders as long as the type and key stay the same.
+
+React events bubble through the React tree, so a parent's `onClick` still fires.
+
+Native DOM listeners behave differently. A listener on the React root container will not see clicks from `body`, but a listener on `document` will.
 
 **Code:**
 
@@ -1190,7 +1382,7 @@ return createPortal(children, document.body);
 
 Same element rendered through portal and as a normal child. Shared state?
 
-Answer: No—two positions, two fibers. Portal only changes DOM parent of its position.
+Answer: No. They are in two different positions in the tree, so React creates two separate instances. The portal only changes the DOM parent of its own position.
 
 ### REACT-048 — `value={undefined}` is still providing a value
 
@@ -1204,7 +1396,13 @@ Answer: No—two positions, two fibers. Portal only changes DOM parent of its po
 
 **Answer:**
 
-With no provider above, `useContext` returns the `createContext` default (`"edit"`). `<Provider value={undefined}>` is still a provider—the consumer reads `undefined`, not the default. Nested providers: nearest wins (`"view"`). Updates wake consumers of the provider they actually read. Providers and consumers match by context object identity—create the context once at module scope and import that reference.
+With no provider above, `useContext` returns the default passed to `createContext`, here `"edit"`.
+
+If there is a provider with `value={undefined}`, that still counts as a provider, so the component reads `undefined`, not the default.
+
+With nested providers, the nearest one wins, so you get `"view"` inside.
+
+Providers and consumers are matched by the context object itself. Create the context once at module level and import that same reference everywhere.
 
 **Code:**
 
@@ -1217,7 +1415,7 @@ const mode = useContext(Mode); // null ⇒ no provider if that is your sentinel
 
 Module `Mode` provided; component creates another `createContext("edit")` and `useContext`s that. What is read?
 
-Answer: That object’s default `"edit"`. Provider/consumer match by reference, not by the string value or variable name.
+Answer: The default `"edit"` of the new context object. Providers and consumers match by object reference, not by value or variable name.
 
 ### REACT-049 — Two roots do not share a batch
 
@@ -1231,13 +1429,19 @@ Two `createRoot` trees; one click calls a setter from each. How many renders/com
 
 **Answer:**
 
-Each `createRoot` is a separate fiber tree with its own render and commit. Two setters are two updates—both may flush before the next paint for that discrete click, but they are still two commits. An error boundary in root1 cannot catch a render throw in root2. Context does not cross roots. Portals stay in one tree; a second root cuts it. Create each root once and update with `root.render`.
+Each `createRoot` creates a fully separate React tree with its own render and commit. If one click updates both, you get two commits. They may happen before the next paint, but they are still separate.
+
+An error boundary in root1 cannot catch a render error from root2, and context does not cross between roots.
+
+Portals stay within one tree, so they are not a way to connect roots.
+
+Create each root once and call `root.render` to update it.
 
 **Follow-up:**
 
 `flushSync(() => setOpen(true))` in root1, then root2’s setter. DOM of root1 when root2’s setter runs?
 
-Answer: Root1’s update is committed before `flushSync` returns. Root2 has not rendered yet from that setter. Roots are still not one fiber tree.
+Answer: Root1 is already committed, because `flushSync` finishes before it returns. Root2 has not rendered yet. They are still separate trees.
 
 ### REACT-050 — The sort wrote through the state array
 
@@ -1251,7 +1455,13 @@ Render mutates `people.sort(...)` when `sort === "name"`; `people` is the module
 
 **Answer:**
 
-`sort` mutates the shared array in place—`initial` is rewritten to A,B. Toggling flag back does nothing; order is already mutated. Reset bails out (`Object.is` same reference) and no pristine copy remains. Keys are fine; there is no row state confusion. Derive a copy: `[...people].sort(...)`, initialize with a copy, reset with a fresh copy—never mutate state during render.
+`Array.prototype.sort` sorts in place. Since `people` is the shared `initial` array, sorting during render rewrites that array itself. Switching the flag back does not restore the original order, because the data is already changed.
+
+Reset also does nothing: `setPeople(initial)` passes the same reference, so React bails out, and there is no untouched copy left.
+
+Keys are not the problem, because rows have no state to mix up.
+
+Fix it by sorting a copy: `[...people].sort(...)`, initialize with a copy, and reset with a fresh copy. Never mutate state during render.
 
 **Code:**
 
@@ -1266,4 +1476,4 @@ const shown =
 
 Handler does `setPeople([...people].sort(...))` but the render `people.sort` block remains. Still wrong?
 
-Answer: Yes—render still mutates whatever is in state whenever the flag is `"name"`. Remove the body mutation; either the flag drives a derived copy or the handler owns order—not both with an in-place sort.
+Answer: Yes. The render still mutates whatever is in state when the flag is `"name"`. Remove the mutation in the body. Either derive a sorted copy from the flag, or let the handler own the order, but not both.

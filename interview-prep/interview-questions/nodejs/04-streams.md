@@ -18,7 +18,7 @@ What are the four stream types in Node.js, and when would you use each?
 
 **Answer:**
 
-`Readable` is a source (file, HTTP request, `process.stdin`). `Writable` is a sink (file, HTTP response, `process.stdout`). `Duplex` has independent read and write sides (`net.Socket`). `Transform` is a Duplex whose output is computed from its input (`zlib.createGzip()`). All extend `EventEmitter`. Use streams to process data incrementally with bounded memory instead of loading whole payloads.
+A `Readable` is a source of data, such as a file, an HTTP request, or `process.stdin`. A `Writable` is a destination, such as a file, an HTTP response, or `process.stdout`. A `Duplex` has a read side and a write side that work independently; `net.Socket` is an example. A `Transform` is a Duplex whose output is computed from its input, like `zlib.createGzip()`. Use streams to process data piece by piece instead of loading everything into memory.
 
 **Follow-up:**
 
@@ -38,13 +38,13 @@ Explain flowing and paused mode of a Readable and what switches between them.
 
 **Answer:**
 
-A Readable starts paused. It becomes flowing when you attach a `'data'` listener, call `.resume()`, or call `.pipe()`. In flowing mode chunks are pushed to listeners as fast as they are produced. In paused mode you pull with `.read()` after `'readable'`. `readable.readableFlowing` is `null` (no consumer yet), `true`, or `false` (explicitly paused).
+A Readable starts out paused. It switches to flowing mode when you attach a `'data'` listener, call `.resume()`, or call `.pipe()`. In flowing mode, chunks are handed to your listeners as soon as they are available. In paused mode, you pull chunks yourself by calling `.read()` after a `'readable'` event. The property `readable.readableFlowing` tells you which state you are in: `null` means no consumer yet, `true` means flowing, and `false` means explicitly paused.
 
 **Follow-up:**
 
 What happens to data produced before a `'data'` listener is attached?
 
-Answer: Nothing is emitted while the stream has no consumer; chunks wait in the internal buffer up to `highWaterMark`, then the source is told to stop producing. Attaching `'data'` later starts delivery from the buffer.
+Answer: Nothing is emitted while there is no consumer. Chunks wait in the internal buffer up to `highWaterMark`, then the source is told to stop producing. Attaching `'data'` later starts delivery from that buffer.
 
 ### NODE-153 — objectMode
 
@@ -58,7 +58,7 @@ What is `objectMode`, and what changes when you enable it?
 
 **Answer:**
 
-With `objectMode: true` a stream carries arbitrary JavaScript values instead of Buffers or strings. `null` is not allowed as a value because it signals end. `highWaterMark` counts objects (default 16), not bytes. Each `push()` or `write()` is one unit; chunks are never merged or split. Use it for parsed records, rows, or events between processing stages.
+With `objectMode: true`, a stream carries any JavaScript value instead of just Buffers or strings. Each `push()` or `write()` is one unit, and chunks are never merged or split. Two things change: `highWaterMark` counts objects (default 16) instead of bytes, and you can no longer use `null` as a value because `null` means end of stream. It is useful for passing parsed records, rows, or events between processing stages.
 
 **Follow-up:**
 
@@ -78,17 +78,17 @@ What is `highWaterMark`, and what are the byte defaults in Node 20 versus Node 2
 
 **Answer:**
 
-It is the internal buffer threshold. When buffered data reaches it, `write()` returns `false` and `push()` returns `false`. It is a signal, not a hard cap. In Node 20 the default for byte streams is 16 KiB. In Node 22 it is 64 KiB on non-Windows platforms; Windows stays at 16 KiB. `objectMode` remains 16 objects. `fs.createReadStream` already used 64 KiB.
+`highWaterMark` is the size at which a stream's internal buffer is considered full. Once buffered data reaches it, `write()` and `push()` return `false`. This is a signal to slow down, not a hard limit. For byte streams, the default is 16 KiB in Node 20. In Node 22 it is 64 KiB on non-Windows platforms, and Windows stays at 16 KiB. In `objectMode` it is still 16 objects. `fs.createReadStream` already used 64 KiB.
 
 **Trade-offs:**
 
-A larger value reduces syscalls and improves throughput but costs memory per concurrent stream. With thousands of connections, 64 KiB each adds up.
+A larger value means fewer syscalls and better throughput, but it costs more memory per stream. With thousands of connections, 64 KiB each adds up.
 
 **Follow-up:**
 
 Does hitting `highWaterMark` reject the chunk?
 
-Answer: No. The chunk is accepted and buffered; `false` only asks the producer to pause until `'drain'`. Ignoring it keeps buffering without a limit.
+Answer: No. The chunk is accepted and buffered. A `false` return only asks the producer to pause until `'drain'`. If the producer ignores it, the buffer keeps growing without a limit.
 
 ### NODE-155 — Backpressure
 
@@ -102,7 +102,7 @@ What is backpressure, and how does Node implement it?
 
 **Answer:**
 
-Backpressure is the consumer telling the producer to slow down. When `writable.write(chunk)` returns `false`, the producer must stop until `'drain'` is emitted. `pipe()` and `pipeline()` do this automatically by pausing the source and resuming on `'drain'`. Without it, the writable buffer grows until memory runs out when the producer is faster than the sink.
+Backpressure is the consumer telling the producer to slow down. When `writable.write(chunk)` returns `false`, the producer should stop writing until the writable emits `'drain'`. `pipe()` and `pipeline()` do this for you: they pause the source and resume it on `'drain'`. Without backpressure, if the producer is faster than the destination, the writable's buffer keeps growing until the process runs out of memory.
 
 **Follow-up:**
 
@@ -122,7 +122,7 @@ What are the differences between `.pipe()` and `stream.pipeline()`?
 
 **Answer:**
 
-`pipe()` handles backpressure but not errors. If a destination fails, the source is only unpiped and stays open, leaking descriptors or sockets, and every stream needs its own `'error'` handler. `pipeline()` forwards errors, destroys all streams on failure or completion, and reports once through a callback or a promise. Prefer `pipeline` in production.
+Both handle backpressure, but only `pipeline()` handles errors. With `pipe()`, if the destination fails, the source is just unpiped and stays open. That can leak file descriptors or sockets, and you need an `'error'` handler on every stream. `pipeline()` forwards errors, destroys all the streams when something fails or finishes, and reports the result once through a callback or a promise. That is why you should prefer it in production.
 
 **Follow-up:**
 
@@ -142,7 +142,7 @@ How do you use `pipeline` from `node:stream/promises`, and what can it accept?
 
 **Answer:**
 
-`await pipeline(src, ...stages, dest)` returns a Promise that resolves when the last stream finishes and rejects on the first error. Middle stages can be Transforms or async generator functions. The last argument may be an options object with `signal` for cancellation. Cleanup of every stream is automatic.
+You call `await pipeline(src, ...stages, dest)`. The returned Promise resolves when the last stream finishes and rejects on the first error. The middle stages can be Transforms or async generator functions. You can also pass an options object as the last argument, with a `signal` for cancellation. Every stream is cleaned up automatically.
 
 **Code:**
 
@@ -158,7 +158,7 @@ await pipeline(createReadStream('in.log'), createGzip(), createWriteStream('in.l
 
 Why prefer `await pipeline` over the callback form?
 
-Answer: Errors surface in a normal `try/catch`, there is no risk of calling the callback twice in handler code, and flow reads linearly with other async steps.
+Answer: Errors show up in a normal `try/catch`, you cannot accidentally call the callback twice, and the flow reads top to bottom alongside other async code.
 
 ### NODE-158 — finished()
 
@@ -172,13 +172,13 @@ What does `finished()` do, and when do you need it instead of `pipeline`?
 
 **Answer:**
 
-`finished(stream, cb)`, or the promise version in `stream/promises`, fires when a stream is no longer readable or writable: ended, errored, or closed early. It reports `ERR_STREAM_PREMATURE_CLOSE` if the stream is destroyed before a clean end. Use it for cleanup when you cannot wrap the flow in `pipeline`, for example around an HTTP response written by a framework.
+`finished(stream, cb)`, or its promise version in `stream/promises`, tells you when a stream is done: it ended, errored, or was closed early. If the stream is destroyed before a clean end, you get `ERR_STREAM_PREMATURE_CLOSE`. Use it when you cannot wrap the flow in `pipeline`, for example to clean up after an HTTP response that a framework is writing for you.
 
 **Follow-up:**
 
 Why keep the cleanup function that `finished` returns?
 
-Answer: Calling it removes the listeners `finished` added. In long-lived streams, forgetting it leaves listeners attached and can trigger `MaxListenersExceededWarning`.
+Answer: Calling it removes the listeners that `finished` added. On long-lived streams, forgetting it leaves listeners attached and can trigger `MaxListenersExceededWarning`.
 
 ### NODE-159 — destroy and error propagation
 
@@ -192,13 +192,13 @@ How do `destroy()` and error propagation work on a stream?
 
 **Answer:**
 
-`stream.destroy(err?)` tears the stream down: it runs `_destroy`, releases resources, emits `'error'` if an error was given, then `'close'`. Afterwards writes fail and reads end. With `autoDestroy: true` (default) a stream destroys itself after `'end'`, `'finish'`, or an error. `destroy` does not touch piped peers; `pipeline` does that propagation.
+`stream.destroy(err?)` shuts the stream down. It runs `_destroy`, releases resources, emits `'error'` if you passed an error, and then emits `'close'`. After that, writes fail and reads end. With `autoDestroy: true` (the default), a stream destroys itself after `'end'`, `'finish'`, or an error. Importantly, `destroy()` does not touch other streams you piped to; `pipeline` is what spreads the failure across the chain.
 
 **Follow-up:**
 
 What should `_destroy(err, cb)` do?
 
-Answer: Close underlying resources such as a file descriptor, socket, or DB cursor, then call `cb(err)` exactly once so the error continues to propagate.
+Answer: Close the underlying resource, such as a file descriptor, socket, or database cursor, then call `cb(err)` exactly once so the error keeps propagating.
 
 ### NODE-160 — for await over a stream
 
@@ -212,7 +212,7 @@ How do you consume a Readable with `for await...of`, and how does it relate to b
 
 **Answer:**
 
-Readable implements `Symbol.asyncIterator`. Each iteration pulls the next chunk only after the previous loop body finished, so backpressure is natural. Stream errors are thrown inside the loop, so `try/catch` works. Leaving the loop early with `break`, `return`, or a throw destroys the stream by default.
+A Readable implements `Symbol.asyncIterator`, so you can loop over it with `for await`. The loop asks for the next chunk only after the previous iteration finishes, so backpressure happens naturally. Stream errors are thrown inside the loop, so a normal `try/catch` works. If you leave the loop early with `break`, `return`, or a thrown error, the stream is destroyed by default.
 
 **Code:**
 
@@ -228,7 +228,7 @@ try {
 
 **Follow-up:**
 
-What does a slow body do to the stream?
+What does a slow loop body do to the stream?
 
 Answer: The internal buffer fills to `highWaterMark`, then the source is paused until the loop catches up. Memory stays bounded.
 
@@ -244,13 +244,13 @@ What is `Readable.from()`, and what is a common gotcha?
 
 **Answer:**
 
-It creates a Readable from an iterable or async iterable such as an array, generator, or async generator: `Readable.from(asyncGen())`. It defaults to `objectMode: true`. It is handy for tests and for turning generators into pipeline sources. Pass `{ objectMode: false }` when the items are strings or Buffers that should be treated as bytes.
+`Readable.from()` creates a Readable from an iterable or async iterable, such as an array, a generator, or an async generator: `Readable.from(asyncGen())`. It is handy in tests and for turning generators into pipeline sources. The gotcha is that it defaults to `objectMode: true`. If your items are strings or Buffers that should be treated as bytes, pass `{ objectMode: false }`.
 
 **Follow-up:**
 
 What does `Readable.from('abc')` emit?
 
-Answer: A single chunk containing the whole string `'abc'`, not one chunk per character. Strings and Buffers are special-cased so they are not iterated as characters or bytes.
+Answer: A single chunk containing the whole string `'abc'`, not one chunk per character. Strings and Buffers are special-cased so they are not iterated character by character.
 
 ### NODE-162 — push(null)
 
@@ -264,13 +264,13 @@ What does `push(null)` mean in a custom Readable?
 
 **Answer:**
 
-`null` signals end of data. Already buffered data is still delivered, then `'end'` is emitted. Pushing after EOF raises `ERR_STREAM_PUSH_AFTER_EOF`. In `objectMode`, `null` therefore cannot be used as a data value. If you never push `null`, consumers wait forever and `pipeline` never resolves.
+Calling `push(null)` signals the end of the data. Anything already buffered is still delivered, and then `'end'` is emitted. Pushing after that raises `ERR_STREAM_PUSH_AFTER_EOF`. This is also why `null` cannot be a data value in `objectMode`. If you forget to push `null`, consumers wait forever and `pipeline` never resolves.
 
 **Follow-up:**
 
 How would you notice a missing `push(null)` in production?
 
-Answer: Requests or jobs hang with no error, and the stream never emits `'end'` or `'close'`. A timeout or `AbortSignal` on the pipeline exposes it.
+Answer: Requests or jobs hang with no error, and the stream never emits `'end'` or `'close'`. A timeout or an `AbortSignal` on the pipeline exposes the problem.
 
 ### NODE-163 — Implementing _read
 
@@ -284,13 +284,13 @@ How do you implement `_read()` correctly for an async source?
 
 **Answer:**
 
-`_read(size)` is called when the consumer wants more data. Fetch or generate data, call `this.push(chunk)`, and push `null` at the end. If `push()` returns `false`, stop until `_read` is called again. For async sources, keep a flag so you do not start a second fetch while one is in flight, and call `this.destroy(err)` on failure rather than throwing.
+Node calls `_read(size)` when the consumer wants more data. In it, fetch or generate data, call `this.push(chunk)`, and push `null` when the source is finished. If `push()` returns `false`, stop until `_read` is called again. For async sources, keep a flag so you do not start a second fetch while one is still running. On failure, call `this.destroy(err)` instead of throwing.
 
 **Follow-up:**
 
-Why can `_read` be called again before an async fetch finished?
+Why can `_read` be called again before an async fetch has finished?
 
-Answer: Node calls it whenever the buffer is below `highWaterMark` and `push` has not satisfied the request. A guard such as `if (this.reading) return` prevents overlapping fetches and reordering.
+Answer: Node calls it whenever the buffer is below `highWaterMark` and nothing has been pushed yet. A guard such as `if (this.reading) return` prevents overlapping fetches and out-of-order chunks.
 
 ### NODE-164 — Implementing _write
 
@@ -304,13 +304,13 @@ How do you implement a Writable with `_write()`, and what must the callback do?
 
 **Answer:**
 
-`_write(chunk, encoding, callback)` processes one chunk and must call `callback()` or `callback(err)` exactly once. Not calling it stalls the stream; calling it twice is an error. By default chunks arrive as Buffers because `decodeStrings` is `true`. For simple cases, `new Writable({ write(chunk, enc, cb) { ... } })` is enough.
+`_write(chunk, encoding, callback)` processes one chunk. When it is done, it must call `callback()` or `callback(err)` exactly once. If you never call it, the stream stalls; calling it twice is an error. By default, chunks arrive as Buffers because `decodeStrings` is `true`. For simple cases, you can skip subclassing: `new Writable({ write(chunk, enc, cb) { ... } })`.
 
 **Follow-up:**
 
 What happens to later `write()` calls while a callback is pending?
 
-Answer: They are queued in the writable buffer and processed in order after the pending one completes. Once the queue passes `highWaterMark`, `write()` returns `false`.
+Answer: They are queued in the writable buffer and processed in order once the pending one completes. When the queue passes `highWaterMark`, `write()` returns `false`.
 
 ### NODE-165 — _transform and _flush
 
@@ -324,13 +324,13 @@ How do `_transform` and `_flush` work in a Transform?
 
 **Answer:**
 
-`_transform(chunk, enc, cb)` receives input, calls `this.push(out)` zero or more times, then `cb()`, or `cb(null, out)` as shorthand. `_flush(cb)` runs after all input has been consumed and before `'end'`, so you can emit remaining state: the last partial line, a checksum trailer, or buffered tail bytes.
+`_transform(chunk, enc, cb)` receives input and calls `this.push(out)` zero or more times. Then it calls `cb()`, or `cb(null, out)` as a shortcut for one output chunk. `_flush(cb)` runs once all input has been consumed, just before `'end'`. It is your chance to emit anything still held in memory, such as the last partial line, a checksum trailer, or leftover bytes.
 
 **Follow-up:**
 
 Why is a line-splitting Transform wrong without `_flush`?
 
-Answer: The final line often has no trailing newline and sits in the carry-over buffer. Without `_flush` that last record is silently dropped.
+Answer: The final line often has no trailing newline, so it is still sitting in the carry-over buffer at the end. Without `_flush`, that last record is silently dropped.
 
 ### NODE-166 — Duplex vs Transform
 
@@ -344,13 +344,13 @@ Give a concrete example of a Duplex and of a Transform, and say how you implemen
 
 **Answer:**
 
-A TCP `net.Socket` is a Duplex: it reads what the peer sends and writes what you send, with no relation between the two sides. Gzip, encryption, and parsers are Transforms, where writes produce reads. Implement a Duplex with both `_read` and `_write`; implement a Transform with `_transform` (and optionally `_flush`).
+A TCP `net.Socket` is a Duplex. It reads what the peer sends and writes what you send, and the two sides are unrelated. Gzip, encryption, and parsers are Transforms, where what you write determines what you read. To implement a Duplex, provide both `_read` and `_write`. To implement a Transform, provide `_transform` and, optionally, `_flush`.
 
 **Follow-up:**
 
 What is `PassThrough` for?
 
-Answer: It is a Transform that outputs its input unchanged. It is used as a tap point, to fork or observe a stream, or as a placeholder in a pipeline.
+Answer: It is a Transform that passes its input through unchanged. People use it as a tap point to observe or fork a stream, or as a placeholder in a pipeline.
 
 ### NODE-167 — cork and uncork
 
@@ -364,13 +364,13 @@ What do `cork()` and `uncork()` do, and when do they help?
 
 **Answer:**
 
-`cork()` makes the Writable buffer all subsequent writes in memory. `uncork()` flushes them, using `_writev` if implemented so they go out as one batch. It helps with many small writes, such as header lines followed by a body on a socket. Calls nest: each `cork()` needs a matching `uncork()`. A common idiom is `process.nextTick(() => stream.uncork())`.
+`cork()` tells a Writable to hold all following writes in memory. `uncork()` releases them together, using `_writev` if the stream implements it, so they go out as one batch. This helps when you make many small writes, such as header lines followed by a body on a socket. Calls nest, so each `cork()` needs its own `uncork()`. A common idiom is `process.nextTick(() => stream.uncork())`.
 
 **Follow-up:**
 
 What happens to corked data if you call `end()`?
 
-Answer: `end()` uncorks fully and flushes the pending writes before finishing. `destroy()`, however, discards buffered data without writing it.
+Answer: `end()` uncorks fully and flushes the pending writes before finishing. `destroy()`, on the other hand, throws the buffered data away without writing it.
 
 ### NODE-168 — _writev
 
@@ -384,13 +384,13 @@ What is `_writev`, and why would you implement it?
 
 **Answer:**
 
-`_writev(chunks, cb)` receives an array of `{ chunk, encoding }` entries and handles them in one operation, such as one multi-row DB insert or one `writev` syscall. Node uses it when writes accumulated, either because of `cork()` or because earlier writes were still in progress. Ordering is preserved within the array.
+`_writev(chunks, cb)` receives an array of `{ chunk, encoding }` entries and handles them in a single operation, such as one multi-row database insert or one `writev` syscall. Node uses it when writes have piled up, either because of `cork()` or because earlier writes were still in progress. The order of chunks in the array is preserved.
 
 **Follow-up:**
 
 Do you have to implement `_write` as well?
 
-Answer: Yes, `_write` is still needed as a fallback when only one chunk is pending. Many implementations make `_write` call `_writev` with a one-element array.
+Answer: Yes. `_write` is still needed for the case where only one chunk is pending. Many implementations simply make `_write` call `_writev` with a one-element array.
 
 ### NODE-169 — Buffer vs string encoding
 
@@ -404,13 +404,13 @@ How do encodings behave in streams, and what is the multi-byte pitfall?
 
 **Answer:**
 
-Readables emit Buffers by default. `setEncoding('utf8')` or the `encoding` option makes them emit strings through an internal `StringDecoder`, which correctly stitches multi-byte characters split across chunks. Calling `chunk.toString()` on each Buffer can corrupt a character that straddles a boundary and produce `�`.
+By default, a Readable emits Buffers. If you call `setEncoding('utf8')` or pass the `encoding` option, it emits strings instead, using an internal `StringDecoder`. The decoder correctly joins multi-byte characters that were split across two chunks. If you call `chunk.toString()` on each Buffer yourself, a character that straddles a chunk boundary can be corrupted and show up as `�`.
 
 **Follow-up:**
 
 Why is `Buffer.concat(chunks).toString()` safer than `str += chunk`?
 
-Answer: With `str += chunk` on Buffers, each chunk is decoded separately and boundary characters break. Concatenating bytes first and decoding once, or using `setEncoding`, keeps characters intact.
+Answer: With `str += chunk` on Buffers, each chunk is decoded separately, so boundary characters break. Joining the bytes first and decoding once, or using `setEncoding`, keeps characters intact.
 
 ### NODE-170 — fs.createReadStream options
 
@@ -424,13 +424,13 @@ What are the key options of `fs.createReadStream`, and how do its errors surface
 
 **Answer:**
 
-`start` and `end` (inclusive byte offsets, used for HTTP Range), `highWaterMark` (64 KiB default), `encoding`, `flags`, `fd`, `autoClose`, and `signal`. The file opens lazily and the stream emits `'open'`, `'ready'`, `'data'`, `'end'`, `'close'`. Failures such as `ENOENT` arrive asynchronously as `'error'` events, not as thrown exceptions.
+The main options are `start` and `end` (inclusive byte offsets, useful for HTTP Range requests), `highWaterMark` (64 KiB by default), `encoding`, `flags`, `fd`, `autoClose`, and `signal`. The file is opened lazily, and the stream emits `'open'`, `'ready'`, `'data'`, `'end'`, and `'close'`. Failures such as `ENOENT` arrive asynchronously as `'error'` events. They are not thrown as exceptions.
 
 **Follow-up:**
 
 How do you serve a byte range safely?
 
-Answer: Parse and validate the `Range` header against the file size, answer 416 for unsatisfiable ranges, then set `start`/`end` and `Content-Range`. Use `pipeline` so a client abort closes the file.
+Answer: Parse and validate the `Range` header against the file size, and answer 416 if it cannot be satisfied. Otherwise set `start`, `end`, and `Content-Range`. Use `pipeline` so a client abort closes the file.
 
 ### NODE-171 — fs.createWriteStream, finish vs close
 
@@ -444,13 +444,13 @@ What do `fs.createWriteStream` flags control, and how do `'finish'` and `'close'
 
 **Answer:**
 
-Default flag `'w'` truncates; `'a'` appends; `'wx'` fails if the file exists. `'finish'` fires after `end()` once all data has been handed to the OS. `'close'` fires after the file descriptor is closed. Wait for `'close'`, or use `pipeline` or `finished`, before reading the file back, renaming it, or deleting it.
+The default flag `'w'` truncates the file, `'a'` appends, and `'wx'` fails if the file already exists. `'finish'` fires after `end()` once all data has been handed to the operating system. `'close'` fires after the file descriptor has been closed. Before you read the file back, rename it, or delete it, wait for `'close'`, or use `pipeline` or `finished`.
 
 **Follow-up:**
 
 Does `'finish'` mean data is on disk?
 
-Answer: No. It means the OS accepted the writes; they may still be in page cache. For durability, call `fsync` (`fs.fsync` or `filehandle.sync()`) before relying on it.
+Answer: No. It means the OS accepted the writes, but they may still be in the page cache. If you need durability, call `fsync` (`fs.fsync` or `filehandle.sync()`).
 
 ### NODE-172 — Request as Readable
 
@@ -464,13 +464,13 @@ Why is `http.IncomingMessage` a Readable, and what does that imply for handlers?
 
 **Answer:**
 
-The request body arrives in chunks from the socket, so `req` is a Readable. You must consume it with `for await`, `pipe`, or `resume()`, or the connection can stall. Never buffer an unbounded body; enforce a size limit and answer 413. If the client disconnects, `req` emits `'close'`, and consumers see an abort error.
+The request body arrives from the socket in chunks, so `req` is a Readable. You need to consume it with `for await`, `pipe`, or `resume()`, otherwise the connection can stall. Never buffer an unbounded body; enforce a size limit and respond with 413 when it is exceeded. If the client disconnects, `req` emits `'close'`, and consumers see an abort error.
 
 **Follow-up:**
 
 What if the handler responds without reading the body?
 
-Answer: For small remaining bodies Node may drain them; for large ones the connection can be closed or left in a bad keep-alive state. Explicitly `req.resume()` or destroy the request to avoid stalls.
+Answer: If little is left, Node may drain it for you. For a large body, the connection can be closed or left in a bad keep-alive state. Call `req.resume()` or destroy the request to avoid stalls.
 
 ### NODE-173 — Streaming a response
 
@@ -484,13 +484,13 @@ Answer: For small remaining bodies Node may drain them; for large ones the conne
 
 **Answer:**
 
-Set headers first, then `pipeline(fs.createReadStream(path), res, cb)`. Without `Content-Length`, Node uses chunked transfer encoding. Backpressure flows from the client's socket to the file stream. If the client disconnects, the pipeline fails with premature close and destroys the file stream, freeing the descriptor. Buffering with `readFile` then `res.end(data)` costs file-size memory per concurrent request.
+Set the headers first, then call `pipeline(fs.createReadStream(path), res, cb)`. Without a `Content-Length`, Node uses chunked transfer encoding. Backpressure flows from the client's socket back to the file stream. If the client disconnects, the pipeline fails with a premature close and destroys the file stream, which frees the descriptor. By contrast, `readFile` followed by `res.end(data)` costs the full file size in memory for every concurrent request.
 
 **Follow-up:**
 
 What does 1,000 concurrent 500 MB downloads cost each way?
 
-Answer: With `readFile` it needs about 500 GB of heap or Buffer memory and will fail. Streaming holds roughly 64 KiB per request plus socket buffers.
+Answer: With `readFile`, about 500 GB of memory, so it will fail. Streaming holds roughly 64 KiB per request plus socket buffers.
 
 ### NODE-174 — Proxying an upload
 
@@ -504,13 +504,13 @@ How would you proxy an incoming upload to another service using streams?
 
 **Answer:**
 
-Open an outbound `http.request`, or `fetch` with a stream body, and `pipeline(req, upstreamReq)`. Forward relevant headers, then pipeline the upstream response into `res`. Memory stays bounded and backpressure flows end to end. Abort the upstream when the client leaves, and handle errors on both directions. Validate size limits before forwarding.
+Open an outbound `http.request`, or use `fetch` with a stream body, and call `pipeline(req, upstreamReq)`. Forward the relevant headers, then pipeline the upstream response into `res`. Memory stays bounded, and backpressure flows end to end. Check size limits before forwarding, handle errors in both directions, and abort the upstream request if the client leaves.
 
 **Follow-up:**
 
 Why does `fetch` need `duplex: 'half'` with a stream body?
 
-Answer: Undici requires it for request bodies that are streams, meaning the request body is sent fully before the response is read. Without it, `fetch` throws.
+Answer: Undici requires it whenever the request body is a stream. It means the whole request body is sent before the response is read. Without it, `fetch` throws.
 
 ### NODE-175 — Premature close
 
@@ -524,13 +524,13 @@ What is a premature close, and how does it surface?
 
 **Answer:**
 
-It happens when a stream is destroyed, or its peer disconnects, before a normal `end` or `finish`. `pipeline` and `finished` fail with `ERR_STREAM_PREMATURE_CLOSE`. Common causes are a client aborting a download, a socket reset, or `break` inside `for await`. It is often expected and should be logged at low severity rather than paging someone.
+A premature close happens when a stream is destroyed, or its peer disconnects, before a normal `end` or `finish`. `pipeline` and `finished` then fail with `ERR_STREAM_PREMATURE_CLOSE`. Common causes are a client aborting a download, a socket reset, or a `break` inside `for await`. It is often expected, so log it at low severity instead of paging someone.
 
 **Follow-up:**
 
 How do you tell a client abort from a server fault?
 
-Answer: Check `err.code === 'ERR_STREAM_PREMATURE_CLOSE'` together with `req.destroyed` or the response's `writableEnded`. Treat it as a fault only if the server side failed first.
+Answer: Check `err.code === 'ERR_STREAM_PREMATURE_CLOSE'` together with `req.destroyed` or the response's `writableEnded`. Treat it as a server fault only if the server side failed first.
 
 ### NODE-176 — pipe error-handling pitfalls
 
@@ -544,7 +544,7 @@ What are the main error-handling pitfalls of `.pipe()`?
 
 **Answer:**
 
-Errors do not propagate, so each stream needs its own `'error'` handler. On destination error the source is only unpiped, not destroyed, which leaks fds and sockets. In `a.pipe(b).pipe(c)` the return value is the last stream, so developers attach a handler only there. A missing handler becomes an uncaught exception. `pipeline` avoids all of these.
+First, errors do not propagate, so every stream needs its own `'error'` handler. Second, when the destination fails, the source is only unpiped, not destroyed, which leaks file descriptors and sockets. Third, in `a.pipe(b).pipe(c)` the return value is the last stream, so developers tend to attach a handler only there. A missing handler turns into an uncaught exception. `pipeline` avoids all of these problems.
 
 **Code:**
 
@@ -565,7 +565,7 @@ try {
 
 What if headers were already sent?
 
-Answer: You cannot change the status code. Destroy the response so the client sees a broken stream rather than a truncated body that looks complete.
+Answer: You cannot change the status code any more. Destroy the response so the client sees a broken stream, rather than a truncated body that looks complete.
 
 ### NODE-177 — Unhandled stream error
 
@@ -579,13 +579,13 @@ What happens when a stream emits `'error'` and no listener is attached?
 
 **Answer:**
 
-`EventEmitter` throws it as an uncaught exception, which crashes the process unless an `uncaughtException` handler exists. Always attach `'error'` listeners, or use `pipeline` or `finished`. After `'error'` the stream is destroyed, so do not expect `'end'` or `'finish'` afterwards.
+Like any `EventEmitter`, an unhandled `'error'` event is thrown as an uncaught exception. That crashes the process unless an `uncaughtException` handler exists. So always attach `'error'` listeners, or use `pipeline` or `finished`. Also remember that after `'error'` the stream is destroyed, so do not expect `'end'` or `'finish'` to follow.
 
 **Follow-up:**
 
 Why does `try/catch` around `.pipe()` not help?
 
-Answer: Stream errors are emitted later, asynchronously, outside the original call stack. Only `await pipeline(...)` turns them into a rejection you can catch.
+Answer: Stream errors are emitted later, asynchronously, outside the original call stack. Only `await pipeline(...)` turns them into a rejection that you can catch.
 
 ### NODE-178 — Memory blowup from wrong buffering
 
@@ -599,13 +599,13 @@ How does wrong buffering blow up memory in stream code, and how do you fix it?
 
 **Answer:**
 
-Collecting every chunk into an array or string, calling `readFile` and `JSON.parse` on huge inputs, or ignoring backpressure in producers makes memory grow with input size or with the producer-consumer speed gap. Fix it by processing incrementally through `pipeline`, putting limits on accumulated bytes, and respecting `write()` return values.
+Memory blows up when it grows with the input size or with the speed gap between producer and consumer. Typical causes are collecting every chunk into an array or string, calling `readFile` and `JSON.parse` on huge inputs, and producers that ignore backpressure. The fix is to process data incrementally through `pipeline`, cap the number of bytes you accumulate, and respect the return value of `write()`.
 
 **Follow-up:**
 
 How would you diagnose it?
 
-Answer: Watch RSS versus heap used (Buffers live outside the heap), and sample `readableLength` and `writableLength` on suspect streams. Growing lengths point to a missing backpressure handoff.
+Answer: Compare RSS with heap used, because Buffers live outside the heap. Also sample `readableLength` and `writableLength` on suspect streams. Lengths that keep growing point to missing backpressure.
 
 ### NODE-179 — Ignoring write() return value
 
@@ -619,7 +619,7 @@ What is wrong with writing in a loop and ignoring the return value of `write()`?
 
 **Answer:**
 
-`write()` never blocks. A loop such as `for (...) w.write(row)` queues everything in memory when the sink is slower than the loop. The correct pattern is `if (!w.write(x)) await once(w, 'drain')`. Better still, generate data from a Readable or async generator and send it through `pipeline`, which does this for you.
+`write()` never blocks. In a loop like `for (...) w.write(row)`, if the destination is slower than the loop, everything piles up in memory. The correct pattern is `if (!w.write(x)) await once(w, 'drain')`. Even better, produce the data from a Readable or an async generator and send it through `pipeline`, which handles this for you.
 
 **Code:**
 
@@ -652,13 +652,13 @@ What is `stream.compose()`, and how stable is it?
 
 **Answer:**
 
-`compose(...streams)` joins streams or async generator functions into one Duplex: the first stage is the writable side and the last is the readable side. It propagates errors and destroys all parts like `pipeline`. It lets you export a reusable processing step as a single stream. The API is still marked experimental in Node 20 and 22, so check the stability index before depending on it.
+`compose(...streams)` joins several streams or async generator functions into one Duplex. The first stage becomes the writable side and the last stage becomes the readable side. Like `pipeline`, it propagates errors and destroys all the parts. This lets you export a reusable processing step as a single stream. The API is still marked experimental in Node 20 and 22, so check the stability index before depending on it.
 
 **Follow-up:**
 
 How does it differ from `pipeline`?
 
-Answer: `pipeline` wires a complete source-to-sink flow and runs it. `compose` returns a stream that is itself a stage, to be written into or read from or placed inside another pipeline.
+Answer: `pipeline` wires a complete source-to-sink flow and runs it. `compose` returns a stream that is itself one stage, which you can write into, read from, or place inside another pipeline.
 
 ### NODE-181 — Uppercase Transform
 
@@ -672,7 +672,7 @@ Write an uppercase Transform and name its UTF-8 caveat.
 
 **Answer:**
 
-Create a Transform whose `transform` callback converts the chunk to upper case and passes it on. This is fine for ASCII demos. With multi-byte UTF-8, converting each Buffer chunk separately can corrupt characters split across chunks. Decode with `setEncoding('utf8')` on the input side, or use `StringDecoder`, before changing text.
+Create a Transform whose `transform` callback converts the chunk to upper case and passes it on. This is fine for ASCII demos. The caveat is that with multi-byte UTF-8, converting each Buffer chunk separately can corrupt characters that are split across chunks. Decode first, with `setEncoding('utf8')` on the input side or a `StringDecoder`, before changing the text.
 
 **Code:**
 
@@ -691,7 +691,7 @@ const upper = new Transform({
 
 How would you write the same stage as an async generator?
 
-Answer: `async function* (src) { for await (const c of src) yield String(c).toUpperCase(); }` placed in `pipeline`. Set the source to a string encoding, or decode inside the generator.
+Answer: `async function* (src) { for await (const c of src) yield String(c).toUpperCase(); }`, placed inside `pipeline`. Set the source to a string encoding, or decode inside the generator.
 
 ### NODE-182 — NDJSON parsing Transform
 
@@ -705,13 +705,13 @@ How do you parse newline-delimited JSON from a byte stream with a Transform?
 
 **Answer:**
 
-Keep a string `tail`. For each chunk, `const lines = (tail + chunk).split('\n'); tail = lines.pop();`, then push `JSON.parse(line)` for each non-empty line. In `_flush`, parse any remaining `tail`. Set `readableObjectMode: true` so the output side emits objects while the input side stays bytes, and decode chunks with `StringDecoder` to avoid breaking multi-byte characters.
+Keep a string called `tail` for the incomplete last line. For each chunk, do `const lines = (tail + chunk).split('\n'); tail = lines.pop();`, then push `JSON.parse(line)` for every non-empty line. In `_flush`, parse whatever is left in `tail`. Set `readableObjectMode: true` so the output side emits objects while the input side stays bytes. Decode with `StringDecoder` so multi-byte characters are not broken.
 
 **Follow-up:**
 
 How do you handle a malformed line?
 
-Answer: Decide per use case: fail the stream with `cb(err)`, skip and count it, or route it to a dead-letter sink. Include the line number in the error for debugging.
+Answer: It depends on the use case. You can fail the stream with `cb(err)`, skip the line and count it, or send it to a dead-letter sink. Include the line number in the error to help debugging.
 
 ### NODE-183 — Async generators as pipeline stages
 
@@ -725,7 +725,7 @@ Can you use async generators as `pipeline` stages, and why would you?
 
 **Answer:**
 
-Yes. The generator receives the previous stage as an async iterable and yields output. Backpressure and error propagation come from the iteration protocol, and `try/finally` gives clean teardown. It is easier to read than a Transform subclass for stateless or lightly stateful steps. A native Transform can be somewhat faster in very hot paths.
+Yes. The generator receives the previous stage as an async iterable and yields its output. Backpressure and error propagation come from the iteration protocol, and `try/finally` gives you clean teardown. For stateless or lightly stateful steps, this is easier to read than a Transform subclass. A native Transform can be somewhat faster in very hot paths.
 
 **Code:**
 
@@ -757,13 +757,13 @@ What do `Readable.prototype.map`, `filter`, and `toArray` offer, and what are th
 
 **Answer:**
 
-They are iterator-helper style operators on Readable: `map`, `filter`, `forEach`, `take`, `drop`, `flatMap`, `reduce`, and `toArray`. They return new Readables or Promises. `map` accepts a `concurrency` option for parallel async mapping. They were experimental in Node 20 and the API may change, so check the stability index for your version. `toArray()` buffers everything, so use it only on bounded input.
+They are iterator-helper style operators on Readable: `map`, `filter`, `forEach`, `take`, `drop`, `flatMap`, `reduce`, and `toArray`. They return either a new Readable or a Promise. `map` accepts a `concurrency` option for running async work in parallel. They were experimental in Node 20 and may change, so check the stability index for your version. Be careful with `toArray()`: it buffers everything, so use it only on bounded input.
 
 **Follow-up:**
 
 How does `concurrency` in `map` affect order and memory?
 
-Answer: Output order is preserved even when work completes out of order, so one slow item can hold finished results in memory. Higher concurrency increases peak buffered items.
+Answer: Output order is preserved even when work finishes out of order, so one slow item can hold finished results in memory. Higher concurrency raises the peak number of buffered items.
 
 ### NODE-185 — stream/promises vs promisify
 
@@ -777,13 +777,13 @@ Answer: Output order is preserved even when work completes out of order, so one 
 
 **Answer:**
 
-Use `node:stream/promises`. It is the native promise API for `pipeline` and `finished`, with `signal` support in options. `util.promisify(stream.pipeline)` also works because `pipeline` has a custom promisify hook that points at the same implementation, but the explicit import is clearer and the recommended style.
+Use `node:stream/promises`. It is the native promise API for `pipeline` and `finished`, and it supports `signal` in its options. `util.promisify(stream.pipeline)` also works, because `pipeline` has a custom promisify hook that points to the same implementation. But the explicit import is clearer and is the recommended style.
 
 **Follow-up:**
 
 How does the callback `pipeline` know the last argument is a callback?
 
-Answer: If the final argument is a function and not a stream or iterable stage, it is treated as the completion callback. Async generator functions in the middle are identified by their position.
+Answer: If the final argument is a function and not a stream or iterable stage, it is treated as the completion callback. Async generator functions in the middle are recognized by their position.
 
 ### NODE-186 — Cancelling a pipeline
 
@@ -797,13 +797,13 @@ How do you cancel a pipeline with `AbortSignal`?
 
 **Answer:**
 
-Pass `{ signal }` as the last argument: `await pipeline(a, b, c, { signal })`. On abort all streams are destroyed and the promise rejects with `AbortError`. `fs.createReadStream({ signal })` and `stream.addAbortSignal(signal, stream)` offer the same for individual streams. Use it for timeouts and for client disconnects.
+Pass `{ signal }` as the last argument: `await pipeline(a, b, c, { signal })`. When the signal aborts, all the streams are destroyed and the promise rejects with `AbortError`. For single streams, `fs.createReadStream({ signal })` and `stream.addAbortSignal(signal, stream)` do the same. This is useful both for timeouts and for client disconnects.
 
 **Follow-up:**
 
 How do you combine a timeout and a client abort?
 
-Answer: `AbortSignal.any([AbortSignal.timeout(ms), clientSignal])` gives one signal that fires on whichever happens first. `AbortSignal.any` is available in Node 20.3 and later.
+Answer: `AbortSignal.any([AbortSignal.timeout(ms), clientSignal])` gives you one signal that fires on whichever happens first. `AbortSignal.any` is available from Node 20.3.
 
 ### NODE-187 — Node streams vs Web Streams
 
@@ -817,7 +817,7 @@ How do Node streams and Web Streams differ, and how do you interoperate?
 
 **Answer:**
 
-Web Streams (`ReadableStream`, `WritableStream`, `TransformStream`) follow the WHATWG standard, used by `fetch` bodies and portable across browsers, Deno, and workers. Node streams have the larger ecosystem (fs, net, zlib). Convert with `Readable.toWeb()`, `Readable.fromWeb()`, `Writable.toWeb()`, and `Writable.fromWeb()`. Both support async iteration.
+Web Streams (`ReadableStream`, `WritableStream`, `TransformStream`) follow the WHATWG standard. They are used by `fetch` bodies and work across browsers, Deno, and workers. Node streams have the larger ecosystem, including fs, net, and zlib. You can convert between them with `Readable.toWeb()`, `Readable.fromWeb()`, `Writable.toWeb()`, and `Writable.fromWeb()`. Both kinds support async iteration.
 
 **Code:**
 
@@ -834,7 +834,7 @@ await pipeline(Readable.fromWeb(res.body), createWriteStream('out.bin'));
 
 Why convert instead of iterating `res.body` directly?
 
-Answer: You can iterate directly, but converting lets you use `pipeline` with Node writables and keeps one cleanup and error model.
+Answer: You can iterate it directly. Converting lets you use `pipeline` with Node writables and keeps a single cleanup and error model.
 
 ### NODE-188 — end, finish, close
 
@@ -848,13 +848,13 @@ Explain `'end'`, `'finish'`, and `'close'`.
 
 **Answer:**
 
-`'end'` is a Readable event: no more data will be delivered. It is not emitted if the stream is never consumed. `'finish'` is a Writable event: after `end()`, all data has been flushed to the underlying system. `'close'` means the stream and its resources, such as a fd or socket, are released; it follows destroy when `emitClose` is `true`. A Duplex can emit all three.
+`'end'` is a Readable event: no more data will be delivered. It is not emitted if nobody consumes the stream. `'finish'` is a Writable event: after `end()` was called, all data has been flushed to the underlying system. `'close'` means the stream and its resources, such as a file descriptor or socket, have been released. It follows destroy when `emitClose` is `true`. A Duplex can emit all three.
 
 **Follow-up:**
 
 Which event do you wait for before deleting a temp file you just wrote?
 
-Answer: `'close'`, because only then is the file descriptor closed. On most systems deleting earlier works, but on Windows it can fail, and `pipeline` waits for the correct moment anyway.
+Answer: `'close'`, because only then is the file descriptor closed. On most systems deleting earlier works, but on Windows it can fail. `pipeline` waits for the right moment anyway.
 
 ### NODE-189 — autoDestroy, emitClose, autoClose
 
@@ -868,13 +868,13 @@ What do `autoDestroy`, `emitClose`, and `autoClose` do?
 
 **Answer:**
 
-`autoDestroy` (default `true` since Node 14) destroys the stream automatically after `'end'`, `'finish'`, or an error. `emitClose` (default `true`) emits `'close'` after destroy. `autoClose` is specific to `fs` streams and closes the fd on end or error. If you set `autoDestroy: false`, you must call `destroy()` yourself or you leak resources.
+`autoDestroy` (default `true` since Node 14) destroys the stream automatically after `'end'`, `'finish'`, or an error. `emitClose` (default `true`) makes the stream emit `'close'` after it is destroyed. `autoClose` only applies to `fs` streams and closes the file descriptor on end or error. If you set `autoDestroy: false`, you must call `destroy()` yourself or you leak resources.
 
 **Follow-up:**
 
 When would you ever disable `autoDestroy`?
 
-Answer: Rarely: when you reuse a stream after `'end'`, for example a custom Duplex that has to be reset. For normal streams, leave it on.
+Answer: Rarely: only if you need to reuse a stream after `'end'`, such as a custom Duplex that has to be reset. For normal streams, leave it on.
 
 ### NODE-190 — 'readable' and read() vs 'data'
 
@@ -888,13 +888,13 @@ How do `'readable'` plus `read()` differ from `'data'`?
 
 **Answer:**
 
-`'data'` pushes chunks to you in flowing mode. `'readable'` signals that data or EOF is available, and you pull with `read(n)` in a loop until it returns `null`. `read(size)` can return exactly `size` bytes when available, which suits binary framing. If both are attached, `'readable'` takes precedence and `'data'` flow does not start until you call `read()`.
+`'data'` pushes chunks to you in flowing mode. `'readable'` only tells you that data, or the end of the stream, is available, and you pull it with `read(n)` in a loop until it returns `null`. `read(size)` can return exactly `size` bytes when they are available, which suits binary framing. If you attach both, `'readable'` takes precedence, and `'data'` does not start flowing until you call `read()`.
 
 **Follow-up:**
 
 How would you parse a length-prefixed binary frame?
 
-Answer: `read(4)` for the length header, then `read(len)` for the payload. If `read` returns `null`, wait for the next `'readable'` and retry. Use `unshift` to push back bytes if you over-read.
+Answer: Call `read(4)` for the length header, then `read(len)` for the payload. If `read` returns `null`, wait for the next `'readable'` and retry. Use `unshift` to push bytes back if you read too much.
 
 ### NODE-191 — Mixing consumption styles
 
@@ -908,13 +908,13 @@ What goes wrong if you mix `'data'`, `'readable'`, `pipe`, and async iteration o
 
 **Answer:**
 
-They all consume the same stream and interfere. Adding `'readable'` stops automatic flowing; removing it may or may not resume. Async iteration uses `read()` internally. Mixed styles lose chunks, hang, or process data twice. Pick one consumption style per stream and document it in the function that owns it.
+They all consume the same stream, so they interfere with each other. Adding `'readable'` stops automatic flowing, and removing it may or may not resume it. Async iteration uses `read()` internally. Mixing styles can lose chunks, hang, or process data twice. Pick one consumption style per stream and document it in the function that owns the stream.
 
 **Follow-up:**
 
 How do you debug a stalled stream?
 
-Answer: Log `readableFlowing`, `readableLength`, `isPaused()`, and `listenerCount('data')` / `listenerCount('readable')`. The combination usually reveals which consumer paused it.
+Answer: Log `readableFlowing`, `readableLength`, `isPaused()`, and `listenerCount('data')` and `listenerCount('readable')`. Together they usually show which consumer paused it.
 
 ### NODE-192 — pause, resume, unpipe
 
@@ -928,13 +928,13 @@ How do `pause()`, `resume()`, and `unpipe()` interact with `pipe`?
 
 **Answer:**
 
-`pipe` calls `pause()` on the source when `dest.write()` returns `false`, and `resume()` on `'drain'`. A manual `pause()` can be overridden by the next `'drain'`. `unpipe(dest)` detaches the destination, and with no remaining pipes the source returns to paused state. Data already buffered stays in the source.
+`pipe` calls `pause()` on the source when `dest.write()` returns `false`, and calls `resume()` on `'drain'`. This means a manual `pause()` can be undone by the next `'drain'`. `unpipe(dest)` detaches the destination, and when no pipes remain, the source goes back to the paused state. Data that was already buffered stays in the source.
 
 **Follow-up:**
 
 After `unpipe()`, what must you do to avoid stuck data?
 
-Answer: Attach a new consumer or call `resume()`, otherwise the stream stays paused and holds its buffered data. If you want to discard it, `resume()` with no listener or `destroy()`.
+Answer: Attach a new consumer or call `resume()`; otherwise the stream stays paused and holds its buffered data. If you want to throw the data away, call `resume()` with no listener, or `destroy()`.
 
 ### NODE-193 — Separate high-water marks on a Transform
 
@@ -948,7 +948,7 @@ How do `readableHighWaterMark` and `writableHighWaterMark` work on a Transform?
 
 **Answer:**
 
-A Transform has two buffers. `highWaterMark` sets both; `readableHighWaterMark` and `writableHighWaterMark` set each independently. Different values help when output expands (decompression) or when one side is in `objectMode`, for example bytes in with `readableObjectMode: true` emitting objects. Worst-case memory for a chain is roughly the sum of both buffers over all stages.
+A Transform has two buffers, one for each side. `highWaterMark` sets both, while `readableHighWaterMark` and `writableHighWaterMark` set each one independently. Different values help when the output is much bigger than the input, as in decompression, or when one side uses `objectMode`, such as bytes in and objects out. Worst-case memory for a chain is roughly the sum of both buffers across all stages.
 
 **Follow-up:**
 
@@ -968,13 +968,13 @@ How do you gzip a file with streams, and what happens under heavy parallel use?
 
 **Answer:**
 
-`await pipeline(createReadStream(src), zlib.createGzip(), createWriteStream(dst))`; decompress with `createGunzip()`. Memory stays bounded. Async zlib work runs on libuv's threadpool, which has four threads by default (`UV_THREADPOOL_SIZE`), so many parallel compressions queue and can also delay `fs` and `dns.lookup`. `zlib.createZstdCompress` was added only in later 22.x releases (22.15) as experimental, so check your exact release.
+Use `await pipeline(createReadStream(src), zlib.createGzip(), createWriteStream(dst))`, and `createGunzip()` to decompress. Memory stays bounded. Async zlib work runs on libuv's threadpool, which has four threads by default (`UV_THREADPOOL_SIZE`). Under heavy parallel use, compressions queue up and can also delay `fs` calls and `dns.lookup`. Also note that `zlib.createZstdCompress` was added only in later 22.x releases (22.15) as experimental, so check your exact release.
 
 **Follow-up:**
 
 Where does a corrupt gzip input fail?
 
-Answer: The Gunzip stream emits an error such as `Z_DATA_ERROR`. `pipeline` destroys the other streams and rejects, so descriptors are closed.
+Answer: The Gunzip stream emits an error such as `Z_DATA_ERROR`. `pipeline` destroys the other streams and rejects, so the descriptors are closed.
 
 ### NODE-195 — process.stdin and stdout
 
@@ -988,13 +988,13 @@ What should you know about `process.stdin` and `process.stdout` as streams?
 
 **Answer:**
 
-`stdin` is a Readable; `stdout` and `stderr` are Writables. Whether writes are synchronous depends on the target and platform: files are synchronous, TTYs differ between POSIX and Windows, and pipes may be asynchronous. So calling `process.exit()` right after a big write can truncate output. Prefer letting the process end naturally, and use `pipeline(process.stdin, transform, process.stdout)` for filters.
+`stdin` is a Readable, and `stdout` and `stderr` are Writables. Whether writes are synchronous depends on the target and platform: files are synchronous, TTYs differ between POSIX and Windows, and pipes may be asynchronous. So calling `process.exit()` right after a large write can truncate the output. Prefer letting the process end naturally, and use `pipeline(process.stdin, transform, process.stdout)` for filter-style programs.
 
 **Follow-up:**
 
 `pipeline` destroys `process.stdout` at the end. How do you avoid that?
 
-Answer: Pass `{ end: false }` where supported, or wrap the last stage in a `PassThrough` that you pipe manually with `{ end: false }`. Alternatively use an async generator as the last stage and write with `process.stdout.write`.
+Answer: Pass `{ end: false }` where supported, or wrap the last stage in a `PassThrough` that you pipe manually with `{ end: false }`. Another option is to use an async generator as the last stage and write with `process.stdout.write`.
 
 ### NODE-196 — _final
 
@@ -1008,13 +1008,13 @@ What is `_final()` in a Writable, and when do you use it?
 
 **Answer:**
 
-`_final(cb)` runs after `end()` and after all pending writes completed, but before `'finish'`. Use it to flush buffered data, commit a transaction, or close a connection. An error passed to `cb` emits `'error'` and no `'finish'`. It is the Writable counterpart of Transform `_flush`.
+`_final(cb)` runs after `end()` was called and all pending writes have completed, but before `'finish'` is emitted. Use it to flush buffered data, commit a transaction, or close a connection. If you pass an error to `cb`, the stream emits `'error'` and no `'finish'`. It is the Writable counterpart of a Transform's `_flush`.
 
 **Follow-up:**
 
 How do you ensure a batching DB writer persists its last partial batch?
 
-Answer: Collect rows in an array in `_write`, insert when the batch is full, and in `_final` insert whatever remains before calling `cb`. Without that, the last rows are lost.
+Answer: Collect rows in an array in `_write` and insert when the batch is full. In `_final`, insert whatever remains before calling `cb`. Without that, the last rows are lost.
 
 ### NODE-197 — Duplex.from
 
@@ -1028,13 +1028,13 @@ What is `Duplex.from()` used for?
 
 **Answer:**
 
-It converts several shapes into a Duplex: a `{ readable, writable }` pair, an async generator function, a Promise, or a Web Streams pair. It simplifies wrapping, for example turning an async function into a stage for `pipeline` or `compose`. It forwards destroy and errors to the wrapped parts.
+`Duplex.from()` converts several kinds of input into a Duplex: a `{ readable, writable }` pair, an async generator function, a Promise, or a Web Streams pair. It makes wrapping easy, for example turning an async function into a stage for `pipeline` or `compose`. It also forwards destroy and errors to the wrapped parts.
 
 **Follow-up:**
 
 How does it differ from subclassing Transform?
 
-Answer: It is less code and uses iteration semantics, but you lose fine control over `_flush`, per-side high-water marks, and chunk-level callbacks.
+Answer: It takes less code and uses iteration semantics, but you lose fine control over `_flush`, per-side high-water marks, and chunk-level callbacks.
 
 ### NODE-198 — break inside for await
 
@@ -1048,13 +1048,13 @@ What happens to a stream when you `break` out of `for await`?
 
 **Answer:**
 
-The iterator's `return()` is called and the stream is destroyed by default (`destroyOnReturn: true`), releasing resources such as file descriptors. If you want to keep using it afterwards, create the iterator with `readable.iterator({ destroyOnReturn: false })`. A `break` after reading a header from a stream you still need to pipe is a common bug.
+The iterator's `return()` is called, and by default the stream is destroyed (`destroyOnReturn: true`), which releases resources such as file descriptors. If you want to keep using the stream afterwards, create the iterator with `readable.iterator({ destroyOnReturn: false })`. A common bug is to `break` after reading a header from a stream that you still need to pipe somewhere else.
 
 **Follow-up:**
 
 What do other consumers of that stream see?
 
-Answer: They see a premature close or abort-type error once it is destroyed, since the stream will not end normally.
+Answer: They see a premature close or an abort-type error once it is destroyed, because the stream will not end normally.
 
 ### NODE-199 — Consuming a stream twice
 
@@ -1068,17 +1068,17 @@ Can a stream be consumed twice? How do you fork one?
 
 **Answer:**
 
-No; once data is consumed it is gone. To fan out, pipe the source into several `PassThrough` streams. The slowest consumer sets the speed because `pipe` pauses on any `false`, and an unconsumed branch stalls everyone. Alternatives: buffer to disk and read twice, or use Web `ReadableStream.tee()`, which buffers without limit if branches are read at different speeds.
+No. Once data is consumed, it is gone. To fan out, pipe the source into several `PassThrough` streams. The slowest consumer sets the speed, because `pipe` pauses whenever any destination returns `false`, and a branch that nobody reads stalls everyone. Alternatives are to buffer to disk and read twice, or to use the Web `ReadableStream.tee()`, which buffers without limit if the branches are read at different speeds.
 
 **Trade-offs:**
 
-Fan-out saves a second read of the source but ties the consumers' health together. A failing branch must not silently stall the others, so wrap with `pipeline` and abort all on any error.
+Fan-out saves a second read of the source, but ties the consumers' health together. A failing branch must not silently stall the others, so wrap everything in `pipeline` and abort all branches on any error.
 
 **Follow-up:**
 
 How would you hash a file and upload it from a single read?
 
-Answer: Pipe the file into a hash `PassThrough`-style tap and the upload simultaneously, for example with a Transform that updates `crypto.createHash` while forwarding chunks. If the upload fails, the pipeline aborts and the partial hash is discarded.
+Answer: Send the file through one Transform that updates `crypto.createHash` while forwarding each chunk to the upload. If the upload fails, the pipeline aborts and the partial hash is discarded.
 
 ### NODE-200 — Reading a body to JSON safely
 
@@ -1092,10 +1092,10 @@ How do you safely read a request body into JSON, and what is `node:stream/consum
 
 **Answer:**
 
-`node:stream/consumers` provides `text`, `json`, `buffer`, `arrayBuffer`, and `blob`, which consume a whole stream: `const body = await json(req)`. They buffer everything, so add a size limit first. Check `Content-Length` and wrap the stream in a counting Transform that errors with 413 over the cap. For very large payloads, use an incremental parser instead of building one big value.
+`node:stream/consumers` provides `text`, `json`, `buffer`, `arrayBuffer`, and `blob`, which read a whole stream into one value: `const body = await json(req)`. Because they buffer everything, add a size limit first. Check `Content-Length`, and wrap the stream in a counting Transform that fails with 413 once the cap is exceeded. For very large payloads, use an incremental parser instead of building one huge value.
 
 **Follow-up:**
 
 How do you also defend against slow uploads?
 
-Answer: Set server-level `headersTimeout` and `requestTimeout`, plus an application timeout or `AbortSignal` on the body read. Close connections that send bytes too slowly.
+Answer: Set the server-level `headersTimeout` and `requestTimeout`, plus an application timeout or an `AbortSignal` on the body read. Close connections that send bytes too slowly.
