@@ -46,6 +46,42 @@ const TRACKS = [
     category: "english",
   },
   {
+    id: "qa-essential-react",
+    root: "interview-prep/interview-questions/essential-site/react",
+    name: "Essential · React",
+    category: "handbook",
+  },
+  {
+    id: "qa-essential-nestjs",
+    root: "interview-prep/interview-questions/essential-site/nestjs",
+    name: "Essential · NestJS",
+    category: "handbook",
+  },
+  {
+    id: "qa-essential-nodejs",
+    root: "interview-prep/interview-questions/essential-site/nodejs",
+    name: "Essential · Node.js",
+    category: "handbook",
+  },
+  {
+    id: "qa-essential-databases",
+    root: "interview-prep/interview-questions/essential-site/databases",
+    name: "Essential · Databases",
+    category: "handbook",
+  },
+  {
+    id: "qa-essential-typescript",
+    root: "interview-prep/interview-questions/essential-site/typescript",
+    name: "Essential · TypeScript",
+    category: "handbook",
+  },
+  {
+    id: "qa-typescript",
+    root: "interview-prep/interview-questions/typescript",
+    name: "TypeScript Q&A",
+    category: "handbook",
+  },
+  {
     id: "qa-react",
     root: "interview-prep/interview-questions/react",
     name: "React Q&A",

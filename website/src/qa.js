@@ -1,7 +1,7 @@
 const QUESTION_HEADING =
-  /^###\s+((?:REACT|NEST|NODE|DB)-\d+)\s+—\s+(.+)\s*$/;
+  /^###\s+((?:REACT|NEST|NODE|DB|TS)-\d+)\s+—\s+(.+)\s*$/;
 
-const QUESTION_ID = /^(?:REACT|NEST|NODE|DB)-\d+$/i;
+const QUESTION_ID = /^(?:REACT|NEST|NODE|DB|TS)-\d+$/i;
 
 /** True when the hash segment is a handbook question id. */
 export function isQuestionId(value) {

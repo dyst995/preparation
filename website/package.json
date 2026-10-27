@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "essential": "node ../interview-prep/interview-questions/build-essential-site.mjs",
+    "predev": "npm run essential",
+    "prebuild": "npm run essential",
     "dev": "vite",
     "build": "vite build",
     "build:pages": "BASE_PATH=/preparation/ vite build && cp dist/index.html dist/404.html",

@@ -14,7 +14,9 @@ Curated subset of the senior handbook for **maximum interview prep value in thre
 
 **Total drill items:** 460 (360 curated + 100 TypeScript).
 
-Machine-readable lists: `_react.json`, `_nestjs.json`, `_nodejs.json`, `_databases.json`, `_typescript.json`.
+**On the website:** open the **Q&A** tab. Essential tracks are first in the sidebar (`Essential · React`, NestJS, Node.js, Databases, TypeScript), each with Must Know / Important / Advanced. Full TypeScript Q&A (100) and the four full banks follow. Regenerate site bundles with `npm run essential` in `website/` (also runs on `predev` / `prebuild`).
+
+Machine-readable lists: `_react.json`, `_nestjs.json`, `_nodejs.json`, `_databases.json`, `_typescript.json`. Bundles served by the site live in `../essential-site/`.
 
 ## Three-day plan
 

@@ -4,7 +4,7 @@ Reference of technical interview questions and senior-level answers for React, N
 
 **Full handbook:** 2,000 questions (500 × 4 tracks, 10 sections × 50). **TypeScript add-on:** 100 questions. Completion counts live in [PROGRESS.md](./PROGRESS.md).
 
-**Three-day crunch:** use the curated [essential/](./essential/) index (360 selected + 100 TypeScript = 460 drills), not the full bank.
+**Three-day crunch:** use the curated [essential/](./essential/) index (360 selected + 100 TypeScript = 460 drills), or open the site **Q&A** tab → `Essential · …` tracks (Must Know / Important / Advanced).
 
 ## Layout
 
