@@ -61,5 +61,5 @@ function extractMeta(markdown) {
 }
 
 export function isQaHandbookTopic(track) {
-  return track?.category === "handbook" && track.id !== "qa-overview";
+  return track?.category === "handbook";
 }

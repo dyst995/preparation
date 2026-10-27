@@ -46,14 +46,6 @@ const TRACKS = [
     category: "english",
   },
   {
-    id: "qa-overview",
-    root: "interview-prep/interview-questions",
-    name: "Q&A overview",
-    category: "handbook",
-    /** Only index / guide files at the handbook root — topic files live in child tracks. */
-    overviewOnly: true,
-  },
-  {
     id: "qa-react",
     root: "interview-prep/interview-questions/react",
     name: "React Q&A",
@@ -221,8 +213,6 @@ export function buildCatalog() {
     const indexPath = join(root, "INDEX.md");
     const rnIndex = join(root, "REACT_NATIVE_INTERVIEW.md");
     const readmePath = join(root, "README.md");
-    const studyGuidePath = join(root, "STUDY_GUIDE.md");
-    const progressPath = join(root, "PROGRESS.md");
     const overviewFile = (() => {
       try {
         if (statSync(indexPath).isFile()) return indexPath;
@@ -252,70 +242,45 @@ export function buildCatalog() {
       });
     }
 
-    if (spec.category === "handbook") {
-      for (const [label, abs] of [
-        ["Study guide", studyGuidePath],
-        ["Progress", progressPath],
-        ["README", readmePath],
-      ]) {
-        if (overviewFile && abs === overviewFile) continue;
-        try {
-          if (!statSync(abs).isFile()) continue;
-        } catch {
-          continue;
-        }
-        const stem = abs.split(sep).pop().replace(/\.md$/i, "");
-        pushModule(modules, "overview", "Overview", {
-          id: stem.toLowerCase(),
-          name: label,
-          title: firstHeading(abs) || label,
-          dir: stem.toLowerCase(),
-          files: { notes: repoRel(abs) },
-        });
-      }
+    const unitDirs = [];
+    walkStudyUnits(root, unitDirs);
+    for (const abs of unitDirs.sort()) {
+      if (abs === root) continue;
+      const files = collectFolderFiles(abs);
+      if (!Object.keys(files).length) continue;
+      const rel = relative(root, abs).split(sep).join("/");
+      const id = rel.split("/").pop();
+      pushModule(modules, "units", "Study units", {
+        id,
+        name: prettyDir(id),
+        title:
+          firstHeading(join(abs, "notes.md")) ||
+          firstHeading(join(abs, "common-techniques.md")) ||
+          prettyDir(id),
+        dir: rel,
+        files,
+      });
     }
 
-    if (!spec.overviewOnly) {
-      const unitDirs = [];
-      walkStudyUnits(root, unitDirs);
-      for (const abs of unitDirs.sort()) {
-        if (abs === root) continue;
-        const files = collectFolderFiles(abs);
-        if (!Object.keys(files).length) continue;
-        const rel = relative(root, abs).split(sep).join("/");
-        const id = rel.split("/").pop();
-        pushModule(modules, "units", "Study units", {
-          id,
-          name: prettyDir(id),
-          title:
-            firstHeading(join(abs, "notes.md")) ||
-            firstHeading(join(abs, "common-techniques.md")) ||
-            prettyDir(id),
-          dir: rel,
-          files,
-        });
+    for (const name of listDir(root).sort()) {
+      if (!name.endsWith(".md") || SKIP_ROOT_MD.has(name)) continue;
+      const abs = join(root, name);
+      try {
+        if (!statSync(abs).isFile()) continue;
+      } catch {
+        continue;
       }
-
-      for (const name of listDir(root).sort()) {
-        if (!name.endsWith(".md") || SKIP_ROOT_MD.has(name)) continue;
-        const abs = join(root, name);
-        try {
-          if (!statSync(abs).isFile()) continue;
-        } catch {
-          continue;
-        }
-        const stem = name.replace(/\.md$/i, "");
-        const files = { notes: repoRel(abs) };
-        const fc = chapterFlashcards(abs);
-        if (fc) files.flashcards = fc;
-        pushModule(modules, "chapters", "Chapters", {
-          id: stem,
-          name: prettyDir(stem),
-          title: firstHeading(abs) || prettyDir(stem),
-          dir: stem,
-          files,
-        });
-      }
+      const stem = name.replace(/\.md$/i, "");
+      const files = { notes: repoRel(abs) };
+      const fc = chapterFlashcards(abs);
+      if (fc) files.flashcards = fc;
+      pushModule(modules, "chapters", "Chapters", {
+        id: stem,
+        name: prettyDir(stem),
+        title: firstHeading(abs) || prettyDir(stem),
+        dir: stem,
+        files,
+      });
     }
 
     for (const mod of modules.values()) {

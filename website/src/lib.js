@@ -29,8 +29,8 @@ export const CATEGORIES = [
     blurb: "Senior question bank",
     homeTitle: "Interview Q&A handbook",
     homeBody:
-      "Long-form senior interview questions and answers for React, NestJS, Node.js, and databases. Open a section for the question index, then one question per page.",
-    homeTrackId: "qa-overview",
+      "Long-form senior interview questions and answers for React, NestJS, Node.js, and databases. Open a topic for its question list, then one question per page.",
+    homeTrackId: null,
   },
   {
     id: "english",
