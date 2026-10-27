@@ -1,3 +1,5 @@
+import { isQuestionId } from "./qa.js";
+
 export const TAB_META = [
   { id: "notes", label: "Notes" },
   { id: "techniques", label: "Techniques" },
@@ -27,7 +29,7 @@ export const CATEGORIES = [
     blurb: "Senior question bank",
     homeTitle: "Interview Q&A handbook",
     homeBody:
-      "Long-form senior interview questions and answers for React, NestJS, Node.js, and databases. Open a track, then a section file (50 questions each).",
+      "Long-form senior interview questions and answers for React, NestJS, Node.js, and databases. Open a section for the question index, then one question per page.",
     homeTrackId: "qa-overview",
   },
   {
@@ -97,7 +99,18 @@ export function parseHash() {
   const parts = raw.split("/").filter(Boolean);
   if (!parts.length) return {};
   if (parts.length === 1) return { trackId: parts[0] };
+
   const last = parts.at(-1);
+  if (isQuestionId(last)) {
+    const maybeTab = parts.at(-2);
+    const hasTab = TAB_IDS.has(maybeTab);
+    return {
+      trackId: parts[0],
+      topicDir: parts.slice(1, hasTab ? -2 : -1).join("/"),
+      tab: hasTab ? maybeTab : "notes",
+      questionId: last.toUpperCase(),
+    };
+  }
   if (TAB_IDS.has(last)) {
     return {
       trackId: parts[0],
@@ -111,7 +124,7 @@ export function parseHash() {
   };
 }
 
-export function setHash(trackId, topicDir, tab) {
+export function setHash(trackId, topicDir, tab, questionId) {
   if (!trackId) {
     location.hash = "";
     return;
@@ -124,7 +137,10 @@ export function setHash(trackId, topicDir, tab) {
     .split("/")
     .map(encodeURIComponent)
     .join("/");
-  location.hash = `#/${encodeURIComponent(trackId)}/${dir}/${encodeURIComponent(tab)}`;
+  let hash = `#/${encodeURIComponent(trackId)}/${dir}`;
+  if (tab) hash += `/${encodeURIComponent(tab)}`;
+  if (questionId) hash += `/${encodeURIComponent(questionId)}`;
+  location.hash = hash;
 }
 
 export function loadProgress() {

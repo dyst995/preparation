@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import MarkdownView from "./MarkdownView.jsx";
 import Flashcards from "./Flashcards.jsx";
+import QaViewer from "./QaViewer.jsx";
 import { loadCatalog, loadNote } from "./api.js";
+import { isQaHandbookTopic } from "./qa.js";
 import {
   CATEGORIES,
   CATEGORY_KEY,
@@ -257,7 +259,7 @@ export default function App() {
             {theme === "dark" ? "Light" : "Dark"}
           </button>
         </header>
-        {topic && (
+        {topic && !isQaHandbookTopic(found?.track) && (
           <div id="tabs">
             {availableTabs(topic).map((t) => (
               <button
@@ -287,6 +289,12 @@ export default function App() {
             onOpenTopic={openTopic}
             onHome={goHome}
             categoryMeta={categoryMeta}
+            onSelectQuestion={(id) => {
+              if (found && topic) setHash(found.track.id, topic.dir, "notes", id);
+            }}
+            onBackToIndex={() => {
+              if (found && topic) setHash(found.track.id, topic.dir, "notes");
+            }}
           />
         </article>
       </main>
@@ -377,6 +385,12 @@ function Crumbs({ catalog, route, found, category }) {
     <div id="crumbs">
       {found.track.name} · {found.mod.name} ·{" "}
       <strong>{found.topic.name}</strong>
+      {route.questionId ? (
+        <>
+          {" "}
+          · <strong>{route.questionId}</strong>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -393,6 +407,8 @@ function Page({
   onOpenTopic,
   onHome,
   categoryMeta,
+  onSelectQuestion,
+  onBackToIndex,
 }) {
   if (!route.trackId) {
     return (
@@ -451,6 +467,17 @@ function Page({
   }
 
   if (!note) return <p className="empty">Loading…</p>;
+
+  if (isQaHandbookTopic(found.track) && note.text) {
+    return (
+      <QaViewer
+        text={note.text}
+        questionId={route.questionId}
+        onSelectQuestion={onSelectQuestion}
+        onBackToIndex={onBackToIndex}
+      />
+    );
+  }
 
   if (tab === "flashcards") {
     if (!note.data?.cards?.length) {
