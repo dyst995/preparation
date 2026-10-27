@@ -173,7 +173,7 @@ function onTimer() {
 
 Change to `await new Promise(() => {})`. Which lines still print, and is the thread blocked?
 
-Answer: `timer`, `before`, `timer-end`, and `tick` still print. `after` never prints, because that promise never settles. `immediate` still runs on a later lap. The pending promise holds memory, not the stack, and by itself it does not keep the process alive.
+Answer: `timer`, `before`, `timer-end`, and `tick` still print, and `after` never does, because that promise never settles. `immediate` still runs on a later lap. The pending promise holds memory, not the stack, and by itself it does not keep the process alive.
 
 ### NODE-057 — A tight nextTick loop starves I/O
 
@@ -200,7 +200,7 @@ Nothing prints. `starve` queues another `nextTick` every time it runs, so the ch
 
 If `starve` stops after a fixed count, can `io` print before `immediate`?
 
-Answer: Once `nextTick` finally empties, both callbacks can be reached. If the read has already completed, poll can run `io` before check runs `immediate`. If the read is still in flight, `immediate` can win. Stopping the flood does not create one fixed order between them.
+Answer: Once `nextTick` empties, both callbacks can be reached. If the read has already completed, poll can run `io` before check runs `immediate`; if it is still in flight, `immediate` can win. Stopping the flood does not create one fixed order between them.
 
 ### NODE-058 — What poll does, and when it waits
 
@@ -220,7 +220,7 @@ Poll collects ready I/O and runs those callbacks: sockets, and completions from 
 
 Why does a process with only a ref'd `setImmediate` and no sockets exit after the callback instead of blocking forever in poll?
 
-Answer: A queued immediate tells the loop not to sleep in an idle poll. Check runs the callback. If nothing else is still keeping the process alive, the loop is finished. Poll's wait is a calculated timeout, not an unconditional block.
+Answer: A queued immediate tells the loop not to sleep in an idle poll, so check runs the callback. If nothing else is keeping the process alive, the loop is finished. Poll's wait is a calculated timeout, not an unconditional block.
 
 ### NODE-059 — Pending callbacks are not the poll queue
 
@@ -280,7 +280,7 @@ The close phase runs after check and before timers. `socket.destroy()` is an abr
 
 Calling `destroy()` from a `'data'` handler: can `'close'` run before that handler returns, and does a `nextTick` queued just before `destroy()` run before `'close'`?
 
-Answer: `destroy` only schedules the close. It does not emit `'close'` on the current stack, so the handler returns first. Its checkpoint then drains the `nextTick`, and the close phase runs after check. That `nextTick` therefore runs before `'close'`.
+Answer: `destroy` only schedules the close and does not emit `'close'` on the current stack, so the handler returns first. Its checkpoint then drains the `nextTick`, and the close phase runs after check. That `nextTick` therefore runs before `'close'`.
 
 ### NODE-062 — The pool finishes off the loop; the callback still waits for poll
 
@@ -391,7 +391,7 @@ The order is `io`, `tick`, `after`, `immediate`. The async poll callback returns
 
 Change to `await readFile(otherUrl)` from `fs/promises`. Can `immediate`, still written after that await, run before the second read's poll callback?
 
-Answer: No. The promise fulfills on a future poll turn, and `setImmediate` is scheduled only in the continuation of that turn, so check is later than the second read's callback. Other poll callbacks may run while the second read is still on the pool. Those callbacks are not `immediate`.
+Answer: No. The promise fulfills on a future poll turn, and `setImmediate` is scheduled only in that turn's continuation, so it cannot run before the second read's callback. Other poll callbacks may run while the second read is still on the pool, but those callbacks are not `immediate`.
 
 ### NODE-066 — Two callbacks in one phase do not share one checkpoint
 
@@ -438,13 +438,13 @@ Explain `setInterval` on Node 20 and 22: when the next firing is scheduled, whet
 
 **Answer:**
 
-`setInterval` uses the same timers phase and the same delay clamp as `setTimeout`. When the loop is about to call the callback, it samples the loop time and arms the next fire from that sample plus the delay. There is one timer and one stack, so a second fire cannot overlap the first, and missed ticks are not replayed as a burst. If the body runs longer than the interval, the next visit can find the timer already due, so the gap can be shorter than the delay. A delay of 0 is a repeating 1 millisecond timer. `clearInterval`, `refresh`, and `unref` leave it in timers.
+`setInterval` uses the same timers phase and delay clamp as `setTimeout`. Just before the callback, Node samples the loop time and arms the next fire from that sample plus the delay. One timer means one stack, so a second fire cannot overlap the first, and missed ticks are not replayed as a burst. If the body runs longer than the interval, the next visit can find the timer already due, so the gap can be shorter than the delay. A delay of 0 repeats every 1 millisecond. `clearInterval`, `refresh`, and `unref` leave it in timers.
 
 **Follow-up:**
 
 An async interval callback `await`s work that settles on a later poll. Can a second fire start before that promise settles?
 
-Answer: Yes. The async function returns at the `await`, and the timer does not wait for that promise. A second fire can start on a later timers turn. If the work must not overlap, keep a flag while it is in flight, or clear the interval until it settles and then schedule again.
+Answer: Yes. The async function returns at the `await`, and the timer does not wait for that promise, so a second fire can start on a later timers turn. If the work must not overlap, keep an in-flight flag, or clear the interval until it settles and then schedule again.
 
 ### NODE-068 — timers/promises and scheduler.yield are the same phases plus a microtask
 
@@ -464,7 +464,7 @@ Answer: Yes. The async function returns at the `await`, and the timer does not w
 
 Abort during the code after `yield`, before the timeout fires. Does the code after the timeout await run?
 
-Answer: No. The timeout promise rejects with `AbortError`, so the success path after that `await` does not run. A `try/catch` around the `await` runs as the rejection continuation. The timers phase does not also fulfill the same promise.
+Answer: No. The timeout promise rejects with `AbortError`, so the success path after that `await` does not run. A `try/catch` around the `await` is the rejection continuation, and the timers phase does not also fulfill the same promise.
 
 ### NODE-069 — A long synchronous callback stalls every later phase
 
@@ -484,7 +484,7 @@ JavaScript runs a callback to completion. While the parse is on the stack, poll 
 
 A health-check `'data'` handler and its timeout both miss during the parse. Is that a poll bug?
 
-Answer: No. Both are waiting for the parse to return. The callback is too long. Phase order cannot insert a pause that JavaScript does not take.
+Answer: No. Both are waiting for the parse to return, because the callback is too long. Phase order cannot insert a pause that JavaScript does not take.
 
 ### NODE-070 — A promise chain that never empties is starvation too
 
@@ -542,7 +542,7 @@ The checkpoint finishes before check, and on Node 20 and 22 timers run after che
 
 Add `readFile(url, () => console.log('file'))` as the first line of `onRequest`. Where does `file` go?
 
-Answer: Refuse a fixed slot against `immediate` or `timeout`. The file callback is a later poll turn, after the pool posts the completion. It cannot run before this callback's checkpoint. Whether it lands before or after check and timers depends on when that completion arrives.
+Answer: Refuse a fixed slot against `immediate` or `timeout`. The file callback is a later poll turn after the pool posts the completion, and it cannot run before this callback's checkpoint. Whether it lands before check and timers depends on when that completion arrives.
 
 ### NODE-072 — A throw in a phase callback is that turn's exception
 
@@ -647,7 +647,7 @@ The fixed order is `handler`, `tick`, `hit`, `handler-end`, `immediate`, `timeou
 
 If `cache` sometimes awaits a real file read, which prefix of that order survives?
 
-Answer: `handler` and `tick` stay on the first poll turn, with `tick` in the `nextTick` drain before the real suspension. `hit`, `handler-end`, `immediate`, and `timeout` move to the checkpoint of the turn that fulfills the read. The six-line order does not survive. The placement rule does.
+Answer: `handler` and `tick` stay on the first poll turn, with `tick` in the `nextTick` drain before the real suspension. `hit`, `handler-end`, `immediate`, and `timeout` move to the checkpoint of the turn that fulfills the read. The six-line order does not survive, but the placement rule does.
 
 ### NODE-076 — queueMicrotask and Promise.then share a queue and split on errors
 
@@ -667,7 +667,7 @@ Both use the same V8 microtask queue, which runs after `process.nextTick` at the
 
 With `p.then(a).then(b)` and a `queueMicrotask` between the two `then` calls, can `b` run before that microtask?
 
-Answer: No. `b` is queued only when `a` settles. The intervening `queueMicrotask` was already in the queue, so `b` runs after it. Both still belong to the same checkpoint.
+Answer: No. `b` is queued only when `a` settles, and the intervening `queueMicrotask` was already waiting, so `b` runs after it. Both still belong to the same checkpoint.
 
 ### NODE-077 — setInterval drift is lateness the next arm does not pay back
 
@@ -687,7 +687,7 @@ There is one timer. The next deadline is the loop time sampled just before the c
 
 Clear the interval as the first line of the callback. Can a re-armed fire still happen?
 
-Answer: No. Node inserts the next deadline before the body runs, and `clearInterval` on that handle removes it. The body that is already running finishes. There is no later fire and no catch-up callback.
+Answer: No. Node inserts the next deadline before the body runs, and `clearInterval` removes that arm. The body that is already running finishes, and there is no later fire or catch-up callback.
 
 ### NODE-078 — unref and ref are a lifetime vote, and the callback stays in its phase
 
@@ -741,13 +741,13 @@ When does Node 20 or 22 poll block in the kernel, and when does it return immedi
 
 **Answer:**
 
-Poll runs callbacks that are already queued and does not pause them for a due timer. That timer waits for the timers phase, after check and close. If the queue is empty and a `setImmediate` is queued, or a timer is already due, the wait is zero. The due timer still runs later in timers, not inside poll. If the next timer is in the future, poll may block until that deadline or until I/O arrives. A listening server alone blocks until the kernel reports activity. An unref'd timer, with nothing else ref'd, lets the loop finish instead of waiting. A zero wait can still collect sockets that are already readable.
+Poll runs callbacks already queued and does not pause them for a due timer. That timer waits for the timers phase, after check and close. An empty queue with a queued `setImmediate`, or a timer already due, uses a zero wait. The due timer still runs later in timers, not inside poll. A future timer may block poll until that deadline or until I/O arrives. A listening server alone blocks until the kernel reports activity. An unref'd timer with nothing else ref'd lets the loop finish. A zero wait can still collect sockets that are already readable.
 
 **Follow-up:**
 
 One socket is ready and one timer is already due. Which runs first, and can the timer run between two poll callbacks that are already queued?
 
-Answer: The socket runs first, in poll. The timer runs after check and close. Between two already queued poll callbacks, the timer cannot run. Those two callbacks get a checkpoint between them, and the timer still waits for the timers phase.
+Answer: The socket runs first, in poll, and the timer runs after check and close. Between two already queued poll callbacks the timer cannot run. Those callbacks get a checkpoint between them, and the timer still waits for the timers phase.
 
 ### NODE-081 — Microtasks that requeue hold an already queued immediate out of check
 
@@ -1066,7 +1066,7 @@ Answer: No. The first `emit` already finished with the listener list it had at t
 
 Add `setTimeout(() => console.log('timeout'), 0)` as the first line of `onData`. Where does `timeout` sit relative to `close`?
 
-Answer: Close runs before timers on this lap, so `close` prints before `timeout` once the timeout is due. The 1 millisecond floor can only push `timeout` later. It cannot put `timeout` ahead of this lap's close. `immediate` stays ahead of both.
+Answer: Close runs before timers on this lap, so `close` prints before `timeout` once the timeout is due. The 1 millisecond floor can only push `timeout` later, not ahead of this lap's close. `immediate` stays ahead of both.
 
 ### NODE-093 — An in-flight file request keeps the loop alive after a timer is unref'd
 
@@ -1115,7 +1115,7 @@ socket.on('drain', () => socket.resume());
 
 If you write again in the same `'data'` callback after `false`, is the second write refused?
 
-Answer: No. Node accepts it, and it may return `false` again. `'drain'` still arrives on a later I/O turn. The second write only made the buffered overrun larger.
+Answer: No. Node accepts the second write, and it may return `false` again. `'drain'` still arrives on a later I/O turn, and the second write only made the buffered overrun larger.
 
 ### NODE-095 — refresh rewinds the start time and leaves the phase and the delay value alone
 
@@ -1186,7 +1186,7 @@ An unbounded `queueMicrotask` chain never finishes this checkpoint, so the due t
 
 Start the `setImmediate` chain from poll instead of from check. Can the due timer run before the second chunk?
 
-Answer: The first nested immediate is this lap's check, and check is before timers, so that second chunk runs before the due timer. Later chunks, scheduled from inside check, wait for following laps, which come after this timer. Which chunk you mean changes the answer. See NODE-064.
+Answer: The first nested immediate is this lap's check, which is before timers, so that second chunk runs before the due timer. Later chunks, scheduled from inside check, wait for following laps that come after this timer. Which chunk you mean changes the answer, as NODE-064 describes.
 
 ### NODE-098 — A rejection handler in this checkpoint still counts; one in check is a later turn
 
