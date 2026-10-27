@@ -705,9 +705,9 @@ What do `timeout.unref()`, `ref()`, and `hasRef()` change? Correct teammates who
 
 **Follow-up:**
 
-Unref an immediate while nothing else is ref'd, then call `heartbeat.ref()` inside `beforeExit`. Does the callback run?
+You call `heartbeat.unref()` at once, and nothing else is ref'd. Inside `beforeExit` you call `heartbeat.ref()`. Does the callback still run?
 
-Answer: Yes, if it is still armed. `ref()` restores the keep-alive vote, so a later timers or check phase can run it. The same `ref()` call inside an `exit` listener does not get another lap.
+Answer: Yes, if the timer is still armed. `ref()` restores the keep-alive vote, so a timers phase can run it. The same `ref()` inside an `exit` listener does not get another lap.
 
 ### NODE-079 — fs.readFile uses the pool because a file read can block; a TCP read does not
 
