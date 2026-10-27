@@ -10,8 +10,56 @@ export const TAB_META = [
 
 export const TAB_IDS = new Set(TAB_META.map((t) => t.id));
 
+/** Top-level site areas shown in the header. */
+export const CATEGORIES = [
+  {
+    id: "interview",
+    label: "Interview",
+    blurb: "Theory + flashcards",
+    homeTitle: "Interview prep",
+    homeBody:
+      "Notes from this repo — study units (notes.md) and chapter files — plus flashcards when a topic has a flashcards.json deck. Checkboxes on notes and repetition are saved in this browser.",
+    homeTrackId: null,
+  },
+  {
+    id: "handbook",
+    label: "Q&A",
+    blurb: "Senior question bank",
+    homeTitle: "Interview Q&A handbook",
+    homeBody:
+      "Long-form senior interview questions and answers for React, NestJS, Node.js, and databases. Open a track, then a section file (50 questions each).",
+    homeTrackId: "qa-overview",
+  },
+  {
+    id: "english",
+    label: "English",
+    blurb: "Spoken interview English",
+    homeTitle: "English",
+    homeBody:
+      "Phrases and unit lessons for speaking in interviews. Same notes / self-test / answers / repetition tabs as the other tracks.",
+    homeTrackId: "english",
+  },
+];
+
 export const STORE_KEY = "interview-notes-progress";
 export const THEME_KEY = "interview-notes-theme";
+export const CATEGORY_KEY = "interview-notes-category";
+
+export function categoryForTrack(trackId, catalog) {
+  if (!trackId) return "interview";
+  const fromCatalog = catalog?.tracks?.find((t) => t.id === trackId)?.category;
+  if (fromCatalog) return fromCatalog;
+  if (trackId === "english") return "english";
+  if (String(trackId).startsWith("qa-")) return "handbook";
+  return "interview";
+}
+
+export function tracksForCategory(catalog, categoryId) {
+  if (!catalog?.tracks) return [];
+  return catalog.tracks.filter(
+    (t) => (t.category || "interview") === categoryId,
+  );
+}
 
 export function allTopics(catalog) {
   const out = [];

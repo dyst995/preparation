@@ -1,16 +1,20 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import MarkdownView from "./MarkdownView.jsx";
 import Flashcards from "./Flashcards.jsx";
 import { loadCatalog, loadNote } from "./api.js";
 import {
+  CATEGORIES,
+  CATEGORY_KEY,
   allTopics,
   availableTabs,
+  categoryForTrack,
   defaultTab,
   findTopic,
   parseHash,
   setHash,
   splitAnswers,
   THEME_KEY,
+  tracksForCategory,
 } from "./lib.js";
 
 export default function App() {
@@ -24,6 +28,11 @@ export default function App() {
   const [theme, setTheme] = useState(
     () => localStorage.getItem(THEME_KEY) || "dark",
   );
+  const [category, setCategory] = useState(() => {
+    const hash = parseHash();
+    if (hash.trackId) return categoryForTrack(hash.trackId);
+    return localStorage.getItem(CATEGORY_KEY) || "interview";
+  });
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -31,8 +40,18 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
+    localStorage.setItem(CATEGORY_KEY, category);
+  }, [category]);
+
+  useEffect(() => {
     loadCatalog()
-      .then(setCatalog)
+      .then((data) => {
+        setCatalog(data);
+        const hash = parseHash();
+        if (hash.trackId) {
+          setCategory(categoryForTrack(hash.trackId, data));
+        }
+      })
       .catch(() => setError("Could not load the notes catalog."));
   }, []);
 
@@ -40,11 +59,17 @@ export default function App() {
     const onHash = () => {
       setAnswersOpen(false);
       setNavOpen(false);
-      setRoute(parseHash());
+      const next = parseHash();
+      setRoute(next);
+      if (next.trackId) {
+        setCategory((prev) =>
+          categoryForTrack(next.trackId, catalog) || prev,
+        );
+      }
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
-  }, []);
+  }, [catalog]);
 
   useEffect(() => {
     if (!navOpen) return;
@@ -59,6 +84,13 @@ export default function App() {
     document.body.classList.toggle("nav-lock", navOpen);
     return () => document.body.classList.remove("nav-lock");
   }, [navOpen]);
+
+  const categoryMeta =
+    CATEGORIES.find((c) => c.id === category) || CATEGORIES[0];
+  const visibleTracks = useMemo(
+    () => (catalog ? tracksForCategory(catalog, category) : []),
+    [catalog, category],
+  );
 
   const found =
     catalog && route.topicDir
@@ -94,14 +126,34 @@ export default function App() {
     };
   }, [filePath]);
 
-  const openTopic = useCallback((trackId, topicObj, nextTab) => {
-    setNavOpen(false);
-    setHash(trackId, topicObj.dir, nextTab || defaultTab(topicObj));
-  }, []);
+  const openTopic = useCallback(
+    (trackId, topicObj, nextTab) => {
+      setNavOpen(false);
+      setCategory(categoryForTrack(trackId, catalog));
+      setHash(trackId, topicObj.dir, nextTab || defaultTab(topicObj));
+    },
+    [catalog],
+  );
 
-  const goHome = useCallback((id) => {
+  const goHome = useCallback(
+    (id) => {
+      setNavOpen(false);
+      if (id) setCategory(categoryForTrack(id, catalog));
+      setHash(id);
+    },
+    [catalog],
+  );
+
+  const switchCategory = useCallback((id) => {
     setNavOpen(false);
-    setHash(id);
+    setQuery("");
+    setCategory(id);
+    const meta = CATEGORIES.find((c) => c.id === id);
+    if (meta?.homeTrackId) {
+      setHash(meta.homeTrackId);
+    } else {
+      setHash();
+    }
   }, []);
 
   if (error) return <p className="empty">{error}</p>;
@@ -118,8 +170,14 @@ export default function App() {
       />
       <aside id="sidebar" className={navOpen ? "open" : ""}>
         <div className="brand">
-          <strong>Interview notes</strong>
-          <span>Theory + flashcards</span>
+          <strong>
+            {category === "english"
+              ? "English"
+              : category === "handbook"
+                ? "Q&A handbook"
+                : "Interview notes"}
+          </strong>
+          <span>{categoryMeta.blurb}</span>
           <button
             type="button"
             id="nav-close"
@@ -133,14 +191,20 @@ export default function App() {
           <input
             id="search"
             type="search"
-            placeholder="Search topics…"
+            placeholder={
+              category === "english"
+                ? "Search English…"
+                : category === "handbook"
+                  ? "Search Q&A…"
+                  : "Search topics…"
+            }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoComplete="off"
           />
         </label>
         <Nav
-          catalog={catalog}
+          tracks={visibleTracks}
           query={query}
           activeDir={route.topicDir}
           activeTrack={route.trackId}
@@ -160,7 +224,30 @@ export default function App() {
             >
               Menu
             </button>
-            <Crumbs catalog={catalog} route={route} found={found} />
+            <div
+              className="category-switch"
+              role="tablist"
+              aria-label="Site category"
+            >
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={category === c.id}
+                  className={category === c.id ? "active" : ""}
+                  onClick={() => switchCategory(c.id)}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            <Crumbs
+              catalog={catalog}
+              route={route}
+              found={found}
+              category={category}
+            />
           </div>
           <button
             type="button"
@@ -190,6 +277,7 @@ export default function App() {
         <article id="content">
           <Page
             catalog={catalog}
+            tracks={visibleTracks}
             route={route}
             found={found}
             tab={tab}
@@ -198,6 +286,7 @@ export default function App() {
             setAnswersOpen={setAnswersOpen}
             onOpenTopic={openTopic}
             onHome={goHome}
+            categoryMeta={categoryMeta}
           />
         </article>
       </main>
@@ -205,11 +294,14 @@ export default function App() {
   );
 }
 
-function Nav({ catalog, query, activeDir, activeTrack, onHome, onTopic }) {
+function Nav({ tracks, query, activeDir, activeTrack, onHome, onTopic }) {
   const q = query.trim().toLowerCase();
+  if (!tracks.length) {
+    return <p className="nav-empty">No topics in this category yet.</p>;
+  }
   return (
     <nav id="nav">
-      {catalog.tracks.map((track) => (
+      {tracks.map((track) => (
         <section key={track.id} className="track">
           <button type="button" onClick={() => onHome(track.id)}>
             {track.name}
@@ -259,11 +351,17 @@ function Nav({ catalog, query, activeDir, activeTrack, onHome, onTopic }) {
   );
 }
 
-function Crumbs({ catalog, route, found }) {
+function Crumbs({ catalog, route, found, category }) {
   if (!route.trackId) {
+    const label =
+      category === "english"
+        ? "English"
+        : category === "handbook"
+          ? "Q&A handbook"
+          : "All tracks";
     return (
       <div id="crumbs">
-        <strong>All tracks</strong>
+        <strong>{label}</strong>
       </div>
     );
   }
@@ -285,6 +383,7 @@ function Crumbs({ catalog, route, found }) {
 
 function Page({
   catalog,
+  tracks,
   route,
   found,
   tab,
@@ -293,21 +392,17 @@ function Page({
   setAnswersOpen,
   onOpenTopic,
   onHome,
+  categoryMeta,
 }) {
   if (!route.trackId) {
     return (
       <>
         <div className="md">
-          <h1>Interview prep</h1>
-          <p>
-            Notes from this repo — study units (<code>notes.md</code>) and
-            chapter files — plus flashcards when a topic has a{" "}
-            <code>flashcards.json</code> deck. Checkboxes on notes and
-            repetition are saved in this browser.
-          </p>
+          <h1>{categoryMeta.homeTitle}</h1>
+          <p>{categoryMeta.homeBody}</p>
         </div>
         <div className="home-grid">
-          {catalog.tracks.map((track) => {
+          {tracks.map((track) => {
             const n = track.modules.reduce((a, m) => a + m.topics.length, 0);
             return (
               <button

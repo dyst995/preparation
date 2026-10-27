@@ -34,16 +34,49 @@ const TRACKS = [
     name: "Design patterns",
   },
   {
-    id: "english",
-    root: "interview-prep/english",
-    name: "English",
-  },
-  {
     id: "devops-cloud",
     root: "interview-prep/devops-cloud",
     name: "DevOps / Cloud",
   },
   { id: "interview-dsa", root: "interview-dsa", name: "DSA" },
+  {
+    id: "english",
+    root: "interview-prep/english",
+    name: "English",
+    category: "english",
+  },
+  {
+    id: "qa-overview",
+    root: "interview-prep/interview-questions",
+    name: "Q&A overview",
+    category: "handbook",
+    /** Only index / guide files at the handbook root — topic files live in child tracks. */
+    overviewOnly: true,
+  },
+  {
+    id: "qa-react",
+    root: "interview-prep/interview-questions/react",
+    name: "React Q&A",
+    category: "handbook",
+  },
+  {
+    id: "qa-nestjs",
+    root: "interview-prep/interview-questions/nestjs",
+    name: "NestJS Q&A",
+    category: "handbook",
+  },
+  {
+    id: "qa-nodejs",
+    root: "interview-prep/interview-questions/nodejs",
+    name: "Node.js Q&A",
+    category: "handbook",
+  },
+  {
+    id: "qa-databases",
+    root: "interview-prep/interview-questions/databases",
+    name: "Databases Q&A",
+    category: "handbook",
+  },
 ];
 
 /** Files that make a study-unit folder (this repo’s structure). */
@@ -71,6 +104,8 @@ const SKIP_ROOT_MD = new Set([
   "order.md",
   "REACT_NATIVE_INTERVIEW.md",
   "PROBLEMS-MASTER-LIST.md",
+  "PROGRESS.md",
+  "STUDY_GUIDE.md",
 ]);
 
 function prettyDir(name) {
@@ -185,6 +220,9 @@ export function buildCatalog() {
 
     const indexPath = join(root, "INDEX.md");
     const rnIndex = join(root, "REACT_NATIVE_INTERVIEW.md");
+    const readmePath = join(root, "README.md");
+    const studyGuidePath = join(root, "STUDY_GUIDE.md");
+    const progressPath = join(root, "PROGRESS.md");
     const overviewFile = (() => {
       try {
         if (statSync(indexPath).isFile()) return indexPath;
@@ -193,6 +231,11 @@ export function buildCatalog() {
       }
       try {
         if (statSync(rnIndex).isFile()) return rnIndex;
+      } catch {
+        /* none */
+      }
+      try {
+        if (statSync(readmePath).isFile()) return readmePath;
       } catch {
         /* none */
       }
@@ -209,45 +252,70 @@ export function buildCatalog() {
       });
     }
 
-    const unitDirs = [];
-    walkStudyUnits(root, unitDirs);
-    for (const abs of unitDirs.sort()) {
-      if (abs === root) continue;
-      const files = collectFolderFiles(abs);
-      if (!Object.keys(files).length) continue;
-      const rel = relative(root, abs).split(sep).join("/");
-      const id = rel.split("/").pop();
-      pushModule(modules, "units", "Study units", {
-        id,
-        name: prettyDir(id),
-        title:
-          firstHeading(join(abs, "notes.md")) ||
-          firstHeading(join(abs, "common-techniques.md")) ||
-          prettyDir(id),
-        dir: rel,
-        files,
-      });
+    if (spec.category === "handbook") {
+      for (const [label, abs] of [
+        ["Study guide", studyGuidePath],
+        ["Progress", progressPath],
+        ["README", readmePath],
+      ]) {
+        if (overviewFile && abs === overviewFile) continue;
+        try {
+          if (!statSync(abs).isFile()) continue;
+        } catch {
+          continue;
+        }
+        const stem = abs.split(sep).pop().replace(/\.md$/i, "");
+        pushModule(modules, "overview", "Overview", {
+          id: stem.toLowerCase(),
+          name: label,
+          title: firstHeading(abs) || label,
+          dir: stem.toLowerCase(),
+          files: { notes: repoRel(abs) },
+        });
+      }
     }
 
-    for (const name of listDir(root).sort()) {
-      if (!name.endsWith(".md") || SKIP_ROOT_MD.has(name)) continue;
-      const abs = join(root, name);
-      try {
-        if (!statSync(abs).isFile()) continue;
-      } catch {
-        continue;
+    if (!spec.overviewOnly) {
+      const unitDirs = [];
+      walkStudyUnits(root, unitDirs);
+      for (const abs of unitDirs.sort()) {
+        if (abs === root) continue;
+        const files = collectFolderFiles(abs);
+        if (!Object.keys(files).length) continue;
+        const rel = relative(root, abs).split(sep).join("/");
+        const id = rel.split("/").pop();
+        pushModule(modules, "units", "Study units", {
+          id,
+          name: prettyDir(id),
+          title:
+            firstHeading(join(abs, "notes.md")) ||
+            firstHeading(join(abs, "common-techniques.md")) ||
+            prettyDir(id),
+          dir: rel,
+          files,
+        });
       }
-      const stem = name.replace(/\.md$/i, "");
-      const files = { notes: repoRel(abs) };
-      const fc = chapterFlashcards(abs);
-      if (fc) files.flashcards = fc;
-      pushModule(modules, "chapters", "Chapters", {
-        id: stem,
-        name: prettyDir(stem),
-        title: firstHeading(abs) || prettyDir(stem),
-        dir: stem,
-        files,
-      });
+
+      for (const name of listDir(root).sort()) {
+        if (!name.endsWith(".md") || SKIP_ROOT_MD.has(name)) continue;
+        const abs = join(root, name);
+        try {
+          if (!statSync(abs).isFile()) continue;
+        } catch {
+          continue;
+        }
+        const stem = name.replace(/\.md$/i, "");
+        const files = { notes: repoRel(abs) };
+        const fc = chapterFlashcards(abs);
+        if (fc) files.flashcards = fc;
+        pushModule(modules, "chapters", "Chapters", {
+          id: stem,
+          name: prettyDir(stem),
+          title: firstHeading(abs) || prettyDir(stem),
+          dir: stem,
+          files,
+        });
+      }
     }
 
     for (const mod of modules.values()) {
@@ -263,6 +331,7 @@ export function buildCatalog() {
     tracks.push({
       id: spec.id,
       name: spec.name,
+      category: spec.category || "interview",
       modules: ordered,
     });
   }
