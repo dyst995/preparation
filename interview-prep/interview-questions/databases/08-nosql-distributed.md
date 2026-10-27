@@ -1,0 +1,1109 @@
+# DB08 — NoSQL & Distributed Data
+
+MongoDB document model and distributed-data concepts. Questions DB-351–DB-400. Postgres is the comparison point when it makes the choice clearer.
+
+Document versus relational modeling, embedding and references, indexes and explain, transactions, CAP and PACELC, quorums, shard keys, leader-based versus Dynamo-style replication, Cassandra consistency, conflicts, change streams, polyglot persistence, migration myths, NewSQL, and vector search as a derived index.
+
+### DB-351 — Document model versus relational model
+
+**Difficulty:** Intermediate
+
+**Category:** Data modeling
+
+**Question:**
+
+How is a document database different from a relational database, and why is that about access patterns rather than about storing JSON?
+
+**Answer:**
+
+A document database stores one record and reads or writes it as a unit. A relational database stores rows and joins them when a question arrives.
+
+Documents put data that is read together in one place, so the hot path is a single fetch. Tables stay normalized and pay for the join at read time. An order plus its line items is one aggregate. A report that slices those facts by region wants tables.
+
+Postgres can store JSON, and MongoDB can store references. Choose the unit of reading, not the file format.
+
+**Follow-up:**
+
+When is a JSONB column on a Postgres row enough, instead of a document collection?
+
+Answer: A JSONB column is one attribute of a relational row, so it still sits inside transactions, constraints, and joins. Use a collection when the document itself is the entity you fetch, index, and shard. A small settings blob on a users table should stay in Postgres.
+
+### DB-352 — Let the access pattern choose the model
+
+**Difficulty:** Intermediate
+
+**Category:** Data modeling
+
+**Question:**
+
+What do you need to know about reads and writes before you choose documents or tables?
+
+**Answer:**
+
+Write each hot operation as who runs it, what they look up, what they change, and how fresh the read must be. Data that is always fetched together is a candidate aggregate. Facts that different services update on different schedules want their own records, so one writer does not rewrite the other's data.
+
+Ad hoc reporting and "sort by any column" push you toward Postgres or a search index. A stable set of screens can live on documents with indexes for those filters. Picking a store before this list is how teams remodel six months later.
+
+**Follow-up:**
+
+How do you choose when the product is new and nobody can name the queries?
+
+Answer: Start from each screen's read and the writes that change it. Keep documents smaller and use references until you know which subtree always loads with the parent. Measure call rate and latency before you embed or shard around a guess.
+
+### DB-353 — When MongoDB is a good fit
+
+**Difficulty:** Junior
+
+**Category:** MongoDB
+
+**Question:**
+
+When is MongoDB a sound primary store?
+
+**Answer:**
+
+MongoDB fits when the main object is a rich aggregate, fields differ by type, and the hot path loads or saves that aggregate by a key. A product page is the clear case: one document, attributes that vary by category, and a few indexes such as brand and price.
+
+Profiles, CMS pages, and device state often have that shape. A replica set covers failover. Sharding comes only after you can name the shard key. If those sentences do not describe the product, another store will fit better.
+
+**Follow-up:**
+
+Is "the schema might change" enough reason to pick MongoDB?
+
+Answer: Postgres can add a nullable column or store sparse attributes in JSONB. Choose MongoDB when the product document is the API and you will index and shard fields inside it. If the rest of the system is relational, keep the flexible part in JSONB.
+
+### DB-354 — When to keep Postgres as the source of truth
+
+**Difficulty:** Intermediate
+
+**Category:** Data modeling
+
+**Question:**
+
+Which workloads should stay on Postgres even if the team is willing to run MongoDB?
+
+**Answer:**
+
+Stay on Postgres when the important operation updates several entities together, or recombines them in many ways. A transfer that debits one account and credits another is a local transaction with constraints. MongoDB can run a multi-document transaction, and a ledger-shaped product is still a poor match for documents.
+
+Foreign keys and unpredictable admin filters belong in tables too. A second database adds a backup story and a consistency boundary. Add one when the access pattern requires it.
+
+**Follow-up:**
+
+The team already runs MongoDB, and a booking must not double-sell a seat. What do you add?
+
+Answer: Put seats and payments in Postgres, where a unique constraint and a short transaction reject the double sell. Keep MongoDB for aggregates it already serves, such as the event page. One store owns each fact, and the other may hold a lagging copy from a stream or a job.
+
+### DB-355 — Documents, BSON, and collections
+
+**Difficulty:** Junior
+
+**Category:** MongoDB
+
+**Question:**
+
+What is a MongoDB document, what is BSON, and what is a collection for?
+
+**Answer:**
+
+A document is the record MongoDB stores: fields, nested objects, arrays, and an `_id`. Applications think in JSON. On disk and on the wire MongoDB uses BSON, a binary form that adds types JSON lacks, such as dates and 64-bit integers.
+
+A collection is the set you query together. Documents in it need not share fields. `_id` is unique inside the collection. If you omit it, the driver inserts an ObjectId, which is roughly time-ordered. Validation and indexes are the schema. The server's flexibility is not a reason to mix unrelated entities.
+
+**Follow-up:**
+
+What goes wrong when one collection stores every kind of event?
+
+Answer: Queries and indexes stop matching. A search for today's orders still walks clicks and errors unless every query filters on type. Unique rules for orders then collide with events that lack those fields, so split by lifecycle and by the indexes each kind needs.
+
+### DB-356 — Schema validation is still schema design
+
+**Difficulty:** Intermediate
+
+**Category:** MongoDB
+
+**Question:**
+
+MongoDB is called schema-less. How should a team control the shape of documents?
+
+**Answer:**
+
+"Schema-less" means the server will not invent a table for you. The shape still lives in the application, and it should live on the collection as JSON Schema rules. Required fields, types, and enums turn bad writes into errors, including writes from a script that bypassed the service.
+
+Unique indexes are part of that schema. So is a version you bump when a field's meaning changes. Old documents remain, so readers tolerate them or you migrate them. The freedom you keep is room to evolve a design you actually wrote down.
+
+**Follow-up:**
+
+Why are application checks before insert not enough?
+
+Answer: Another service, a migration, or a later bug will write around them. Collection validation runs for every writer. Keep the app checks for clearer errors and for workflow rules a schema cannot express, and treat the database as the gate when they disagree.
+
+### DB-357 — Embedding versus referencing
+
+**Difficulty:** Intermediate
+
+**Category:** Data modeling
+
+**Question:**
+
+When do you embed a related object in MongoDB, and when do you store a reference?
+
+**Answer:**
+
+Embed when the child belongs to the parent, you read it with the parent, and it stays bounded. One read returns the aggregate. One write can update parent and child together, because a single-document write is atomic.
+
+Store an id when the child has its own life, is shared, or can grow large. The parent stays small. You pay a second query, or a `$lookup`, and you lose that single-document atomic update. An order's shipping address is usually embedded. The customer is usually referenced, with a few fields copied so the order page does not join.
+
+**Follow-up:**
+
+Comments embedded on a post worked for a year. What is the first sign to split them out?
+
+Answer: The hot write is "append a comment," and each append rewrites a document that is mostly old comments. Growth and contention on a viral post make it urgent. Move comments to a collection keyed by post id, and keep only a short cached preview on the post.
+
+### DB-358 — The 16 MB ceiling and unbounded arrays
+
+**Difficulty:** Intermediate
+
+**Category:** Data modeling
+
+**Question:**
+
+What is the MongoDB document size limit, and how should it change the way you model arrays?
+
+**Answer:**
+
+A BSON document cannot exceed 16 MB, and field names count. Treat that as a rail, not a budget. The oplog entry and the replication cost grow with the document long before you reach the cap.
+
+Unbounded arrays are the usual way teams get there. Comments, likes, and sensor readings belong in their own collection once they grow with traffic. If you still want locality, bucket them: one document per parent per day, or per fixed batch of events. A crowd pushing into one array is a contention problem before it is a size error.
+
+**Follow-up:**
+
+What does bucketing a user's activity events make harder?
+
+Answer: A filter across that user's whole history, such as every purchase on any date, must read many buckets. Index the user id and the filtered field, and accept a multi-document read. If the real query is global, store the events for that query instead of only under the user.
+
+### DB-359 — References and $lookup
+
+**Difficulty:** Intermediate
+
+**Category:** MongoDB
+
+**Question:**
+
+What is a reference in MongoDB, and what is `$lookup` doing compared with a SQL join?
+
+**Answer:**
+
+A reference is an id that names `_id` in another collection. The app can query again, or `$lookup` can attach the matches as an array inside an aggregation.
+
+`$lookup` is not a planner searching join orders across a normalized schema. You name both sides. A lookup between large collections, without a selective filter and an index on the foreign field, is an expensive hot path. Load one parent, then fetch the few related documents, or copy the fields a list page needs. Several lookups on every screen usually mean the data wants to be one aggregate.
+
+**Follow-up:**
+
+The foreign field is indexed and the list page is still slow. What do you change?
+
+Answer: Stop joining on the list. Copy the few display fields, such as the author name, onto the child when you write it, and refresh those copies when the source changes. Keep `$lookup` for a detail view that loads one parent.
+
+### DB-360 — One-to-few, one-to-many, and one-to-squillions
+
+**Difficulty:** Intermediate
+
+**Category:** Data modeling
+
+**Question:**
+
+How do the one-to-few, one-to-many, and one-to-squillions patterns differ?
+
+**Answer:**
+
+One-to-few embeds the children. A person has a handful of addresses. They load together and will not become a million rows.
+
+One-to-many puts the child in its own collection with the parent id indexed. Comments on a post work this way. You can page them, and a "latest three" array on the post is only a cache.
+
+One-to-squillions uses that same reference and never loads the children as a group. Sensor readings stay in a large collection, often bucketed. You do not `$lookup` billions of readings onto the sensor.
+
+**Follow-up:**
+
+How do you keep an embedded "latest 20 comments" correct when one comment is deleted?
+
+Answer: Delete in the comment collection first, because that collection is the source of truth. Then recompute the latest 20 and replace the cached array. Racing deletes both recompute from the collection, so the last rebuild still matches, and the cache must not be the only copy.
+
+### DB-361 — Many-to-many in documents
+
+**Difficulty:** Senior
+
+**Category:** Data modeling
+
+**Question:**
+
+How do you model many-to-many in MongoDB without copying a join-table habit blindly?
+
+**Answer:**
+
+Store a bounded id array on the side you read, such as a user's `roleIds`, and find it with a multikey index. Do not also store every user id on the role when that list would be huge.
+
+Use a link collection when the relationship has its own fields, or either side is large. That is the right join table. Looking one up on every page, or embedding an unbounded id list on a popular tag, is the habit that hurts.
+
+**Follow-up:**
+
+If ids live on both sides and the second write fails, which side wins?
+
+Answer: Write the side your reads trust first, and treat the other array as a cache a job can rebuild from the source id. If both copies are equally true, you cannot tell which write to redo. One owner, or a link collection, avoids that argument.
+
+### DB-362 — Denormalization and update anomalies
+
+**Difficulty:** Intermediate
+
+**Category:** Data modeling
+
+**Question:**
+
+What are you accepting when you copy a field from one MongoDB document onto another?
+
+**Answer:**
+
+You accept that a later change to the source does not change the copies. That is the anomaly. A snapshot, such as the author name at publish time, should stay old. A cache of the current name must be refreshed, or readers see two names for one person.
+
+Name the field so those meanings stay distinct. A popular rename touches many copies, so batch it and expect a mix of old and new while it runs. If that mix is unacceptable, store the id and resolve the name.
+
+**Follow-up:**
+
+How do you find copies that have already drifted?
+
+Answer: Store the source id beside the copied text. A job or a change stream compares the source with the copies and patches them in batches. Two people can share a display name, so the text alone is not a safe join key.
+
+### DB-363 — Single-field, unique, and TTL indexes
+
+**Difficulty:** Junior
+
+**Category:** Indexing
+
+**Question:**
+
+What does a normal MongoDB index give you, and when do unique and TTL indexes enforce a business rule?
+
+**Answer:**
+
+A single-field index is a B-tree on one field, including a path inside a nested object. Equality, a range, and a matching sort can use it. Without it, a large collection is scanned.
+
+A unique index rejects a second email or order number. Many documents may omit a field, so "one active email" usually needs a partial unique index. A TTL index deletes documents after a date field ages out. It is a janitor for sessions and tokens. Deletion can lag, so it is not a timeout your security check can trust.
+
+**Follow-up:**
+
+A reset token must stop working at 15 minutes, but the TTL delete can lag. What enforces the deadline?
+
+Answer: Store `expiresAt` and reject the token in the only path that accepts it, even if the document is still there. The TTL index only reclaims space later. "The document exists" is not the same statement as "the token is valid."
+
+### DB-364 — Compound indexes and the ESR rule
+
+**Difficulty:** Intermediate
+
+**Category:** Indexing
+
+**Question:**
+
+How do you order fields in a MongoDB compound index, and what is the ESR rule?
+
+**Answer:**
+
+A compound index is one B-tree ordered left to right. A query uses a prefix of that order. An index on status, then `createdAt`, serves a status filter and a status filter plus `createdAt`. It does not serve `createdAt` alone.
+
+ESR means equality, then sort, then range. Equality pins a small subtree. The sort field next makes that subtree already ordered. A range belongs last because it uses up the remaining order. Put the range before the sort and MongoDB can still sort in memory. Build the index for the query you run.
+
+**Follow-up:**
+
+Which filter on `{ status, priority, createdAt }` still cannot use the index for the sort?
+
+Answer: Status equals open, priority is a range, and the sort is `createdAt`. After the range walks many priorities, `createdAt` is not one ordered sequence, so the server sorts the matches. Put the sort field before the range when that sort is the query you care about.
+
+### DB-365 — Multikey, partial, and sparse indexes
+
+**Difficulty:** Intermediate
+
+**Category:** Indexing
+
+**Question:**
+
+What are multikey, partial, and sparse indexes, and when would you choose each?
+
+**Answer:**
+
+A multikey index stores one entry per array element, so a tags query can find any tag. The index is larger than the document count. A compound index can be multikey for only one array field.
+
+A partial index includes documents that match a filter you write, such as "status is active." It stays smaller and can be unique. That is how one email is unique among active users while closed accounts remain. A sparse index only skips documents that lack the field. Prefer partial, because "the field exists" is rarely the rule you meant.
+
+**Follow-up:**
+
+How can a closed account keep an email that a new active account may reuse?
+
+Answer: Use a unique partial index on the normalized email where status is active. Closed accounts fall outside it, so they do not block the new user. A sparse index would still include those stored emails and would reject the reuse.
+
+### DB-366 — Reading explain at interview depth
+
+**Difficulty:** Senior
+
+**Category:** Indexing
+
+**Question:**
+
+What do you look for in MongoDB explain output, and which numbers mean the index is wrong?
+
+**Answer:**
+
+Use execution stats on the real query and a realistic amount of data. `COLLSCAN` walks the collection. `IXSCAN` uses an index. `FETCH` loads the document after the index hit. `SORT` is an in-memory sort you usually want off a hot path.
+
+Compare `nReturned` with keys examined and documents examined. A selective query's examined counts sit near the number of rows it returns. When documents examined dwarf `nReturned`, the index prefix is wide and the real predicate runs after the fetch. Explain the production sort and projection, not a trimmed version of the query.
+
+**Follow-up:**
+
+The query returns 20 documents, examines 40,000, and the plan is `IXSCAN` plus `FETCH`. What is wrong?
+
+Answer: An index is used and almost every loaded document is thrown away. The prefix is a broad field such as status, and the selective predicate runs too late. Extend the compound index with the field that actually shrinks the set, because a boolean index can still read half the collection.
+
+### DB-367 — Covered queries
+
+**Difficulty:** Intermediate
+
+**Category:** Indexing
+
+**Question:**
+
+What is a covered query in MongoDB, and when is it worth designing for?
+
+**Answer:**
+
+A covered query is answered entirely from the index. Documents examined is zero. Every field you filter, sort, and return has to be in that index.
+
+Results include `_id` unless the projection removes it. Leaving `_id` in the result forces a fetch when the index does not contain it. That is the usual miss. Cover a hot read that returns a few small fields. Every extra indexed field makes writes maintain a wider tree. A plan that still shows `FETCH` is not covered, whatever you intended.
+
+**Follow-up:**
+
+You added the projected field and explain still shows `FETCH`. What do you check?
+
+Answer: Drop `_id` in the projection, or add it to the index. Then look for a computed projection, an array that made the index multikey, or a filter outside the index. The success condition is an index scan and zero documents examined.
+
+### DB-368 — Single-document writes and multi-document transactions
+
+**Difficulty:** Intermediate
+
+**Category:** Transactions
+
+**Question:**
+
+What does MongoDB guarantee for a write to one document, and what did multi-document transactions add?
+
+**Answer:**
+
+A single-document write is atomic, including several fields and array updates in that command. If the aggregate is one document, that write is the transaction you need.
+
+Multi-document transactions came in MongoDB 4.0 for replica sets and 4.2 for sharded clusters. Reads share a snapshot, and the writes commit or abort together. Use one when an invariant really spans documents, such as two balances. They add latency, conflict aborts, and oplog cost. The default lifetime is 60 seconds. If every request opens one, fold the data into one document or use Postgres.
+
+**Follow-up:**
+
+How are retryable writes different from a multi-document transaction?
+
+Answer: A retryable write lets the driver repeat one write after a network blip without applying it twice. It does not group several documents. On a transient transaction error, retry the whole transaction, and if the commit result is unknown, retry the commit first because it may already have succeeded.
+
+### DB-369 — Transaction cost and write conflicts
+
+**Difficulty:** Senior
+
+**Category:** Transactions
+
+**Question:**
+
+What do you give up with a MongoDB multi-document transaction, and how should the app handle aborts?
+
+**Answer:**
+
+You pay latency and capacity. Commit waits for the write concern, which should be majority. If the documents sit on different shards, commit is distributed.
+
+Two transactions writing the same document conflict, and one aborts. That protects the snapshot and shows you a hot key. Do not leave a transaction open across a user pause or a remote API call. Retry transient aborts with a limit and backoff. A real conflict, such as a seat already taken, is a product response. The transaction body has to be safe to run again.
+
+**Follow-up:**
+
+Checkouts keep aborting because they all update one inventory document. What do you change?
+
+Answer: Decrement with a conditional update that succeeds only when quantity is still positive, then create the order. If order and inventory must commit together, split the counter into buckets so buyers hit different documents. Retrying the same hot document only raises the abort rate.
+
+### DB-370 — Write concern and the journal
+
+**Difficulty:** Intermediate
+
+**Category:** Consistency
+
+**Question:**
+
+What does write concern mean in MongoDB, and what does the journal add?
+
+**Answer:**
+
+Write concern decides when the driver may report success. `w: 1` means the primary applied the write. `w: "majority"` means a majority of voting data-bearing members applied it, so a normal election should not roll it back. `w: 0` does not wait, and failures stay invisible.
+
+Journaling puts the write on disk. A crash can lose a write that lived only in memory. Since MongoDB 5.0 a typical replica set defaults to majority, which includes the journal. Set the concern in the driver anyway. A timeout means the outcome is unknown, so retry with an idempotency key.
+
+**Follow-up:**
+
+When is `w: 1` plus journaling still the wrong acknowledgment for an order?
+
+Answer: The primary can journal the write and die before any secondary copies it. The new primary does not have the order, and the client was told success. Majority waits until failover should keep the write, so save the weaker setting for data you can rebuild.
+
+### DB-371 — Read concern versus read preference
+
+**Difficulty:** Senior
+
+**Category:** Consistency
+
+**Question:**
+
+What is the difference between read concern and read preference in MongoDB?
+
+**Answer:**
+
+Read preference chooses the member: primary, secondary, or nearest. A secondary can lag the leader. Read concern chooses durability. `local` may return a write that a crashed primary later rolls back. `majority` returns data a majority has acknowledged, which can still be behind the newest primary write. `linearizable` reads one document on the primary only after confirming that node is still primary, and it costs a round trip.
+
+"I read the primary" only names the member. After a user's own save, use a causal session, or read the primary after a majority write.
+
+**Follow-up:**
+
+A user saves, sees success, refreshes, and the profile looks old. What happened?
+
+Answer: The save and the refresh took different paths. A common case is a primary write, then a secondary read that has not applied it yet. Pin that refresh to the primary or use a causal session so the read waits for this user's write, and check any cache in front of the database.
+
+### DB-372 — Replica sets, the oplog, and elections
+
+**Difficulty:** Intermediate
+
+**Category:** Distributed systems
+
+**Question:**
+
+How does a MongoDB replica set stay available, and what happens during an election?
+
+**Answer:**
+
+One primary takes writes. Secondaries apply the oplog in order. If the primary disappears, the others elect a replacement that has a majority of votes. Three data-bearing nodes can lose one and still elect. Until then, writes fail or wait, and secondary reads can be stale.
+
+Two nodes cannot elect after one dies, because one vote is not a majority of two. Retry an idempotent write once the driver finds the new primary. A few seconds is normal. A delayed member cushions a bad delete. It is not a backup.
+
+**Follow-up:**
+
+Why is a primary, one secondary, and an arbiter weaker than three data-bearing nodes?
+
+Answer: An arbiter votes and stores no data. A voting majority can exist when only one node holds the bytes, so a "majority" acknowledgment can be weaker than it sounds. If that primary dies first, the latest writes can die with it, whereas three data-bearing nodes let a majority write reach two copies.
+
+### DB-373 — CAP during a partition
+
+**Difficulty:** Senior
+
+**Category:** Distributed systems
+
+**Question:**
+
+What does the CAP theorem claim, and how should you answer whether MongoDB is CP or AP?
+
+**Answer:**
+
+During a partition you cannot have both linearizable consistency and an answer from every side. Networks do split, so partition tolerance is the situation, not a feature you turn off. You refuse some operations so copies do not diverge, or you accept both sides and repair later. CAP does not grade latency on a healthy day.
+
+With majority writes, MongoDB's minority side cannot elect, so it cannot take writes. Clients who reach the majority continue. Stale secondary reads are a preference, and Cassandra at a low level can still accept writes on a split side. Name the setting.
+
+**Follow-up:**
+
+Can a system be consistent and available by assuming partitions will not happen?
+
+Answer: Only if you assume a single node, or a network that never splits. If both sides of a dead link accept writes, you can split brain. If only one side accepts them, the other side is unavailable, so say what this deployment does when the link fails and rehearse it.
+
+### DB-374 — PACELC when the network is healthy
+
+**Difficulty:** Staff
+
+**Category:** Distributed systems
+
+**Question:**
+
+What does PACELC add to CAP, and how do MongoDB and Cassandra sit on it?
+
+**Answer:**
+
+If the network partitions, you choose availability or consistency. Otherwise, on a healthy day, you choose latency or consistency. CAP never asks the second question, and the second question is the one you pay for constantly.
+
+Cassandra's usual story prefers to stay available through a partition and to answer quickly when healthy, especially at level ONE. QUORUM spends latency to get closer to consistency. MongoDB with majority writes refuses the minority side during a partition, and a majority or linearizable read waits on replication when the network is fine. Secondary reads are a different point. Say the settings you run.
+
+**Follow-up:**
+
+Where do Cassandra `LOCAL_QUORUM` and MongoDB majority writes plus secondary reads sit?
+
+Answer: `LOCAL_QUORUM` waits for a local-data-center majority, so it costs more than ONE and is still not a global order. Majority MongoDB writes wait for durability, while the secondary read can lag. That pair fits a feed, and it does not fit showing the user the profile they just saved unless a session makes the read wait.
+
+### DB-375 — Eventual consistency, stated precisely
+
+**Difficulty:** Junior
+
+**Category:** Consistency
+
+**Question:**
+
+What does eventual consistency mean, and what does the phrase not promise?
+
+**Answer:**
+
+If writes stop and replicas can still exchange messages, they converge on the same value. Reads during the lag may be old. Nothing in the word "eventual" sets a deadline. You add a deadline only by measuring one.
+
+The term also does not say the newest business update wins. Last-write-wins can drop one of two conflicting edits and still converge. A disconnected replica can lag for minutes. MongoDB secondary reads are eventual relative to the primary. Writes through one primary already have an order. Say who may be stale, and what you do if two updates conflicted.
+
+**Follow-up:**
+
+Someone says "make it eventual" so the feature can be faster. What do you ask before you agree?
+
+Answer: Ask which read may be stale, by how much, and what happens if a user acts on the old value. A search facet can lag, and a balance used to approve a debit cannot. If they want "under a second," measure replica lag instead of renaming the requirement eventual.
+
+### DB-376 — Session consistency and read-your-writes
+
+**Difficulty:** Intermediate
+
+**Category:** Consistency
+
+**Question:**
+
+What is read-your-writes, and how does a MongoDB causal session provide it?
+
+**Answer:**
+
+After a client's write succeeds, a later read by that same client sees the write. A different client might not yet. This is what stops a user from saving a form and watching the next page forget it.
+
+A causal session tracks cluster time. The next read waits until its node has applied that write, so a secondary can still show your own update. That costs less than a linearizable read of every document. Keep the same session on the request. A fresh pool checkout does not carry the time.
+
+**Follow-up:**
+
+User A updates a shared document. User B refreshes and does not see it. Did read-your-writes fail?
+
+Answer: The promise covers A's later reads, not B's, and B may simply be on a lagging secondary. If B must observe A's commit, B reads the primary or receives the cluster time A just saw. A's session does not do that by itself.
+
+### DB-377 — Quorum reads and writes
+
+**Difficulty:** Senior
+
+**Category:** Consistency
+
+**Question:**
+
+In a replicated system, what are N, R, and W, and what does R + W greater than N buy you?
+
+**Answer:**
+
+N is the replica count. W is how many must acknowledge a write. R is how many you read. If R + W is greater than N, the sets overlap, so a reader that keeps the newest version sees the latest successful write. Every vote has to come from a real owner.
+
+N = 3, W = 2, R = 2 still works after one replica dies. W = 1 and R = 1 can miss the write. W greater than N / 2 is the separate claim that two writes cannot both succeed. Say which property you mean.
+
+**Follow-up:**
+
+With N = 3, W = 2, and R = 2, why can a careful read not miss the write that just succeeded?
+
+Answer: The write reached two of the three replicas. Every pair you might read includes at least one of those two. The reader has to compare versions and return the newer one, because the first reply can still be the stale third copy.
+
+### DB-378 — Sloppy quorums
+
+**Difficulty:** Staff
+
+**Category:** Consistency
+
+**Question:**
+
+What is a sloppy quorum, and why can R + W greater than N fail to show the latest write?
+
+**Answer:**
+
+A strict quorum counts only owners of the key. A sloppy quorum also counts reachable substitutes, so a write can succeed during a partition. They store a hint and forward it later. Dynamo-style hinted handoff buys availability that way.
+
+The overlap proof assumed R and W came from the same owners. A later read of the real owners can miss the write until the hint arrives, even though the client was told success. Cassandra does not count hints toward the consistency level. Cite the formula only with strict members and a version check.
+
+**Follow-up:**
+
+A coordinator stored a hint and died before replaying it. What had the client been told?
+
+Answer: If the hint was not part of W, success meant real owners already had the write, so the hint was only a spare copy. If the hint counted as a vote, the client was told success and that extra copy may have vanished with the coordinator. Hints help repair, and they are not durability votes.
+
+### DB-379 — Leader-based replication
+
+**Difficulty:** Intermediate
+
+**Category:** Distributed systems
+
+**Question:**
+
+How does leader-based replication work, and which databases are you grouping under that name?
+
+**Answer:**
+
+One leader accepts writes for a range, appends them to a log, and followers apply that log in order. MongoDB replica sets, a Postgres primary with standbys, and Raft groups all do this. Each key gets a single write order. Reading the leader gives you your own writes naturally.
+
+Writes pause while an election has no winner. One hot leader is also a throughput ceiling for its keys. Sharding creates many leaders, one per shard, not one global primary. A transaction that touches two shards needs a further protocol. One shard's log does not order another leader's keys.
+
+**Follow-up:**
+
+What should a client do during the seconds when no leader is elected?
+
+Answer: Expect writes to fail or time out, then retry an idempotent write once the driver finds the new leader. Do not send the write to a former follower to bridge the gap. A timeout means unknown: the old leader may have committed and died before the client saw the response.
+
+### DB-380 — Dynamo-style replication
+
+**Difficulty:** Senior
+
+**Category:** Distributed systems
+
+**Question:**
+
+How does Dynamo-style replication differ from leader-based replication, and where does Cassandra sit?
+
+**Answer:**
+
+No single leader orders every write to a key. Any node can coordinate a request, send it to the owners on a hash ring, and wait for W replies. A read asks R replicas and reconciles what they return. Two coordinators can accept two updates, so a timestamp or the application has to merge them.
+
+Cassandra is in this family: the partition key places the row, and the consistency level picks R and W. A lightweight transaction is the slower consensus path for a conditional update. MongoDB is different. Each shard has a primary and one log.
+
+**Follow-up:**
+
+The coordinator talks to the replicas. Why is it not a leader in the MongoDB sense?
+
+Answer: The next request for the same key can use another coordinator. It does not own a log that the replicas must treat as the only history. The owners are peers, while a MongoDB primary is the only member allowed to take writes for its range and to define their order.
+
+### DB-381 — Choosing a MongoDB shard key
+
+**Difficulty:** Senior
+
+**Category:** Sharding
+
+**Question:**
+
+What makes a good MongoDB shard key, and which reasonable-looking keys fail in production?
+
+**Answer:**
+
+The key chooses the shard for each document. It needs many distinct values, writes that do not all pile up, and a place in the queries that must stay fast. Status or country alone collapses data into a few chunks you cannot split usefully.
+
+An ObjectId is unique and roughly monotonic, so ranged inserts all hit the top chunk. Hashing spreads inserts and scatters range reads. A tenant prefix targets that tenant's queries, and one giant tenant becomes a hot shard. Resharding exists and is an expensive rewrite, so include the field the hot query already filters on.
+
+**Follow-up:**
+
+When do you choose a hashed `_id` instead of a ranged `tenantId`?
+
+Answer: Hash `_id` when the hot read is fetch-by-id and inserts belong to many different ids. Other filters then scatter. Use ranged `tenantId` when nearly every query names the tenant, and if one tenant dominates, add another field so that tenant's writes spread while queries still include `tenantId`.
+
+### DB-382 — Hot shards and monotonic keys
+
+**Difficulty:** Senior
+
+**Category:** Sharding
+
+**Question:**
+
+What is a hot shard, and why do monotonic keys create one even when disk looks balanced?
+
+**Answer:**
+
+A hot shard is out of CPU or IO while the others are idle. The busiest shard is the ceiling, whatever the cluster's total size. Old chunks can look evenly spread while every new insert still lands on the highest range.
+
+Time and ObjectId sort those inserts onto that high end. Split the chunk, and the new maximum receives the next inserts. Hashing spreads a monotonic key. It does not split one celebrity id, because one value still routes to one place. Salt or bucket the hot key. Adding shards does not move a route that never changes.
+
+**Follow-up:**
+
+The shard key is `userId`, and one celebrity account takes most of the writes. What do you change?
+
+Answer: Hashing that one `userId` still maps the celebrity to a single shard. Keep the small profile there. Write high-volume events under `userId` plus a bucket, then fan out on read, because one counter document will not survive that traffic inside a transaction.
+
+### DB-383 — mongos, chunks, and the balancer
+
+**Difficulty:** Intermediate
+
+**Category:** Sharding
+
+**Question:**
+
+What are mongos, chunks, config servers, and the balancer doing in a sharded MongoDB cluster?
+
+**Answer:**
+
+mongos routes a targeted query to the shard that owns the key. It stores nothing, so run more than one near the app. Each shard is a replica set with its own primary. Config servers, also a replica set, hold the range map, and mongos caches it.
+
+A chunk is one range of shard-key values. The balancer moves chunks off crowded shards and can split a range only when key values differ. Even chunk counts are not even traffic. Watch operations per shard, not only disk.
+
+**Follow-up:**
+
+What is a jumbo chunk, and why doesn't running the balancer fix it?
+
+Answer: It grew past the size the balancer will move, and it cannot be split, usually because one shard-key value owns the whole range. The balancer leaves it where it is. You change the key, delete the piled-up data, or reshard onto a key with more distinct values.
+
+### DB-384 — Targeted queries versus scatter-gather
+
+**Difficulty:** Intermediate
+
+**Category:** Sharding
+
+**Question:**
+
+What is the difference between a targeted query and a scatter-gather query on a sharded cluster?
+
+**Answer:**
+
+A targeted query includes the shard key, so mongos contacts one shard, or a small set. Adding shards does not slow it down. A scatter-gather query gives the router no bound. Every shard does the work, and the response waits on the slowest one. Load rises as the cluster grows.
+
+A limit does not remove that fanout. Each shard can return its own top rows, and mongos still merges them. Counts and updates that omit the shard key are the usual cases. Explain through mongos shows a single shard or a merge. The hot API should already know the key.
+
+**Follow-up:**
+
+How do you notice scatter-gather in production before it takes the cluster down?
+
+Answer: If loading one user lights up every shard, the query omitted the shard key. Explain it and look for a merge stage. Targeted latency stays flat as you add shards, while scatter latency rises because each call waits on the slowest one.
+
+### DB-385 — Cassandra's model, lightly
+
+**Difficulty:** Intermediate
+
+**Category:** Cassandra
+
+**Question:**
+
+How does Cassandra want you to model data, compared with a MongoDB document?
+
+**Answer:**
+
+Cassandra designs the table from the query. The partition key picks the node, and clustering columns sort rows inside it. A healthy read names the full partition key, then a slice. The same fact is often written to one table per screen, because reads do not join.
+
+Keep partitions bounded. An endless per-user history becomes hot, so bucket by time. The layout favors appends. Use Cassandra for known queries at high write volume, a document when you edit one aggregate, and Postgres when filters are open-ended.
+
+**Follow-up:**
+
+A teammate wants `ALLOW FILTERING` so a query can skip the partition key. What do you tell them?
+
+Answer: The flag scans partitions and discards rows. On a real cluster that scan is an incident waiting for traffic. Add a table whose partition key is the field they need, write both tables together, and send real ad hoc questions to an analytics copy.
+
+### DB-386 — Cassandra consistency levels
+
+**Difficulty:** Senior
+
+**Category:** Cassandra
+
+**Question:**
+
+What do Cassandra's ONE, QUORUM, LOCAL_QUORUM, and ALL actually wait for?
+
+**Answer:**
+
+Each query picks a level. ONE waits for a single replica, so it is fast and can miss a write stored elsewhere. QUORUM waits for a majority: two replicas when the factor is three, if hints are not votes.
+
+LOCAL_QUORUM takes that majority only in the local data center, so a remote site does not set your latency or your outage. ALL waits for every replica, and one dead node blocks the call. A conditional update uses a lightweight transaction, which is a slower path.
+
+**Follow-up:**
+
+The product must stay up when one of two data centers is lost. What level do you use on the user-facing write?
+
+Answer: Use LOCAL_QUORUM, with enough copies in each data center to form a local majority, commonly three. The write completes without the other site, and that site catches up afterward. ALL, or a quorum across both sites, can demand replicas that are gone, and a user who fails over at once may still read a stale value.
+
+### DB-387 — Conflict resolution
+
+**Difficulty:** Senior
+
+**Category:** Consistency
+
+**Question:**
+
+When two replicas accept different updates to the same data, what are the main ways to resolve the conflict?
+
+**Answer:**
+
+A conflict means both updates were accepted and no single log ordered them. A leader prevents that for the keys it owns. Multi-leader and quorum designs do not.
+
+Last-write-wins keeps the higher timestamp and drops the rest with no error. Clock skew can let the older update win. Cassandra does this per cell, so different columns can both survive. CouchDB-style siblings keep both copies for the app to merge. A structure that unions, such as a set, fits only when that merge is the real rule. A shared balance is not a counter that only grows.
+
+**Follow-up:**
+
+Two Cassandra clients update one row at the same time. One sets email, the other sets phone. What remains, and what if both set email?
+
+Answer: Each cell keeps its own timestamp, so the new email and the new phone both survive. If both write email, the later timestamp remains and the other address is discarded, with no sibling stored. A document-style replace would have wiped the field the second writer never sent, and Cassandra does not replace the whole row that way.
+
+### DB-388 — Version vectors and causal order
+
+**Difficulty:** Staff
+
+**Category:** Consistency
+
+**Question:**
+
+What do version vectors tell you, and what do they refuse to decide?
+
+**Answer:**
+
+Each replica increments its own counter and attaches the vector. If every counter in A is at or below B, A happened before B. If each side has a counter the other lacks, the writes were concurrent: neither writer had seen the other.
+
+The vector does not merge fields. Last-write-wins can still drop a concurrent edit it just detected. Causal consistency is the client promise that a read of A, then a write of B, is not shown as B without A. MongoDB sessions carry that with cluster time. Vectors matter when more than one place accepts writes.
+
+**Follow-up:**
+
+Two shopping-cart updates are concurrent. What should you do, and what does last-write-wins get wrong?
+
+Answer: Union the line items, or show both carts if a blind union might duplicate a purchase. Each shopper added items without seeing the other, so the usual intent is to keep both adds. Last-write-wins keeps one timestamp and deletes the other shopper's items, so use the vector to see the overlap and then merge the way the cart allows.
+
+### DB-389 — Change streams
+
+**Difficulty:** Intermediate
+
+**Category:** MongoDB
+
+**Question:**
+
+What is a MongoDB change stream, and what should a consumer rely on?
+
+**Answer:**
+
+A change stream tails a replica set's oplog for inserts, updates, and deletes. Each event carries a resume token, so a consumer can restart after a crash. A standalone cannot offer this, because it has no oplog.
+
+If you crash after handling an event and before saving the token, you see it again, so the handler must be idempotent. Order follows the oplog on one replica set. Across shards, do not assume one global sequence. Use a stream for a few projections, such as a search index, not as a bus for every team.
+
+**Follow-up:**
+
+You saved the resume token and then crashed before the side effect. What breaks, and how do you close the hole?
+
+Answer: The restart skips an event that never took effect, and no later event repairs it. Store the token only after the side effect commits, in the same transaction when the destination allows it. A retry may repeat the last event, so give it an idempotency key and do not advance the cursor past work you have not finished.
+
+### DB-390 — Change streams and the transactional outbox
+
+**Difficulty:** Senior
+
+**Category:** Architecture
+
+**Question:**
+
+When should you watch a change stream, and when should the application write an outbox instead?
+
+**Answer:**
+
+A change stream projects commits that already happened. The service writes the document once, and a consumer refreshes a cache or a search index. That fits when every commit is interesting and a duplicate event is harmless.
+
+An outbox record commits with the business change, and a relay publishes it. Use that when others need a product event. "Order placed" is not "a field changed," because a backfill would otherwise notify customers. Fan services out from one queue, not from five oplog watchers.
+
+**Follow-up:**
+
+Five services each want their own change stream on the orders collection. What do you recommend?
+
+Answer: Run one relay and publish to a log or queue they all subscribe to. Five watchers mean five resume tokens and five readers of the same oplog. A slow consumer can sit on a queue, while one that falls off the oplog eventually needs a full rebuild.
+
+### DB-391 — Polyglot persistence
+
+**Difficulty:** Intermediate
+
+**Category:** Architecture
+
+**Question:**
+
+What is polyglot persistence, and when is a second database actually justified?
+
+**Answer:**
+
+It means using more than one store because the access patterns differ. A ledger can live in Postgres, sessions in a store with cheap expiry, files in object storage, and text search in a search index. Each fact needs an owner. A copy needs an allowed lag and a way to rebuild it.
+
+You pay with another backup, another failure mode, and a consistency boundary. Add a database when you can name the owner, the copy, and the allowed lag. A JSONB column or a read replica is the smaller step when it solves the same problem.
+
+**Follow-up:**
+
+How many primary databases is too many for a team of eight engineers?
+
+Answer: More than they can restore on a bad night, so Postgres, a cache, and object storage is a sane core. Add search or documents only for a measured gap, with an owner. A managed service removes some chores, and it still does not make two stores commit together.
+
+### DB-392 — Dual writes
+
+**Difficulty:** Intermediate
+
+**Category:** Architecture
+
+**Question:**
+
+How does a dual write fail when one request updates the database and then a queue?
+
+**Answer:**
+
+Those two systems do not commit together. If the insert succeeds and the process dies before publish, the order exists and the warehouse never hears about it. If the message goes out and the insert then rolls back, a worker can act on an order that is not real. A retry duplicates the order or the event unless each step has an idempotency key.
+
+Make one write the source of truth: an outbox row committed with the order, or a tail of that commit. A tighter timeout does not close the gap, so reconcile if the code already dual-writes.
+
+**Follow-up:**
+
+The process crashes after the database commit and before the queue publish. What does each side see?
+
+Answer: The user's next page can show the order, because it reads the database. The warehouse sees nothing, and the queue has no hole it can report. Publish from an outbox row that committed with the order, because the request process's memory is not a durable record of the message.
+
+### DB-393 — Myths that are outdated about MongoDB
+
+**Difficulty:** Intermediate
+
+**Category:** Migration
+
+**Question:**
+
+Which common claims about MongoDB are too blunt to use in a design review?
+
+**Answer:**
+
+"There are no transactions" skips multi-document transactions, present since 4.0 on replica sets and 4.2 when sharded. The useful claim is narrower: the hot path should still be one document, and a ledger fits Postgres better.
+
+"It loses data" describes a weak write concern. `w: 1` can acknowledge a write the next primary does not keep. Majority plus the journal is the setting to defend. "Schema-less" means you must design the schema yourself. `$lookup` exists, and it is not a relational planner. Judge the access pattern. The product name is not a character reference.
+
+**Follow-up:**
+
+Where does the "MongoDB loses writes" claim come from, so you can answer it precisely?
+
+Answer: A `w: 1` write can die with the primary before a secondary copies it, and the client was already told success. A timeout is an unknown result, so retries need an idempotency key. Majority acknowledgment is the bar for data you cannot rebuild, and replication is still not a backup, because a mistaken delete is copied on purpose.
+
+### DB-394 — Migrating off MongoDB without a big bang
+
+**Difficulty:** Senior
+
+**Category:** Migration
+
+**Question:**
+
+How do you move one collection off MongoDB without a rewrite weekend?
+
+**Answer:**
+
+Move one use case whose readers and writers you can list. Shape the destination around the queries that hurt, not as a dump of every array into a JSON column. Backfill old documents with a job that can resume. Then follow new writes from MongoDB, which stays the owner, into the destination, and compare samples until shadow reads look dull.
+
+Switch reads while MongoDB still accepts writes, so the switch can flip back. Switch writes last, and keep a reverse copy until a real business cycle has passed. Leave aggregates that documents already serve well in MongoDB.
+
+**Follow-up:**
+
+Postgres reads are wrong on the morning you cut them over. What is the rollback?
+
+Answer: Send reads back to MongoDB. That works only while MongoDB is still receiving the writes, which is why writes move last. Keep the reverse copy until the new path survives a business cycle, and practice the flag, because a collection that froze yesterday cannot restore the missing updates.
+
+### DB-395 — Postgres JSONB versus a document database
+
+**Difficulty:** Intermediate
+
+**Category:** Migration
+
+**Question:**
+
+When does Postgres JSONB replace a document database, and when does that replacement disappoint you?
+
+**Answer:**
+
+JSONB fits when the flexible part is one attribute, the data fits a primary, and you want SQL around the rest. Keep columns for fields you join or constrain, and add expression indexes for a few JSON paths. Settings and a moderate catalog usually belong here, especially if the team already runs Postgres.
+
+It disappoints when the whole domain hides in one column: weak constraints, vague statistics, and a large value rewritten on update. JSONB does not shard itself. Editing a huge set of aggregates by key needs a sharding plan, not a different column type.
+
+**Follow-up:**
+
+What workload would you still place in MongoDB after Postgres is available?
+
+Answer: A very large set of aggregates, loaded and replaced by id, with a shard key and a short index list you can name, and no cross-document transaction on the hot path. A settings object does not qualify. If the shard key is still a guess, the workload is not ready to leave Postgres.
+
+### DB-396 — NewSQL in one interview answer
+
+**Difficulty:** Intermediate
+
+**Category:** NewSQL
+
+**Question:**
+
+What problem are NewSQL databases trying to solve, and when are they the wrong tool?
+
+**Answer:**
+
+NewSQL keeps SQL and strong transactions while spreading rows across nodes. Spanner, CockroachDB, Yugabyte, and TiDB split the key space into ranges, replicate each range with consensus, and run a distributed transaction when one statement touches several ranges.
+
+That is worthwhile when one Postgres primary cannot take the writes and those cross-range transactions are real. It is expensive when a single primary already fits, because you inherit hot ranges and cross-region commit time. A row every client updates remains a ceiling. Adding nodes does not remove a key they all share.
+
+**Follow-up:**
+
+Why not shard Postgres yourself and skip NewSQL?
+
+Answer: Do that when each transaction stays on one shard, which usually means one tenant per shard. Partitioning, replicas, or application sharding is less machinery. Choose NewSQL when transactions must cross shards and you do not want to build the router and the commit protocol yourself.
+
+### DB-397 — Spanner, CockroachDB, and commit latency
+
+**Difficulty:** Staff
+
+**Category:** NewSQL
+
+**Question:**
+
+Where does commit latency come from in Spanner and in CockroachDB?
+
+**Answer:**
+
+Both systems split keys into ranges and replicate a range with consensus: Paxos in Spanner, Raft in CockroachDB. A write inside one range waits for that range's leader and a majority. A transaction across ranges adds another round trip, and distant leaders add that network wait.
+
+Spanner's TrueTime clocks have a known error band, and a commit waits it out so later transactions get later real-world timestamps. CockroachDB uses hybrid logical clocks, stays serializable, and may retry under clock skew. Replicas across continents make either quorum wait as long as that network. Keep ordinary replicas in one region.
+
+**Follow-up:**
+
+Why does Spanner wait out the clock uncertainty instead of returning when a majority has the log?
+
+Answer: A majority acknowledgment makes that range's log durable and ordered. It does not line the timestamp up with real time across ranges. Spanner waits until the chosen timestamp is safely in the past, beyond the clocks' uncertainty, or a later transaction can receive an earlier timestamp than one the client already saw.
+
+### DB-398 — Two-phase commit, consensus, and sagas
+
+**Difficulty:** Staff
+
+**Category:** Distributed systems
+
+**Question:**
+
+How do two-phase commit, consensus, and sagas differ when work spans shards or services?
+
+**Answer:**
+
+Consensus orders one shard's log. It does not commit two shards together. Two-phase commit prepares each participant, then commits or aborts. If the coordinator dies after prepare, participants can hold locks until its decision is recovered. Distributed SQL uses a form of this and replicates that decision.
+
+A saga is local transactions plus compensations, such as releasing a seat when a charge fails. Use it when steps can be undone. Use one real transaction when two balances must not diverge and you cannot make the user whole later.
+
+**Follow-up:**
+
+Checkout must charge a card and decrement inventory. What should you refuse to call one atomic commit?
+
+Answer: Reserve the seat, charge the card with an idempotency key, then confirm the reservation, and release the seat if the charge fails. Do not hold a prepared database transaction open while the card network responds. Your database and the bank do not share a commit, and these steps can still make the shopper's outcome correct.
+
+### DB-399 — Vector search next to the source of truth
+
+**Difficulty:** Intermediate
+
+**Category:** Architecture
+
+**Question:**
+
+Where should embeddings live relative to Postgres or MongoDB, and when is a separate vector database justified?
+
+**Answer:**
+
+An embedding is a numeric vector for similarity search. An approximate index finds close items without scanning every vector. The row or document stays the source of truth, and the vector is derived from its text, so a text change must be recomputed. A lagging index is stale search.
+
+`pgvector` keeps the vector on the Postgres row. Atlas Vector Search keeps it beside the document. A self-hosted MongoDB process does not gain that index just because BSON can hold floats. Use a dedicated vector database when search would swamp the primary, and keep it rebuildable from the source text.
+
+**Follow-up:**
+
+For a product that already uses Postgres, when do you leave `pgvector` for a dedicated engine?
+
+Answer: Start with `pgvector` when the vector is a column you filter with SQL and the table still fits your operational limits. Measure recall, because an approximate index can miss true neighbors. Move the index out when builds or query rate crowd the primary, keep the text in Postgres, and rebuild the vector store by primary key.
+
+### DB-400 — Choosing a store in a system-design interview
+
+**Difficulty:** Senior
+
+**Category:** Architecture
+
+**Question:**
+
+In a system design interview, how do you choose among Postgres, MongoDB, Cassandra, and a NewSQL system?
+
+**Answer:**
+
+Name the hot path first: the lookup key, the write, what must be atomic, and how fresh the read must be. Postgres is the default when invariants cross rows and one primary can take the writes. Mention JSONB when one attribute is flexible.
+
+Choose MongoDB for one aggregate whose indexes you can name, and state majority writes. Name a shard key before you shard. Choose Cassandra when every query is known, and say the consistency level. Choose NewSQL when SQL transactions must cross nodes. End with the fact that would change your mind.
+
+**Follow-up:**
+
+The interviewer says "just use Mongo" for checkout with assigned seats. How do you answer?
+
+Answer: Two buyers must not get the same seat, which is a uniqueness rule and a short transaction Postgres states directly. I would keep MongoDB for the event page if that content is a real aggregate. Forced onto MongoDB, I would use one document per seat with a conditional update, and I would name the constraints I am giving up.

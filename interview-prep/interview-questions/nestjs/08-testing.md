@@ -1,0 +1,1005 @@
+# NEST08 — Testing
+
+NestJS 10 with `@nestjs/testing` and supertest. Questions NEST-351–NEST-400.
+
+TestingModule and `Test.createTestingModule`, provider overrides, unit tests versus HTTP end-to-end tests, mocking repositories and Prisma, guards, pipes, interceptors, and filters, `init` and `close`, database strategy with a light Testcontainers path, Pact at a high level, flaky end-to-end tests, queues and cron, a short WebSocket end-to-end path, and coverage versus confidence.
+
+### NEST-351 — What a TestingModule is
+
+**Difficulty:** Junior
+
+**Category:** TestingModule
+
+**Question:**
+
+What is a TestingModule, and why do Nest tests build one?
+
+**Answer:**
+
+A TestingModule is a Nest dependency-injection container built for one test. You list the controllers and providers you need, Nest constructs them, and you either call a method or send HTTP through an application created from that module. It follows the same wiring rules as production, so a custom provider, a request scope, or an imported module still behaves the way it will in the app. Constructing the service with `new` skips that metadata. The test can then pass while the real module is wired wrong.
+
+**Follow-up:**
+
+Why is `compile()` asynchronous?
+
+Answer: Dynamic modules and async factories may return promises, and `compile()` waits until they finish. If you forget to await it, you still hold a promise, so `get` is missing and the test throws before any assertion.
+
+### NEST-352 — How you create one in NestJS 10
+
+**Difficulty:** Junior
+
+**Category:** TestingModule
+
+**Question:**
+
+How do you create a testing module in NestJS 10?
+
+**Answer:**
+
+Call `Test.createTestingModule()` from `@nestjs/testing`. The argument has the same shape as `@Module()`: imports, controllers, providers, and exports. That call returns a builder, not the module itself. Chain any overrides on the builder, then await `compile()`. `compile()` returns the TestingModule, which is the handle for `get`, `resolve`, `init`, `close`, and `createNestApplication`. People sometimes say “TestingModule.createTestingModule” for this flow. The static method lives on `Test`, and the TestingModule exists only after `compile()` resolves.
+
+**Follow-up:**
+
+What happens if a constructor dependency is missing from that metadata?
+
+Answer: `compile()` fails and names the missing provider, including which constructor parameter it could not fill. Add the provider, import the module that exports it, or supply a stand-in with `overrideProvider` or `useMocker` before compiling again.
+
+### NEST-353 — Unit tests and end-to-end tests
+
+**Difficulty:** Junior
+
+**Category:** Test strategy
+
+**Question:**
+
+How should you split unit tests and end-to-end tests in a NestJS app?
+
+**Answer:**
+
+A unit test compiles a small module and calls a provider, guard, or pipe in process. An end-to-end test creates a Nest application and sends a real HTTP request. Use the unit layer for business rules, query arguments, and branchy decisions. Use the HTTP layer for routing, status codes, validation, and auth on the wire. Keep the unit suite large and the HTTP suite small. A direct call such as `controller.create(dto)` never runs pipes, guards, or interceptors. Booting all of `AppModule` for every case is slow and easy to make flaky.
+
+**Follow-up:**
+
+Where do the files usually live?
+
+Answer: Put `cats.service.spec.ts` next to the service so the default Jest config under `src` picks it up. Put HTTP specs in `test/` with a second Jest config, a longer timeout, and a script such as `test:e2e`.
+
+### NEST-354 — What a provider unit test runs
+
+**Difficulty:** Junior
+
+**Category:** Test strategy
+
+**Question:**
+
+What code actually runs when you unit test a Nest service?
+
+**Answer:**
+
+Nest constructs the service and the providers you registered, then your test calls a method on the instance from `moduleRef.get`. That method runs your real TypeScript. Decorators that belong to HTTP stay idle, so `@Get`, `@UseGuards`, `@UseInterceptors`, and `ValidationPipe` do nothing during a direct call. Constructor injection does run, and a missing dependency fails at `compile()`. This is the right place to assert a calculated total, a thrown domain error, or the exact argument passed to a repository.
+
+**Follow-up:**
+
+Why can that test pass while the route still returns 500?
+
+Answer: The service test never entered the HTTP path. A missing guard, a pipe that rejects the body, or a controller that reads the wrong property can still break the route. Add one HTTP test for the status and the body the client sees.
+
+### NEST-355 — What an HTTP test runs
+
+**Difficulty:** Junior
+
+**Category:** Test strategy
+
+**Question:**
+
+What does a Nest end-to-end test exercise that a service test skips?
+
+**Answer:**
+
+An end-to-end test boots an application and sends HTTP to `app.getHttpServer()`. Nest then runs the adapter, middleware, the global prefix, versioning, guards, pipes, interceptors, the controller, and exception filters. The client sees a status code and a JSON body, which is the contract another app depends on. Serialization such as `ClassSerializerInterceptor` and `@Exclude()` shows up here. A service test can return an entity that the wire format will later strip or rename.
+
+**Follow-up:**
+
+How many HTTP cases do you want per route?
+
+Answer: Cover the outcomes a caller can see: success, a validation failure, and an authorization failure when the route is protected. Keep field-by-field domain branches in the service spec so the HTTP file stays short.
+
+### NEST-356 — overrideProvider
+
+**Difficulty:** Intermediate
+
+**Category:** Overrides
+
+**Question:**
+
+What does `overrideProvider` do, and when do you call it?
+
+**Answer:**
+
+`overrideProvider(token)` replaces one provider in the test graph before Nest constructs anything. You call it on the builder, then `useValue`, `useClass`, or `useFactory`, then `compile()`. The token is the class, string, or symbol the production module provides. A typical case is to import the real feature module and replace only `PrismaService`, a repository, or `HttpService`. The service under test still runs its real methods. The override has to happen before `compile()`. After that, the instances already exist.
+
+**Follow-up:**
+
+Why can an override appear to do nothing?
+
+Answer: The token has to be the same one the constructor injects. Overriding a class does nothing when the code injects a string token, or when a method calls `new PrismaClient()` itself and never asks Nest for it.
+
+### NEST-357 — useValue, useClass, and useFactory
+
+**Difficulty:** Intermediate
+
+**Category:** Overrides
+
+**Question:**
+
+When do you pick `useValue`, `useClass`, or `useFactory` on an override?
+
+**Answer:**
+
+`useValue` hands Nest an object you already built, usually a set of `jest.fn()` methods. Choose it when you want to script return values and assert calls. `useClass` asks Nest to construct a stand-in and inject that class’s own dependencies. `useFactory` runs a function during compile and may be async, which fits a double you build from env or from another test value. All three replace the same token. For a repository, `useValue` is the usual choice because every scripted call stays visible in the test.
+
+**Follow-up:**
+
+How do you reset a `useValue` mock between tests?
+
+Answer: Keep the mock object in the file and call `jest.clearAllMocks()` in `beforeEach`. That drops call history and keeps a `mockResolvedValue` you set once. Use `mockReset` when one test replaced the implementation and the next test needs a clean function.
+
+### NEST-358 — Overriding guards, pipes, interceptors, and filters
+
+**Difficulty:** Intermediate
+
+**Category:** Overrides
+
+**Question:**
+
+How do you replace a guard, pipe, interceptor, or filter in a Nest test?
+
+**Answer:**
+
+The builder exposes `overrideGuard`, `overridePipe`, `overrideInterceptor`, and `overrideFilter`. Each one takes the class you passed to `@UseGuards`, `@UsePipes`, `@UseInterceptors`, or `@UseFilters`. A guard double is an object with `canActivate`. A pipe double is an object with `transform`. Nest uses these doubles when it builds the route for an HTTP test. Use them when the subject is the controller and the cross-cutting class already has its own spec. The class reference has to be the same one the decorator uses.
+
+**Follow-up:**
+
+Why is `AuthGuard('jwt')` awkward to override?
+
+Answer: Each call to `AuthGuard('jwt')` returns a new mixin class, so the test’s override and the controller’s decorator can point at different classes. Export one `const JwtAuthGuard = AuthGuard('jwt')`, use that in `@UseGuards`, and override that same class.
+
+### NEST-359 — overrideModule
+
+**Difficulty:** Intermediate
+
+**Category:** Overrides
+
+**Question:**
+
+When should you use `overrideModule`?
+
+**Answer:**
+
+`overrideModule(ModuleClass).useModule(replacement)` swaps an imported module before compile. Use it when the real module opens a connection as soon as it is imported, such as a database, cache, or queue module. The replacement has to export the tokens your feature injects, for example `PrismaService` or a repository. `overrideProvider` is enough when you already know that token and the module is otherwise quiet. `overrideModule` is the cleaner cut when `forRoot()` would open a socket during import.
+
+**Follow-up:**
+
+How do you keep a feature test from calling `TypeOrmModule.forRoot()`?
+
+Answer: Import the feature module and override `getRepositoryToken(User)` so `forRoot()` never runs. Use `overrideModule(TypeOrmModule)` when the HTTP test needs the real feature module and a quiet database binding that still exports the same tokens.
+
+### NEST-360 — useMocker
+
+**Difficulty:** Intermediate
+
+**Category:** Overrides
+
+**Question:**
+
+What is `useMocker` on the testing module builder?
+
+**Answer:**
+
+`useMocker(callback)` fills dependencies you left out of `providers`. Nest calls your function with each missing token, and you return a stand-in. That keeps a controller spec small when the constructor list grows and you only care about one collaborator. Return an explicit fake for the service you will assert on. For the rest, a shallow object of `jest.fn()` methods is enough. If the callback returns `undefined`, Nest still reports that token as unresolved and `compile()` fails.
+
+**Follow-up:**
+
+What is the risk of a deep automatic mock?
+
+Answer: A deep mock turns every property into a function, so a typo in a method name still returns something and the test stays green. Keep an explicit mock, and `expect` the real method name, for the collaborator whose behavior the test is about.
+
+### NEST-361 — Mocking a TypeORM repository
+
+**Difficulty:** Intermediate
+
+**Category:** Data access
+
+**Question:**
+
+How do you mock a TypeORM repository in a NestJS 10 unit test?
+
+**Answer:**
+
+Override the token from `getRepositoryToken(User)` in `@nestjs/typeorm`. That is what `TypeOrmModule.forFeature([User])` registers and what `@InjectRepository(User)` injects. Pass `useValue` with the methods the service calls, such as `find`, `findOne`, `save`, and `delete`, each scripted with `mockResolvedValue`. Compile the module, get the service, and call the use case. The test never opens a database. If the service starts calling a method you left off the mock, the test throws because that property is not a function.
+
+**Follow-up:**
+
+How do you mock a query builder chain?
+
+Answer: Return one builder whose `leftJoin`, `where`, and `orderBy` return that same builder, and whose `getMany` resolves the rows. `createQueryBuilder` returns that object. Expect `where` to have been called with the clause and parameters the rule requires.
+
+### NEST-362 — Mocking PrismaService
+
+**Difficulty:** Intermediate
+
+**Category:** Data access
+
+**Question:**
+
+How do you mock Prisma in a NestJS unit test?
+
+**Answer:**
+
+In production, `PrismaService` usually extends `PrismaClient` and is injected like any other provider. In the test, `overrideProvider(PrismaService)` with `useValue` and a plain object. Include the delegates the code touches, such as `user.findUnique` and `user.create`, plus `$connect` and `$disconnect` so lifecycle hooks can run. `mockResolvedValue` sets the row or `null`. The service still calls `this.prisma.user.findUnique({ where: { id } })`, and you assert that `where`. No SQL reaches an engine.
+
+**Follow-up:**
+
+How should `$disconnect` behave on that mock?
+
+Answer: Set `$disconnect` and `$connect` to async functions that resolve. `onModuleDestroy` often calls `$disconnect`, and `app.close()` runs that hook. A missing method throws during teardown and can hide the assertion you actually cared about.
+
+### NEST-363 — Mocking a custom repository class
+
+**Difficulty:** Intermediate
+
+**Category:** Data access
+
+**Question:**
+
+How do you mock a custom repository that is its own injectable class?
+
+**Answer:**
+
+Override the class token: `overrideProvider(UsersRepository)` with a `useValue` object whose methods are `jest.fn()`. Nest injects that object anywhere a constructor asks for `UsersRepository`. Import the real feature module so the service, its mapping, and its error handling stay real. The repository is the seam. Keep its public methods named after use cases, because those names become the mock surface. The usual miss is a module that provides a string token while the test overrides the class.
+
+**Follow-up:**
+
+Should the mock extend the real repository?
+
+Answer: An object of mock functions is enough, because Nest matches the token and does not check the prototype. Use `useClass` with a subclass only when production code branches on `instanceof` or must run a real base method.
+
+### NEST-364 — What to assert on a repository call
+
+**Difficulty:** Intermediate
+
+**Category:** Data access
+
+**Question:**
+
+What should you assert on a mocked repository call?
+
+**Answer:**
+
+Assert the argument that carries the business rule, and assert the value the service returns to its caller. If the rule is “load the user by email”, expect `findUnique` to receive that email in `where`. If the rule is “store a hash, never the raw password”, expect `data` to contain the hash. One `toHaveBeenCalledWith` plus the return value is usually the whole test. Asserting every neighbor call, including logs, couples the test to incidental details and makes a harmless refactor fail.
+
+**Follow-up:**
+
+How do you assert a call when the argument has extra fields?
+
+Answer: Pass `expect.objectContaining` with the fields that carry the rule, and `expect.any(String)` for generated ids. A bare `toHaveBeenCalled()` still passes when `where` is wrong, so the bug you care about stays green.
+
+### NEST-365 — Mocking Prisma `$transaction`
+
+**Difficulty:** Senior
+
+**Category:** Data access
+
+**Question:**
+
+How do you mock `prisma.$transaction` so service code that uses it still runs?
+
+**Answer:**
+
+Prisma has two forms, and the mock should follow the one the service uses. The callback form receives a function and a transaction client. Implement `$transaction` as an async function that calls that function with your mock client, the same object that holds `user.create` and the other delegates. The array form receives a list of promises, and `Promise.all` is a fair stand-in. A `jest.fn()` with no implementation returns `undefined`, so the next line that reads `result.id` throws for a reason that looks like a product bug.
+
+**Follow-up:**
+
+What does this mock leave untested?
+
+Answer: The callback runs immediately, so you learn nothing about rollbacks, isolation, or a timeout. A throw inside the callback still rejects, which is enough for your `catch`. Prove a real rollback with Postgres, not with this mock.
+
+### NEST-366 — Getting the instance with get
+
+**Difficulty:** Junior
+
+**Category:** TestingModule
+
+**Question:**
+
+How do you get the service under test out of a compiled module?
+
+**Answer:**
+
+After `await compile()`, call `moduleRef.get(CatsService)`. Nest returns the singleton it constructed, and you call methods on that object. `get` looks the token up in the testing container. A missing token throws an error that names the class. Pass the same class or custom token you registered. `get` is synchronous and is the normal path for a default singleton. Keep `moduleRef` in the test so `afterEach` or `afterAll` can close it when providers open resources.
+
+**Follow-up:**
+
+What does `strict: false` change?
+
+Answer: `strict: true` limits the lookup to one module boundary. The application context defaults `strict` to false, so `get` can see providers from imported modules in the compiled graph. If lookup still fails, import the module that exports the provider or register it directly.
+
+### NEST-367 — Request-scoped providers and resolve
+
+**Difficulty:** Senior
+
+**Category:** TestingModule
+
+**Question:**
+
+How do you test a request-scoped provider?
+
+**Answer:**
+
+`moduleRef.get()` will not hand you a request-scoped provider. Nest expects `await moduleRef.resolve(ReportService)`. Each `resolve()` without a context id builds a new context, so you get a new instance and new request-scoped dependencies. That matches production, where each HTTP request gets its own subgraph. Register the scope the same way you do in the app, with `@Injectable({ scope: Scope.REQUEST })`, so the test is about the real wiring and not a singleton copy you created only for the spec.
+
+**Follow-up:**
+
+How do you share one fake request between a scoped service and a scoped repository?
+
+Answer: Create a context id with `ContextIdFactory.create()`, register a request object with `registerRequestByContextId`, then `resolve` both tokens with that same id. They then share one request. A bare `resolve()` would build a second request and hide bugs that depend on shared request state.
+
+### NEST-368 — createNestApplication
+
+**Difficulty:** Intermediate
+
+**Category:** HTTP tests
+
+**Question:**
+
+How do you turn a TestingModule into an HTTP app?
+
+**Answer:**
+
+Call `moduleRef.createNestApplication()` to get an `INestApplication`, the same kind of object `main.ts` boots. Pass `{ logger: false }` when you want a quiet run. Apply the global prefix, versioning, pipes, and filters your real bootstrap applies, then `await app.init()`, and pass `app.getHttpServer()` to supertest. The default platform is Express. Pass a Fastify adapter when production uses Fastify, so the test hits the same adapter. The HTTP server is ready for in-process requests after `init()`.
+
+**Follow-up:**
+
+When would you call `createNestMicroservice` instead?
+
+Answer: Use it for a transporter such as TCP, Redis, or NATS and for `@MessagePattern` handlers. A `@Get` controller test needs `createNestApplication` and `getHttpServer()`. The microservice app does not expose that HTTP server.
+
+### NEST-369 — supertest
+
+**Difficulty:** Intermediate
+
+**Category:** HTTP tests
+
+**Question:**
+
+How does supertest talk to a Nest app?
+
+**Answer:**
+
+supertest is an HTTP client that can drive a Node server in process. After `await app.init()`, call `request(app.getHttpServer())` and chain the method, path, body, and headers. `.send()` sets the JSON body, `.set()` sets a header such as `Authorization`, and `.expect(201)` fails the test on any other status. You can also await the response and use Jest on `res.status` and `res.body`. The request goes through the routes, prefix, and pipes registered on that app. It does not open a real TCP port.
+
+**Follow-up:**
+
+How do you keep a cookie across two requests?
+
+Answer: Use `request.agent(app.getHttpServer())` so the agent stores cookies the way a browser jar does. Log in with that agent, then call the protected route with the same agent. A fresh `request()` on the second call sends no cookie.
+
+### NEST-370 — init and listen
+
+**Difficulty:** Intermediate
+
+**Category:** HTTP tests
+
+**Question:**
+
+When does an end-to-end test need `init()`, and when does it need `listen()`?
+
+**Answer:**
+
+`await app.init()` registers routes and runs application lifecycle hooks. supertest can then use `getHttpServer()` with no TCP port, which is what ordinary HTTP tests should do. `await app.listen(port)` also accepts real sockets. You need that when a real client must connect over the network, including a Socket.IO client. Pass `0` and read `app.getHttpServer().address().port` so the operating system picks a free port. Two files that both `listen(3000)` fail with `EADDRINUSE`.
+
+**Follow-up:**
+
+Does `init()` run `onModuleInit`?
+
+Answer: Yes. `app.init()` runs `onModuleInit` and `onApplicationBootstrap`, so a Prisma connect or cache warmup in those hooks runs here. A unit test that only `compile()`s and `get()`s a service does not run those hooks until something calls `init()`.
+
+### NEST-371 — Closing the application
+
+**Difficulty:** Intermediate
+
+**Category:** Lifecycle
+
+**Question:**
+
+Why does every Nest HTTP test need `await app.close()`?
+
+**Answer:**
+
+`app.close()` shuts the HTTP server and runs `onModuleDestroy` and `onApplicationShutdown`. That is where Prisma `$disconnect`, a queue `close()`, and a Redis `quit()` should live. Put `await app.close()` in `afterAll`, or in `finally`, so a failed assertion still cleans up. An open server keeps the event loop busy. Jest then reports open handles or waits until it force-exits the worker. Closing the app also shows that those shutdown hooks actually resolve.
+
+**Follow-up:**
+
+What do you do when `close()` itself hangs?
+
+Answer: A hook is waiting on a client that never connected, often Redis or a database pool. Make the test double resolve `close` and `$disconnect`, or point an integration test at a real test database and close that client. `--detectOpenHandles` names the leftover socket.
+
+### NEST-372 — TestingModule init and close
+
+**Difficulty:** Intermediate
+
+**Category:** Lifecycle
+
+**Question:**
+
+When should you call `init()` and `close()` on the TestingModule itself?
+
+**Answer:**
+
+The compiled module can boot without HTTP. `await moduleRef.init()` runs `onModuleInit` and `onApplicationBootstrap`. `await moduleRef.close()` runs the destroy and shutdown hooks. Use that pair when a provider test must connect a client or register a scheduler, and whenever the compiled module opens a resource. You can skip `init()` when the test only calls a pure method and the constructor opens nothing. Every `init()` needs a matching `close()`, or the same open-handle problem shows up without an HTTP server.
+
+**Follow-up:**
+
+What happens if you init the module and also init the Nest application?
+
+Answer: Both calls walk lifecycle hooks on the same container, so `onModuleInit` can run twice and open two connections or two intervals. HTTP tests should init and close the application. Non-HTTP tests should init and close the module.
+
+### NEST-373 — Testing onModuleInit
+
+**Difficulty:** Intermediate
+
+**Category:** Lifecycle
+
+**Question:**
+
+How do you test logic that lives in `onModuleInit`?
+
+**Answer:**
+
+Put the work in a method you can call, and leave `onModuleInit` as a one-line delegate. Unit test that method with mocks. When the hook itself must run, `await moduleRef.init()` and assert the side effect, such as a mock `$connect` or a named cron job in `SchedulerRegistry`. `onApplicationBootstrap` runs after every module’s `onModuleInit`, so work that depends on other modules being ready belongs there. `close()` then runs `onModuleDestroy`, which is where you assert teardown.
+
+**Follow-up:**
+
+Why can calling `service.onModuleInit()` yourself miss a bug?
+
+Answer: A direct call skips Nest’s hook order. Another provider may need to finish its own `onModuleInit` first, which `moduleRef.init()` guarantees. Use the direct call for branch logic, and boot the module when the risk is ordering or a missing export.
+
+### NEST-374 — Testing a guard in isolation
+
+**Difficulty:** Intermediate
+
+**Category:** Guards
+
+**Question:**
+
+How do you unit test a guard’s `canActivate`?
+
+**Answer:**
+
+Get the guard from a testing module, or construct it with its dependencies mocked. Build a small `ExecutionContext` that implements only what the guard calls. For HTTP, `switchToHttp().getRequest()` returns a request with the headers and `user` you care about. `getHandler()` and `getClass()` return the function and class a `Reflector` will read. Await `canActivate` and expect `true` or `false`. When the guard throws `UnauthorizedException`, expect that rejection. This test skips the router and locks the decision itself.
+
+**Follow-up:**
+
+How do you test `@Roles('admin')` metadata?
+
+Answer: Mock `Reflector.getAllAndOverride` to return `['admin']`, put `roles: ['admin']` on the user, and expect `true`. A second case uses a member role and expects `false`. A real `Reflector` plus `SetMetadata` on a dummy handler is the check that the metadata key string matches the decorator.
+
+### NEST-375 — Testing a guard through HTTP
+
+**Difficulty:** Intermediate
+
+**Category:** Guards
+
+**Question:**
+
+How do you prove a guard is actually attached to a route?
+
+**Answer:**
+
+Boot the controller with `createNestApplication`, leave the real guard in place, and send supertest requests. One request carries a valid `Authorization` header and expects 200. One omits it and expects 401. A pure `canActivate` unit test cannot see a missing `@UseGuards`. Mock the token verifier or `JwtService`, and let the guard’s allow and deny paths stay real. Override the guard with `canActivate: () => true` only in specs whose subject is something else, such as body validation.
+
+**Follow-up:**
+
+How do you simulate a logged-in user when the guard is overridden?
+
+Answer: In `canActivate`, read the `ExecutionContext`, set `request.user` to the id and roles the handler expects, and return `true`. A stub that only returns `true` leaves `req.user` empty, and the handler throws when it reads `req.user.email`.
+
+### NEST-376 — APP_GUARD in tests
+
+**Difficulty:** Senior
+
+**Category:** Guards
+
+**Question:**
+
+How do you handle a global guard registered with `APP_GUARD`?
+
+**Answer:**
+
+`APP_GUARD` is a multi-provider. Nest runs every guard registered under that token on every route. `overrideGuard` replaces a class bound with `@UseGuards`. A global guard registered as `{ provide: APP_GUARD, useClass: JwtAuthGuard }` is different. Adding another `APP_GUARD` in the test stacks a second guard beside the real one. `overrideProvider(APP_GUARD)` replaces that token for the compiled test. A clear structure is an `AuthModule` you import in production and replace with `overrideModule` when a spec needs an open door.
+
+**Follow-up:**
+
+Which specs should keep the real global guard?
+
+Answer: The auth spec should keep it and send real headers, including one request that must be rejected. A cats CRUD spec can replace `AuthModule` so requests reach the controller. Put one denied request in the auth file so the global registration cannot disappear unnoticed.
+
+### NEST-377 — Testing a pipe
+
+**Difficulty:** Intermediate
+
+**Category:** Pipes
+
+**Question:**
+
+How do you unit test a custom `PipeTransform`?
+
+**Answer:**
+
+Call `pipe.transform(value, metadata)` yourself. `metadata` is an `ArgumentMetadata`: `type` is body, query, param, or custom; `metatype` is the DTO class; `data` is the decorator argument, such as a param name. A parse pipe should return the coerced value for a good input and throw `BadRequestException` for a bad one. Construct the pipe with `new`, or get it from a testing module when it injects a service. Await the result either way. This test never opens a port.
+
+**Follow-up:**
+
+How do you test a pipe that needs the parameter name or the DTO type?
+
+Answer: `@Param('id', ParseUUIDPipe)` passes `data: 'id'`, so include that field when the pipe reads `metadata.data`. For `ValidationPipe`, set `metatype` to the DTO class. Without it, the pipe skips validation and a bad payload still looks valid.
+
+### NEST-378 — ValidationPipe in end-to-end tests
+
+**Difficulty:** Intermediate
+
+**Category:** Pipes
+
+**Question:**
+
+How do you test `ValidationPipe` on a route?
+
+**Answer:**
+
+Register `ValidationPipe` on the test application the same way production does, then POST an invalid body with supertest and expect 400. Send a valid body and expect the success status. The pipe uses `class-validator` on the DTO named in `@Body()`. A unit test that calls `controller.create` with a plain object never runs the pipe, so a missing `@IsEmail()` stays invisible there. Match `whitelist`, `forbidNonWhitelisted`, and `transform` to production, because those flags change which fields survive.
+
+**Follow-up:**
+
+Why would the app return 400 while the test accepts the same body?
+
+Answer: The test app never installed the pipe, or it installed a default pipe while production sets `transform: true`. `transform` turns JSON into a class instance so nested DTOs and `@Type` actually run. Share one setup function between `main.ts` and the test, and call it before `init()`.
+
+### NEST-379 — Testing an interceptor
+
+**Difficulty:** Intermediate
+
+**Category:** Interceptors
+
+**Question:**
+
+How do you unit test a `NestInterceptor`?
+
+**Answer:**
+
+Call `interceptor.intercept(context, next)`. `next.handle()` must return an RxJS observable, usually `of(responseBody)`. The interceptor may map, tap, or catch that stream. Convert the result with `lastValueFrom` from `rxjs` and assert the value. Build the execution context the same way you do for a guard when the interceptor reads the request. Timeouts and response mapping belong in this unit test. One HTTP test should still prove the interceptor is registered, by checking a header or the wrapped body.
+
+**Follow-up:**
+
+How do you test an interceptor that turns a downstream error into a fallback?
+
+Answer: Make `next.handle` return `throwError(() => new Error('downstream'))`, then `await lastValueFrom(...)` and expect the fallback. A second case emits `of({ id: 1 })` and expects that value to pass through. Asserting the observable object itself never runs the operators.
+
+### NEST-380 — Testing an exception filter
+
+**Difficulty:** Intermediate
+
+**Category:** Filters
+
+**Question:**
+
+How do you test an exception filter?
+
+**Answer:**
+
+Call `filter.catch(exception, host)` with the error your code throws and a mock `ArgumentsHost`. The host’s HTTP response is a double whose `status` returns itself and whose `json` is a `jest.fn()`. Expect `status` to be called with 404 or 400, and `json` to receive the public body. That locks the mapping from a domain error to HTTP. Also send one HTTP request that triggers the error, so you know the filter is bound with `@UseFilters` or `useGlobalFilters` and not only with a direct call.
+
+**Follow-up:**
+
+How do you keep stack traces out of the JSON?
+
+Answer: Expect the body to contain the status and the message the client is allowed to see, and expect `stack` to be absent. Log the raw error through a logger double. A snapshot of the whole object fails on a timestamp and can still hide a stack field you did not look at.
+
+### NEST-381 — Middleware in HTTP tests
+
+**Difficulty:** Intermediate
+
+**Category:** HTTP tests
+
+**Question:**
+
+How do you test Nest middleware?
+
+**Answer:**
+
+Middleware registered with `AppModule.configure` runs when the test imports that module and calls `app.init()`. Send a request with supertest and assert the effect: a correlation-id header, a rejected API key, or a rewritten path. For the function itself, call it with mock `req`, `res`, and `next`, and expect `next` to have been called. The direct call covers branches. The HTTP call proves `consumer.apply(...).forRoutes(...)` includes the route you care about.
+
+**Follow-up:**
+
+Why would middleware run in production and stay silent in the test?
+
+Answer: The test compiled a feature module and never imported the module that implements `configure`. Middleware applied with `app.use` only inside `main.ts` is also missing until the test calls the same setup. Import that module, or call the shared setup before `init()`.
+
+### NEST-382 — Globals that live only in main.ts
+
+**Difficulty:** Senior
+
+**Category:** HTTP tests
+
+**Question:**
+
+Why do global pipes and filters disappear in tests that boot `AppModule`?
+
+**Answer:**
+
+`NestFactory.create` returns an app, and the lines after it in `main.ts` call `useGlobalPipes`, `useGlobalFilters`, `setGlobalPrefix`, and `enableVersioning`. `Test.createTestingModule({ imports: [AppModule] })` compiles the module graph only. `createNestApplication()` does not replay `main.ts`. The test app has your controllers and lacks those globals, so requests skip validation or hit unprefixed paths. The suite then passes against a different application than production. Move those calls into one function both bootstraps invoke.
+
+**Follow-up:**
+
+How do you test the global prefix without copying it into every spec?
+
+Answer: Export `configureApp(app)` and call it from `main.ts` and from the e2e helper before `init()`. One spec requests `/api/cats` and expects 200, and requests `/cats` and expects 404, when the prefix is `api`. A new global filter then has a single place to live.
+
+### NEST-383 — A shared test application helper
+
+**Difficulty:** Intermediate
+
+**Category:** HTTP tests
+
+**Question:**
+
+What belongs in a shared end-to-end bootstrap helper?
+
+**Answer:**
+
+The helper should compile the testing module, call `configureApp`, `init()` the app, and return it, along with a `close` that awaits `app.close()`. Let each file pass its overrides in, for example a function that calls `overrideProvider(PrismaService)` before `compile()`. The helper applies those overrides and keeps logging quiet with `{ logger: false }`. Assertions stay in the spec. One helper is what stops every file from forgetting the prefix or `close()`. It should not hide which module the spec actually imported.
+
+**Follow-up:**
+
+How do you stop the helper from always importing `AppModule`?
+
+Answer: Accept a module argument so a cats spec can import `CatsModule` plus a test database module. Reserve full `AppModule` for a smoke test of `/health`. A helper that always imports the whole app pulls queues, cron, and every integration into every file.
+
+### NEST-384 — Database strategies for tests
+
+**Difficulty:** Intermediate
+
+**Category:** Databases
+
+**Question:**
+
+Which database strategy should a Nest suite use?
+
+**Answer:**
+
+Use three layers. Unit tests override `PrismaService` or the repository and never open a database. A small integration set runs real SQL against Postgres so queries, constraints, and migrations stay honest. A thin HTTP set boots Nest on top of that database, or on top of the same mocks, depending on the risk. SQLite in memory only fits a schema that stays inside SQLite’s features. Prisma schemas that use Postgres enums, arrays, or database types should run on Postgres. Mocks prove branching. Postgres proves the query.
+
+**Follow-up:**
+
+Why is a shared developer database a shaky default for CI?
+
+Answer: Parallel Jest workers and parallel pull requests write the same tables and see each other’s rows, so a test that expects one user can find two. CI should migrate an empty schema and isolate each test. A local Docker database is fine when one worker truncates between tests.
+
+### NEST-385 — Testcontainers for Postgres
+
+**Difficulty:** Senior
+
+**Category:** Databases
+
+**Question:**
+
+How do you use Testcontainers for Nest database tests without slowing every spec?
+
+**Answer:**
+
+Start one Postgres container in `beforeAll` for that file, or once in Jest global setup for the suite. `@testcontainers/postgresql` can start `postgres:16-alpine` and give you a connection URI. Set `DATABASE_URL`, run `prisma migrate deploy`, then boot Nest against that URL. Stop the container in `afterAll` or global teardown. A new container per test costs many seconds and adds flakes. One container per file is the usual balance. Unit tests stay on mocks and do not need Docker. This file is the SQL proof, so keep the file count small.
+
+**Follow-up:**
+
+What does CI need for this to stay stable?
+
+Answer: The runner needs a Docker socket so Testcontainers can start the image, and the image should be cached so the pull happens once. Raise that file’s Jest timeout to about a minute for the first boot. If Docker is missing, skip the file with a clear message and still run the mocked unit suite.
+
+### NEST-386 — Isolating rows between tests
+
+**Difficulty:** Intermediate
+
+**Category:** Databases
+
+**Question:**
+
+How do you keep database tests from depending on each other?
+
+**Answer:**
+
+Each test should see only the rows it inserts. Truncate the touched tables in `beforeEach`, and leave the migrations table intact. `TRUNCATE ... RESTART IDENTITY CASCADE` is the straightforward Prisma approach. Insert through Prisma or through the HTTP API inside the test so the arrange step is visible. When truncation is incomplete, generate unique emails with `randomUUID()`. A fixed address such as `a@b.co` collides as soon as two tests insert it. Order-dependent tests are the usual result of a shared leftover row.
+
+**Follow-up:**
+
+Why is wrapping each test in a rollback awkward with Prisma and Nest?
+
+Answer: A transaction you open in the test and the `PrismaClient` inside the app are different connections, so the app’s writes are not inside your `BEGIN`. Truncate uses the same client the app uses. A rollback harness pays off only after every query shares that one transaction client.
+
+### NEST-387 — Why end-to-end tests flake
+
+**Difficulty:** Senior
+
+**Category:** Reliability
+
+**Question:**
+
+What usually makes a Nest end-to-end suite flake?
+
+**Answer:**
+
+The usual causes are shared rows, a fixed port, a real timer, test order, and an app that was never closed. Jest runs files in parallel workers, so two apps that listen on port 3000, or share one schema, collide. A `setTimeout` in product code or in the test expires a moment late under load. A test that expects an empty table fails after a sibling inserted a row. Retrying the test hides the race and leaves it for a later run. Fix the shared resource, and close every app in `afterAll`.
+
+**Follow-up:**
+
+How should time-based product code be tested?
+
+Answer: Inject a clock whose `now()` returns a `Date` the test chooses, and compare against that. `jest.useFakeTimers()` can also stall supertest and database drivers that wait on real timers. Use fake timers only around a pure function, then switch back before HTTP or Prisma work.
+
+### NEST-388 — Ports and Jest workers
+
+**Difficulty:** Intermediate
+
+**Category:** Reliability
+
+**Question:**
+
+How do you keep parallel Jest workers from breaking Nest end-to-end tests?
+
+**Answer:**
+
+HTTP tests that only use supertest should `init()` and skip `listen()`, so they need no port. Tests that must listen should use port `0` and read the assigned port. Database end-to-end tests should use one Jest worker, with `maxWorkers: 1` or `--runInBand`, when every file shares one schema. To run in parallel, give each worker its own database name from `JEST_WORKER_ID`. Close the app in `afterAll` of every file. Parallelism is safe when workers share nothing they can mutate.
+
+**Follow-up:**
+
+What does a leaked app look like in Jest’s output?
+
+Answer: Jest says a worker failed to exit gracefully, or the run hangs until the timeout. `--detectOpenHandles` points at a timer, socket, or TCP server. Typical owners are an HTTP server, a Prisma pool, a Bull connection, and a cron job that is still scheduled.
+
+### NEST-389 — Contract tests at a high level
+
+**Difficulty:** Senior
+
+**Category:** Contracts
+
+**Question:**
+
+Where does Pact-style contract testing sit next to Nest unit and end-to-end tests?
+
+**Answer:**
+
+A contract test checks that two services agree on a request and a response. With Pact, the consumer test runs your Nest HTTP client against a mock server and writes a pact file. Provider verification replays that file against a running Nest API. Unit tests still cover rules inside one process. End-to-end tests still cover one app’s stack and database. The contract fails when a field or status changes in a way the other team cannot parse. It stays quiet about SQL and about rules that never cross the wire.
+
+**Follow-up:**
+
+When is a contract test worth adding?
+
+Answer: Add one when another team deploys on its own cadence and calls your API, or when your Nest app calls theirs. A single team that owns the controller and the only client can rely on an end-to-end test and a typed client. Start with one interaction: method, path, a required header, and the body.
+
+### NEST-390 — Consumer and provider roles
+
+**Difficulty:** Senior
+
+**Category:** Contracts
+
+**Question:**
+
+What is the difference between a Pact consumer test and provider verification?
+
+**Answer:**
+
+The consumer test describes the HTTP call the client needs. It fails if the Nest client sends something else or cannot read the mock response. That client is often a service around `HttpService` from `@nestjs/axios`. Provider verification starts your API and checks that real responses match the published interactions. A provider state is a named setup, such as “user 7 exists”, that seeds the row the interaction expects. The consumer owns the expectation. The provider proves it can meet that expectation.
+
+**Follow-up:**
+
+What is a provider state in practice?
+
+Answer: The pact names a state string, and verification tells your app to enter that state before the request, usually by inserting a row through Prisma. Clean the row afterward. A check that assumes a user created by hand fails on a fresh CI database.
+
+### NEST-391 — What contracts leave to other tests
+
+**Difficulty:** Intermediate
+
+**Category:** Contracts
+
+**Question:**
+
+Which bugs should stay in unit or end-to-end tests even if you have Pact?
+
+**Answer:**
+
+Authorization rules, database constraints, transactions, cron, and queue side effects stay in unit and integration tests. A contract checks the agreed HTTP shape: path, method, status, and body fields. A 200 body can match the pact while the handler wrote the wrong balance, as long as the types line up. Keep one end-to-end path that uses the database for the critical write, and keep service tests for branches. The pact guards the boundary between teams. It does not replace the test that locks the `where` clause.
+
+**Follow-up:**
+
+How do you avoid asserting the same case in three layers?
+
+Answer: Give each layer a different fact: the unit test expects the repository `where`, the HTTP test expects the status and a row count, and the contract expects the JSON keys the partner parses. Drop a test that only repeats another file.
+
+### NEST-392 — Testing a cron job
+
+**Difficulty:** Intermediate
+
+**Category:** Scheduling
+
+**Question:**
+
+How do you test a method decorated with `@Cron()`?
+
+**Answer:**
+
+Move the work into a service method and unit test that method with mocked dependencies. The `@Cron()` method stays a thin wrapper. To prove the schedule is registered, import `ScheduleModule.forRoot()`, init the module, and `get(SchedulerRegistry)`. `getCronJob('nightly-report')` returns the job when the decorator sets that name. `CronExpression` only describes the pattern. `job.fireOnTick()` runs the wrapper once if you need that link, and `job.stop()` keeps the timer from holding Jest open. Most specs should call the service method and never wait for midnight.
+
+**Follow-up:**
+
+What should you watch for with `fireOnTick()`?
+
+Answer: It invokes the callback and does not await an async handler, so a rejection can surface later as an unhandled promise. Have the handler signal completion and await that signal. Prefer calling the service method directly unless the spec is about the decorator pointing at that method.
+
+### NEST-393 — Keeping schedulers quiet
+
+**Difficulty:** Intermediate
+
+**Category:** Scheduling
+
+**Question:**
+
+How do you stop cron jobs from firing during unrelated tests?
+
+**Answer:**
+
+Leave `ScheduleModule` out of unit tests that do not care about time. In end-to-end tests, import a module that does not register the jobs, or stop them after `init()`. `getCronJobs()` returns the map. Call `stop()` on each job. Intervals from `@Interval()` live on the same registry and need the same cleanup, or they keep a timer in the event loop. A job that fires because the clock crossed its pattern will write rows and make the next assertion fail. Stopping the jobs also lets Jest exit.
+
+**Follow-up:**
+
+How do you test `@Interval()` without waiting one second?
+
+Answer: Extract the body to a method and call it from the unit test, since the decorator only registers the timer. If you need to prove registration, look the interval up by name after `init()` and then delete it. Waiting for a real tick makes the file slow and sensitive to load.
+
+### NEST-394 — Testing a queue producer
+
+**Difficulty:** Intermediate
+
+**Category:** Queues
+
+**Question:**
+
+How do you test a service that enqueues a Bull or BullMQ job?
+
+**Answer:**
+
+Override the queue and assert `add`. For both `@nestjs/bull` and `@nestjs/bullmq`, `getQueueToken('email')` is the token behind `@InjectQueue('email')`. `useValue` can be an object whose `add` resolves `{ id: 'job-1' }`. Call the service and expect `add` to have been called with the job name and payload, for example a welcome job and a user id. Include options such as `attempts` or `delay` when those are part of the rule. The test never connects to Redis. A real Redis belongs in a separate integration test.
+
+**Follow-up:**
+
+How do you test a failure to enqueue?
+
+Answer: Make `add` reject with a connection error and expect the service to throw the exception your API promises, or to return the failed result it documents. That locks the handling around `queue.add`. The happy path stays on a resolved mock, and the rejection needs no Redis.
+
+### NEST-395 — Testing a queue processor
+
+**Difficulty:** Intermediate
+
+**Category:** Queues
+
+**Question:**
+
+How do you test a Bull or BullMQ processor?
+
+**Answer:**
+
+Get the processor from the testing module and call it with a fake job. For BullMQ, that is `process(job)` on a `WorkerHost`. For the older Bull package, it is the method marked `@Process('welcome')`. Pass a job with `data` and an id. Mock the mailer or repository the processor injects, and expect the side effect, such as `mailer.send` receiving that user. Make the mock throw and expect the handler to reject, so the queue can retry. This unit test does not need a worker connection.
+
+**Follow-up:**
+
+What belongs in one real Redis integration test?
+
+Answer: Enqueue a job and wait until the processor finishes, against a Redis Testcontainer or a local Redis, which proves the queue name, the registration, and that the payload survives serialization. Assert the row or the mailer double after it completes, with a timeout of a few seconds. Keep branch coverage in the unit test.
+
+### NEST-396 — Testing a gateway without a socket
+
+**Difficulty:** Intermediate
+
+**Category:** WebSockets
+
+**Question:**
+
+How do you unit test a Nest WebSocket gateway?
+
+**Answer:**
+
+Get the gateway and call the handler. A `@SubscribeMessage('ping')` method that returns `{ event: 'pong', data: 'ok' }` can be asserted directly. Parameter decorators such as `@MessageBody()` and `@ConnectedSocket()` run in the socket pipeline, so pass those arguments yourself in a unit test. When the handler broadcasts, pass a fake client with `emit` and `join` as `jest.fn()` and expect those calls. This covers branching. It does not prove the namespace, CORS, or that the adapter is mounted.
+
+**Follow-up:**
+
+How do you test auth inside `handleConnection`?
+
+Answer: Call `handleConnection` with a socket whose handshake has no token, and expect `disconnect` to have been called. A second case supplies a token your `JwtService` mock accepts and expects the client to stay connected or to join a room. Test a `WsGuard` separately with `switchToWs().getClient()`.
+
+### NEST-397 — A short Socket.IO end-to-end test
+
+**Difficulty:** Intermediate
+
+**Category:** WebSockets
+
+**Question:**
+
+How do you run a brief Socket.IO end-to-end test against a Nest gateway?
+
+**Answer:**
+
+Create the app from the gateway’s module, apply `configureApp` if you use it, and `await app.listen(0)`. Read the port from `getHttpServer().address().port`. Connect with `socket.io-client` to `http://127.0.0.1` on that port, using the websocket transport. Wait for `connect`, emit the message, and wait for the acknowledgement or the pushed event. Then close the client and `await app.close()`. One round trip proves the adapter, the namespace, and the handler. Keep payload branches on the gateway method’s unit test.
+
+**Follow-up:**
+
+Why is `app.init()` not enough for this client?
+
+Answer: A Socket.IO client opens a real network connection, and `init()` does not bind a port you can dial. `listen(0)` binds an ephemeral port and starts the upgrade path. Close the client before `app.close()` so the socket is not the open handle Jest reports.
+
+### NEST-398 — Coverage and confidence
+
+**Difficulty:** Senior
+
+**Category:** Coverage
+
+**Question:**
+
+What does a high coverage percentage tell you about a Nest app?
+
+**Answer:**
+
+Coverage counts lines or branches that ran while the suite executed. It does not say whether an assertion matches the business rule. A test with no `expect` still paints lines as covered. A mocked Prisma test can execute a method and never run SQL. Use the report as a map of files nobody executed, and build confidence with assertions that fail when the behavior changes. Leave `main.ts`, modules that only list imports, and the generated Prisma client out of `collectCoverageFrom`. Spend that attention on guards, money math, and write paths.
+
+**Follow-up:**
+
+What coverage target is reasonable?
+
+Answer: Hold services, guards, pipes, and pure mappers to a high bar, because they are cheap to test and full of decisions. Hold controllers lower when a few HTTP tests lock status codes and the rest lives in services. A global 100 percent target pushes people to test import lists and to write assertions that only restate a mock.
+
+### NEST-399 — Assertions that fail for the right reason
+
+**Difficulty:** Intermediate
+
+**Category:** Coverage
+
+**Question:**
+
+What should a Nest test assert so a real regression fails the suite?
+
+**Answer:**
+
+Assert the outcome a caller can observe. For a service, that is the return value or the thrown error, plus the repository argument that encodes the rule. For HTTP, that is the status and the few body fields the client uses. For a guard, that is `true`, `false`, or the exception type. `toMatchObject` on `{ id: 'u1' }` states the contract without freezing every extra field. Put the negative case beside it: an unknown id returns 404, and a member role returns 403. A snapshot of a full error object mostly tracks timestamps.
+
+**Follow-up:**
+
+How do you tell a useful test from one that only touches mocks?
+
+Answer: Imagine changing the production rule and ask whether this test fails. `toHaveBeenCalled()` stays green when `where` is wrong, while an expectation on `where: { orgId }` fails for a cross-tenant bug. Delete a test that stays green for every behavior change you are afraid of.
+
+### NEST-400 — A practical Nest test portfolio
+
+**Difficulty:** Senior
+
+**Category:** Test strategy
+
+**Question:**
+
+How would you describe the test portfolio for a NestJS 10 service?
+
+**Answer:**
+
+Most tests are unit tests of services, guards, pipes, interceptors, and processors. They use `Test.createTestingModule`, override Prisma or a repository, and call the subject directly. Close the module when a hook opens a resource. HTTP tests use `createNestApplication`, a shared `configureApp`, and supertest. One Postgres file, with migrations and truncation on a single worker, proves the SQL. Cron and queues are tested by calling the handler. The gateway gets a unit test and one Socket.IO round trip. Add Pact when another team consumes the API. Treat coverage as a map of what ran, and trust the assertions.
+
+**Follow-up:**
+
+What do you leave real, and what do you replace?
+
+Answer: Leave the class under test real. Keep the real guard when the spec is about authorization, the real `ValidationPipe` when the spec is about the DTO, and real SQL when the spec is about a constraint or a migration. Replace the edges those units call: Prisma delegates, `HttpService`, `queue.add`, the mailer, and the clock.
